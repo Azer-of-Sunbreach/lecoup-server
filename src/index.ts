@@ -13,6 +13,14 @@ import {
 } from './types';
 import { LobbyManager } from './lobbyManager';
 import { GameRoomManager } from './gameRoom';
+import {
+    createMultiplayerGameState,
+    processPlayerAction,
+    advanceTurn,
+    processAITurn,
+    getClientState,
+    MultiplayerGameState
+} from './gameLogic';
 
 const PORT = process.env.PORT || 3001;
 
@@ -145,23 +153,32 @@ io.on('connection', (socket) => {
         // Notify all players that game is starting
         io.to(lobby.code).emit('game_starting', { lobby: startResult.lobby! });
 
-        // Create the game room with initial state
-        // Note: In production, we would import the actual game creation logic
-        // For now, we send a signal that clients should create the game state
-        const room = gameRoomManager.createRoom(startResult.lobby!, {
-            turn: 1,
-            // Initial state will be set by the first state sync from host
-        });
+        // Determine human and AI factions
+        const humanFactions: FactionId[] = startResult.lobby!.players
+            .map(p => p.faction)
+            .filter((f): f is FactionId => f !== null);
+
+        let aiFaction: FactionId | null = null;
+        if (startResult.lobby!.maxPlayers === 2) {
+            const allFactions = [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
+            aiFaction = allFactions.find(f => !humanFactions.includes(f as FactionId)) as FactionId || null;
+        }
+
+        // Create REAL server-side game state using shared logic
+        const serverGameState = createMultiplayerGameState(humanFactions, aiFaction);
+
+        // Create game room with the proper state
+        const room = gameRoomManager.createRoom(startResult.lobby!, serverGameState);
 
         lobbyManager.setGameInProgress(lobby.code);
 
-        // Notify all players that game has started
+        // Notify all players that game has started with the full state
         io.to(lobby.code).emit('game_started', {
-            gameState: room.gameState,
+            gameState: getClientState(serverGameState),
             turnOrder: room.turnOrder
         });
 
-        console.log(`[Game] Started: ${lobby.code}`);
+        console.log(`[Game] Started: ${lobby.code} with factions: humans=${humanFactions}, AI=${aiFaction}`);
     });
 
     // ==================
@@ -175,23 +192,38 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Verify it's the player's turn
-        if (!gameRoomManager.isPlayerTurn(code, socket.id)) {
-            socket.emit('action_result', { success: false, error: 'Not your turn' });
+        const room = gameRoomManager.getRoom(code);
+        if (!room) {
+            socket.emit('error', { message: 'Game room not found' });
             return;
         }
 
-        // For now, we trust the client to process the action
-        // In production, we would validate and process server-side
-        console.log(`[Game] ${code}: Action from ${socket.id} - ${action.type}`);
+        // Get player's faction
+        const playerFaction = room.playerFactions.get(socket.id);
+        if (!playerFaction) {
+            socket.emit('action_result', { success: false, error: 'Player faction not found' });
+            return;
+        }
 
-        // Broadcast that an action was taken (for real-time visibility)
-        socket.to(code).emit('action_result', {
-            success: true,
-            gameState: null // State will be synced separately
-        });
+        // Process action on server using shared game logic
+        console.log(`[Game] ${code}: Processing ${action.type} from ${playerFaction}`);
+        const sharedAction = { ...action, faction: playerFaction }; // Add faction for shared type
+        const result = processPlayerAction(room.gameState, sharedAction as any, playerFaction);
+
+        if (!result.success) {
+            socket.emit('action_result', { success: false, error: result.error });
+            return;
+        }
+
+        // Update server state
+        room.gameState = result.newState;
+
+        // Broadcast updated state to ALL players
+        const clientState = getClientState(result.newState);
+        io.to(code).emit('state_update', { gameState: clientState });
 
         socket.emit('action_result', { success: true });
+        console.log(`[Game] ${code}: Action ${action.type} processed successfully`);
     });
 
     socket.on('end_turn', () => {
