@@ -290,8 +290,8 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start server
-httpServer.listen(PORT, () => {
+// Start server - bind to 0.0.0.0 for Render compatibility
+httpServer.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`CORS enabled for: ${process.env.CLIENT_URL || "http://localhost:5173"}`);
     console.log('');
