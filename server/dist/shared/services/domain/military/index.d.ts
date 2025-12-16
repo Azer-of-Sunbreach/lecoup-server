@@ -9,3 +9,4 @@ export { executeFortify } from './fortification';
 export type { FortifyResult } from './fortification';
 export { executeMergeRegiments } from './mergeRegiments';
 export type { MergeResult } from './mergeRegiments';
+export { executeGarrison } from './garrison';

@@ -6,7 +6,7 @@ exports.processTurn = void 0;
 const types_1 = require("../types");
 const economy_1 = require("../utils/economy");
 // AI functions stubbed for server-side - AI runs on client in multiplayer
-const processAITurn = (state) => state;
+const gameAI_1 = require("./gameAI");
 const generateTurnNarrative = async (_turn, _events, _faction) => "The war continues...";
 const combatDetection_1 = require("./combatDetection");
 // Import from turnLogic (already existed)
@@ -35,7 +35,7 @@ const processTurn = async (initialState) => {
     // --- PHASE 1: AI PLANNING & EXECUTION ---
     // Reset justMoved BEFORE AI turn, so previous-turn armies can be moved by AI
     state.armies = state.armies.map(a => ({ ...a, justMoved: false }));
-    state = processAITurn(state);
+    state = (0, gameAI_1.processAITurn)(state);
     // --- PHASE 2: TURN ADVANCEMENT & RESET ---
     state.turn += 1;
     state.locations = state.locations.map(l => ({
