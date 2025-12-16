@@ -35,6 +35,7 @@ import { detectBattles } from '../../shared/services/combatDetection';
 import { processTurn } from '../../shared/services/turnProcessor';
 import { calculateEconomyAndFood } from '../../shared/utils/economy';
 import { extractCoreState } from '../../shared/utils/stateUtils';
+import { processAITurn } from './ai';
 
 export interface MultiplayerGameState extends GameState {
     humanFactions: FactionId[];
@@ -314,31 +315,8 @@ export async function advanceTurn(
     return { newState: updatedState, nextFaction, isAITurn };
 }
 
-/**
- * Process AI turn
- */
-export async function processAITurn(
-    state: MultiplayerGameState
-): Promise<MultiplayerGameState> {
-    if (!state.aiFaction || state.currentTurnFaction !== state.aiFaction) {
-        return state;
-    }
-
-    // AI processing is handled by processTurn
-    const processed = await processTurn({
-        ...state,
-        playerFaction: state.aiFaction
-    });
-
-    return {
-        ...processed as MultiplayerGameState,
-        humanFactions: state.humanFactions,
-        aiFaction: state.aiFaction,
-        turnOrder: state.turnOrder,
-        currentTurnIndex: state.currentTurnIndex,
-        currentTurnFaction: state.currentTurnFaction
-    };
-}
+// Re-export processAITurn from ./ai
+export { processAITurn } from './ai';
 
 /**
  * Extract state for client (removes server-only fields)
