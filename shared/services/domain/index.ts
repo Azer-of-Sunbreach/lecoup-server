@@ -13,3 +13,6 @@ export * from './economy';
 
 // Retreat services
 export * from './retreat';
+
+// Logistics services
+export * from './convoys';

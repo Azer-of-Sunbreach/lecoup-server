@@ -4,7 +4,7 @@
 import { GameState, FactionId, FACTION_NAMES } from '../types';
 import { calculateEconomyAndFood } from '../utils/economy';
 // AI functions stubbed for server-side - AI runs on client in multiplayer
-const processAITurn = (state: GameState): GameState => state;
+import { processAITurn } from './gameAI';
 const generateTurnNarrative = async (_turn: number, _events: string[], _faction: FactionId): Promise<string> => "The war continues...";
 import { detectBattles } from './combatDetection';
 
