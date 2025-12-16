@@ -187,8 +187,11 @@ io.on('connection', (socket) => {
     // ==================
 
     socket.on('player_action', ({ action }) => {
+        console.log(`[Game] Received player_action from socket ${socket.id}:`, action?.type);
         const code = socket.data.gameCode;
+        console.log(`[Game] Socket gameCode: ${code}`);
         if (!code) {
+            console.log(`[Game] ERROR: No gameCode for socket ${socket.id}`);
             socket.emit('error', { message: 'Not in a game' });
             return;
         }
