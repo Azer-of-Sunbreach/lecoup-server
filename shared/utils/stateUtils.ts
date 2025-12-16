@@ -14,13 +14,19 @@ import {
  * Used when sending state over network
  */
 export const extractCoreState = (state: GameState, gameId: string = 'solo'): CoreGameState => {
+    // Use currentTurnFaction if it exists (multiplayer), otherwise playerFaction (solo)
+    const currentFaction = (state as any).currentTurnFaction || state.playerFaction;
+    const humanFactions = (state as any).humanFactions || [state.playerFaction];
+    const aiFactionValue = (state as any).aiFaction !== undefined ? (state as any).aiFaction : null;
+    const turnOrderValue = (state as any).turnOrder || [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
+
     return {
         gameId,
         turn: state.turn,
-        currentPlayerFaction: state.playerFaction,
-        turnOrder: [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES],
-        playerFactions: [state.playerFaction], // Solo: only one human
-        aiFaction: null, // Will be set properly in multiplayer
+        currentPlayerFaction: currentFaction,
+        turnOrder: turnOrderValue,
+        playerFactions: humanFactions,
+        aiFaction: aiFactionValue,
 
         locations: state.locations,
         armies: state.armies,
