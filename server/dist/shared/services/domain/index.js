@@ -25,3 +25,5 @@ __exportStar(require("./politics"), exports);
 __exportStar(require("./economy"), exports);
 // Retreat services
 __exportStar(require("./retreat"), exports);
+// Logistics services
+__exportStar(require("./convoys"), exports);
