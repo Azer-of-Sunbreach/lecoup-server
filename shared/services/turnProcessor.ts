@@ -3,8 +3,8 @@
 
 import { GameState, FactionId, FACTION_NAMES } from '../types';
 import { calculateEconomyAndFood } from '../utils/economy';
-// AI functions stubbed for server-side - AI runs on client in multiplayer
-import { processAITurn } from './gameAI';
+// AI functions stubbed - server handles AI via gameLogic.ts directly
+const processAITurn = (state: GameState): GameState => state;
 const generateTurnNarrative = async (_turn: number, _events: string[], _faction: FactionId): Promise<string> => "The war continues...";
 import { detectBattles } from './combatDetection';
 
