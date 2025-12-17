@@ -222,8 +222,56 @@ io.on('connection', (socket) => {
         // Update server state
         room.gameState = result.newState;
 
+        // Check if combat was triggered by this action
+        if (result.newState.combatState) {
+            const combat = result.newState.combatState;
+            const attackerIsAI = combat.attackerFaction === room.aiFaction;
+            const defenderIsAI = combat.defenderFaction === room.aiFaction;
+
+            console.log(`[Game] ${code}: Combat detected - Attacker: ${combat.attackerFaction} (AI: ${attackerIsAI}), Defender: ${combat.defenderFaction} (AI: ${defenderIsAI})`);
+
+            if (attackerIsAI && defenderIsAI) {
+                // AI vs AI - auto resolve with FIGHT
+                console.log(`[Game] ${code}: AI vs AI combat - auto-resolving`);
+                const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
+                room.gameState = { ...room.gameState, ...updates };
+            } else if (attackerIsAI) {
+                // AI attacker vs Human defender - AI always fights, ask defender
+                console.log(`[Game] ${code}: AI attacker - auto-choosing FIGHT, asking defender`);
+                const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
+                if (defenderSocketId) {
+                    gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
+                    gameRoomManager.setAttackerChoice(code, 'FIGHT');
+                    io.to(defenderSocketId).emit('combat_choice_requested', {
+                        combatState: combat,
+                        role: 'DEFENDER'
+                    });
+                } else {
+                    // Defender is also AI (shouldn't happen) - auto resolve
+                    const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
+                    room.gameState = { ...room.gameState, ...updates };
+                }
+            } else if (defenderIsAI) {
+                // Human attacker vs AI defender - ask attacker, AI will auto-respond
+                console.log(`[Game] ${code}: Human attacker vs AI defender - asking attacker`);
+                gameRoomManager.initiateCombat(code, combat, socket.id, combat.defenderFaction);
+                socket.emit('combat_choice_requested', {
+                    combatState: combat,
+                    role: 'ATTACKER'
+                });
+            } else {
+                // Human vs Human - ask attacker first
+                console.log(`[Game] ${code}: PvP combat - asking attacker`);
+                gameRoomManager.initiateCombat(code, combat, socket.id, combat.defenderFaction);
+                socket.emit('combat_choice_requested', {
+                    combatState: combat,
+                    role: 'ATTACKER'
+                });
+            }
+        }
+
         // Broadcast updated state to ALL players
-        const clientState = getClientState(result.newState);
+        const clientState = getClientState(room.gameState);
         io.to(code).emit('state_update', { gameState: clientState });
 
         socket.emit('action_result', { success: true });
@@ -317,6 +365,10 @@ io.on('connection', (socket) => {
                         combatState: combat.combatState,
                         role: 'DEFENDER'
                     });
+                } else {
+                    // Defender is AI - auto-choose FIGHT and resolve immediately
+                    console.log(`[Game] ${code}: AI defender - auto-choosing FIGHT`);
+                    gameRoomManager.setDefenderChoice(code, 'FIGHT');
                 }
             }
         } else if (socket.id === combat.defenderSocketId) {
