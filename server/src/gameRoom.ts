@@ -79,9 +79,11 @@ export class GameRoomManager {
         const room = this.rooms.get(code);
         if (!room) return false;
 
-        const currentFaction = room.turnOrder[room.currentTurnIndex];
+        // Use gameState.currentTurnFaction which is properly updated by advanceTurn
+        const currentFaction = room.gameState.currentTurnFaction;
         const playerFaction = room.playerFactions.get(socketId);
 
+        console.log(`[GameRoom] isPlayerTurn check: current=${currentFaction}, player=${playerFaction}, match=${playerFaction === currentFaction}`);
         return playerFaction === currentFaction;
     }
 

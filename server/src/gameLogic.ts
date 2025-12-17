@@ -68,8 +68,11 @@ export function createMultiplayerGameState(
         [FactionId.NEUTRAL]: { gold: 0 },
     };
 
-    // Turn order: all factions in standard order
-    const turnOrder = [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
+    // Turn order: humans first (in faction order), then AI last
+    // This ensures the game starts with a human player's turn
+    const standardOrder = [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
+    const humanTurns = standardOrder.filter(f => humanFactions.includes(f));
+    const turnOrder = aiFaction ? [...humanTurns, aiFaction] : humanTurns;
 
     // Calculate initial economy
     const calculatedLocations = calculateEconomyAndFood(
@@ -255,6 +258,33 @@ export function processPlayerAction(
             const result = executeUpdateCityManagement(updatedState, action.locationId, action.updates);
             if (!result.success) {
                 return { success: false, newState: state, error: result.message || 'Failed to update city management' };
+            }
+            updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
+            break;
+        }
+
+        case 'ATTACH_LEADER': {
+            const result = executeAttachLeader(updatedState, action.armyId, action.characterId);
+            if (!result.success) {
+                return { success: false, newState: state, error: result.message || 'Failed to attach leader' };
+            }
+            updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
+            break;
+        }
+
+        case 'DETACH_LEADER': {
+            const result = executeDetachLeader(updatedState, action.characterId);
+            if (!result.success) {
+                return { success: false, newState: state, error: result.message || 'Failed to detach leader' };
+            }
+            updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
+            break;
+        }
+
+        case 'MOVE_LEADER': {
+            const result = executeMoveLeader(updatedState, action.characterId, action.destinationId);
+            if (!result.success) {
+                return { success: false, newState: state, error: result.message || 'Failed to move leader' };
             }
             updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
             break;
