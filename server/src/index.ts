@@ -305,6 +305,23 @@ io.on('connection', (socket) => {
             // Update room state
             room.gameState = result.newState;
 
+            // Auto-resolve any AI combats (AI vs AI, AI vs Neutral, etc.)
+            while (room.gameState.combatState) {
+                const combat = room.gameState.combatState;
+                const attackerIsHuman = room.playerFactions.has(gameRoomManager.getSocketForFaction(code, combat.attackerFaction) || '');
+                const defenderIsHuman = room.playerFactions.has(gameRoomManager.getSocketForFaction(code, combat.defenderFaction) || '');
+
+                if (!attackerIsHuman && !defenderIsHuman) {
+                    // Neither is human (AI vs AI or AI vs Neutral) - auto-resolve
+                    console.log(`[Game] ${code}: Auto-resolving non-human combat: ${combat.attackerFaction} vs ${combat.defenderFaction}`);
+                    const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
+                    room.gameState = { ...room.gameState, ...updates };
+                } else {
+                    // At least one human involved - break loop, will be handled by combat_choice
+                    break;
+                }
+            }
+
             // Notify players of the new state and turn
             io.to(code).emit('state_update', { gameState: getClientState(room.gameState) });
             io.to(code).emit('turn_changed', {
@@ -320,6 +337,22 @@ io.on('connection', (socket) => {
                 // Advance turn AGAIN (if AI is last, this will trigger processTurn which runs AI logic)
                 result = await advanceTurn(room.gameState);
                 room.gameState = result.newState;
+
+                // Auto-resolve any AI combats generated during AI turn
+                while (room.gameState.combatState) {
+                    const combat = room.gameState.combatState;
+                    const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
+                    const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
+
+                    if (!attackerSocketId && !defenderSocketId) {
+                        // Neither is human - auto-resolve
+                        console.log(`[Game] ${code}: Auto-resolving AI combat: ${combat.attackerFaction} vs ${combat.defenderFaction}`);
+                        const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
+                        room.gameState = { ...room.gameState, ...updates };
+                    } else {
+                        break;
+                    }
+                }
 
                 // Send updates after AI turn
                 io.to(code).emit('state_update', { gameState: getClientState(room.gameState) });
