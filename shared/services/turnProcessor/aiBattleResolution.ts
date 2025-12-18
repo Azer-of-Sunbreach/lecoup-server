@@ -41,10 +41,14 @@ export function resolveAIBattles(
         loops++;
         battles = detectBattles(locations, armies, roads);
 
-        // Filter out Player battles AND Sieging battles
+        // Get human factions - in multiplayer, state.humanFactions exists
+        // In solo mode, fallback to [state.playerFaction]
+        const humanFactions: FactionId[] = (state as any).humanFactions || [state.playerFaction];
+
+        // Filter out battles involving ANY human faction, and sieging battles
         const activeAiBattles = battles.filter(b =>
-            b.attackerFaction !== state.playerFaction &&
-            b.defenderFaction !== state.playerFaction &&
+            !humanFactions.includes(b.attackerFaction) &&
+            !humanFactions.includes(b.defenderFaction) &&
             !b.attackers.some(a => a.isSieging)
         );
 
@@ -52,8 +56,8 @@ export function resolveAIBattles(
             // Log sieges only on first pass
             if (loops === 1) {
                 const siegeBattles = battles.filter(b =>
-                    b.attackerFaction !== state.playerFaction &&
-                    b.defenderFaction !== state.playerFaction &&
+                    !humanFactions.includes(b.attackerFaction) &&
+                    !humanFactions.includes(b.defenderFaction) &&
                     b.attackers.some(a => a.isSieging)
                 );
                 siegeBattles.forEach(b => {
