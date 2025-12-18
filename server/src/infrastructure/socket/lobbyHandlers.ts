@@ -1,7 +1,7 @@
 /**
- * Lobby Socket Handlers
- * Handles all lobby-related socket events: create, join, leave, faction selection, ready, start
- */
+* Lobby Socket Handlers
+* Handles all lobby-related socket events: create, join, leave, faction selection, ready, start
+*/
 
 import { Server, Socket } from 'socket.io';
 import { FactionId } from '../../types';
@@ -114,9 +114,12 @@ export function registerLobbyHandlers(
         io.to(lobby.code).emit('game_starting', { lobby: startResult.lobby! });
 
         // Determine human and AI factions
+        // IMPORTANT: Sort by standard faction order (REPUBLICANS < CONSPIRATORS < NOBLES)
+        const standardOrder = [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
         const humanFactions: FactionId[] = startResult.lobby!.players
             .map(p => p.faction)
-            .filter((f): f is FactionId => f !== null);
+            .filter((f): f is FactionId => f !== null)
+            .sort((a, b) => standardOrder.indexOf(a) - standardOrder.indexOf(b));
 
         let aiFaction: FactionId | null = null;
         if (startResult.lobby!.maxPlayers === 2) {
