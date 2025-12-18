@@ -45,6 +45,12 @@ export function registerCombatHandlers(
 
                 // If defender is human, request their choice
                 if (combat.defenderSocketId) {
+                    // Notify attacker they're waiting for defender
+                    io.to(socket.id).emit('attacker_waiting', {
+                        combatState: combat.combatState,
+                        message: 'Waiting for defender\'s reaction...'
+                    });
+                    // Request defender's choice
                     io.to(combat.defenderSocketId).emit('combat_choice_requested', {
                         combatState: combat.combatState,
                         role: 'DEFENDER'
