@@ -130,7 +130,17 @@ export const resolveCombatResult = (
 
     // Detect remaining player battles
     const currentBattles = detectBattles(newLocations, newArmies, newRoads);
-    const playerBattles = getPlayerBattles(currentBattles, prevState.playerFaction);
+
+    // FIX: If running on server (NEUTRAL playerFaction), DO NOT filter battles.
+    // The server needs to know about ALL battles to resolve them.
+    // Filtering by "playerFaction" (Neutral) would return empty list, clearing combatState.
+    let playerBattles: typeof currentBattles = [];
+
+    if (prevState.playerFaction === FactionId.NEUTRAL) {
+        playerBattles = currentBattles; // Server sees all
+    } else {
+        playerBattles = getPlayerBattles(currentBattles, prevState.playerFaction);
+    }
 
     const nextBattle = playerBattles.length > 0 ? playerBattles[0] : null;
     const nextQueue = playerBattles.length > 1 ? playerBattles.slice(1) : [];
