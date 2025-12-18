@@ -96,21 +96,31 @@ export const detectBattles = (locations: Location[], armies: Army[], roads: Road
 
                 const ownerIsPresent = stage.faction && factions.includes(stage.faction);
 
-                let defenderFac = garrisonedFaction
-                    ? garrisonedFaction
-                    : (stationaryFaction ? stationaryFaction : (ownerIsPresent ? stage.faction! : factions[0]));
+                // Determine defender
+                let defenderFac: FactionId;
 
-                // Tie-breaker fallback if both are moving or both stationary: use owner or first found.
-                // Logic above: Garrison -> Stationary -> Owner -> First.
-                // This correctly handles:
-                // 1. Unfortified defender holding road (Stationary) vs Attacker (Moving) -> Defender is Stationary.
-                // 2. Fortified defender (Garrisoned) -> Defender is Garrisoned.
-                // 3. Meeting engagement (Both Moving) -> Owner is defender? Or arbitrary. 
-                //    If both moving (justMoved=true), stationaryFaction is undefined. ownerIsPresent used.
+                if (garrisonedFaction) {
+                    defenderFac = garrisonedFaction;
+                } else if (stationaryFaction) {
+                    defenderFac = stationaryFaction;
+                } else if (ownerIsPresent) {
+                    defenderFac = stage.faction!;
+                } else {
+                    // Both moving (Meeting Engagement) - Arbitrary, usually first faction in list
+                    defenderFac = factions[0];
+                }
 
                 const finalDefenderFac = defenderFac;
 
                 // Support multiple attacker factions
+                // CRITICAL FIX: Ensure we don't accidentally select the defender as an invader
+                // The filter `f !== finalDefenderFac` handles this, but if we have [A, B] and A is defender, B is invader.
+                // If we have [A, B] and neither is stationary/garrison/owner, A becomes defender, B becomes invader.
+                // This correctly creates a battle for B attacking A.
+                // Note: For PvP meeting engagement, WHO attacks WHOM matters for UI triggering.
+                // If B attacks A, B gets "Battle Imminent" (Attacker) and A gets "Battle Imminent" (Defender).
+                // This is correct.
+
                 const invaderFactions = factions.filter(f => f !== finalDefenderFac);
 
                 invaderFactions.forEach(attackerFac => {
