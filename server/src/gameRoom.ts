@@ -69,6 +69,19 @@ export class GameRoomManager {
         return this.rooms.get(code);
     }
 
+    /**
+     * Find gameCode for a socket ID by searching all rooms' playerFactions
+     * This handles socket reconnection where socket.data.gameCode might be lost
+     */
+    getGameCodeForSocket(socketId: string): string | null {
+        for (const [code, room] of this.rooms) {
+            if (room.playerFactions.has(socketId)) {
+                return code;
+            }
+        }
+        return null;
+    }
+
     getCurrentFaction(code: string): FactionId | undefined {
         const room = this.rooms.get(code);
         if (!room) return undefined;
