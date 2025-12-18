@@ -345,8 +345,8 @@ export async function advanceTurn(
     return { newState: updatedState, nextFaction, isAITurn };
 }
 
-// Re-export processAITurn from ./ai
-export { processAITurn } from './ai';
+// Re-export processAITurn and processSingleFactionAITurn from ./ai
+export { processAITurn, processSingleFactionAITurn } from './ai';
 
 /**
  * Extract state for client (removes server-only fields)
