@@ -5,7 +5,7 @@
 
 import { Server, Socket } from 'socket.io';
 import { GameRoomManager } from '../../gameRoom';
-import { processPlayerAction, advanceTurn, getClientState } from '../../gameLogic';
+import { processPlayerAction, advanceTurn, getClientState, processSingleFactionAITurn } from '../../gameLogic';
 import { resolveCombatResult } from '../../../../shared/services/combat';
 
 export function registerGameHandlers(
@@ -166,11 +166,10 @@ export function registerGameHandlers(
             // 2. If it's an AI turn, process it immediately
             // Loop in case multiple AI turns happen in sequence (unlikely in this design but good for robustness)
             while (result.isAITurn) {
-                console.log(`[Game] ${code}: Skipping AI turn for ${result.nextFaction} (AI plays during round resolution)`);
+                console.log(`[Game] ${code}: Processing AI turn for ${result.nextFaction}`);
 
-                // Advance turn AGAIN (if AI is last, this will trigger processTurn which runs AI logic)
-                result = await advanceTurn(room.gameState);
-                room.gameState = result.newState;
+                // Execute AI logic for this faction
+                room.gameState = processSingleFactionAITurn(room.gameState, result.nextFaction);
 
                 // Auto-resolve any AI combats generated during AI turn
                 while (room.gameState.combatState) {
@@ -184,11 +183,25 @@ export function registerGameHandlers(
                         const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
                         room.gameState = { ...room.gameState, ...updates };
                     } else {
+                        // Combat involves a human - break and let combat handlers deal with it
+                        console.log(`[Game] ${code}: AI combat involves human player - requesting choice`);
+                        // TODO: Emit combat_choice_requested to the human player
                         break;
                     }
                 }
 
                 // Send updates after AI turn
+                io.to(code).emit('state_update', { gameState: getClientState(room.gameState) });
+                io.to(code).emit('turn_changed', {
+                    currentFaction: room.gameState.currentTurnFaction,
+                    turnNumber: room.gameState.turn
+                });
+
+                // Advance to next player after AI finishes
+                result = await advanceTurn(room.gameState);
+                room.gameState = result.newState;
+
+                // Send state update after advancing turn
                 io.to(code).emit('state_update', { gameState: getClientState(room.gameState) });
                 io.to(code).emit('turn_changed', {
                     currentFaction: room.gameState.currentTurnFaction,
