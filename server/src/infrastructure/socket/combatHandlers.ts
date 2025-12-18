@@ -15,7 +15,16 @@ export function registerCombatHandlers(
 ): void {
 
     socket.on('combat_choice', ({ choice, siegeCost }) => {
-        const code = socket.data.gameCode;
+        // Try to get gameCode from socket data, or recover it from room manager
+        let code = socket.data.gameCode;
+        if (!code) {
+            code = gameRoomManager.getGameCodeForSocket(socket.id);
+            if (code) {
+                socket.data.gameCode = code;
+                console.log(`[Combat] Recovered gameCode ${code} for socket ${socket.id}`);
+            }
+        }
+
         if (!code) {
             socket.emit('error', { message: 'Not in a game' });
             return;

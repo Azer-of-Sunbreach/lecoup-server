@@ -16,8 +16,17 @@ export function registerGameHandlers(
 
     socket.on('player_action', ({ action }) => {
         console.log(`[Game] Received player_action from socket ${socket.id}:`, action?.type);
-        const code = socket.data.gameCode;
-        console.log(`[Game] Socket gameCode: ${code}`);
+
+        // Try to get gameCode from socket data, or recover it from room manager
+        let code = socket.data.gameCode;
+        if (!code) {
+            code = gameRoomManager.getGameCodeForSocket(socket.id);
+            if (code) {
+                socket.data.gameCode = code; // Restore it
+                console.log(`[Game] Recovered gameCode ${code} for socket ${socket.id}`);
+            }
+        }
+
         if (!code) {
             console.log(`[Game] ERROR: No gameCode for socket ${socket.id}`);
             socket.emit('error', { message: 'Not in a game' });
@@ -113,7 +122,16 @@ export function registerGameHandlers(
     });
 
     socket.on('end_turn', async () => {
-        const code = socket.data.gameCode;
+        // Try to get gameCode from socket data, or recover it from room manager
+        let code = socket.data.gameCode;
+        if (!code) {
+            code = gameRoomManager.getGameCodeForSocket(socket.id);
+            if (code) {
+                socket.data.gameCode = code;
+                console.log(`[Game] Recovered gameCode ${code} for socket ${socket.id}`);
+            }
+        }
+
         if (!code) {
             socket.emit('error', { message: 'Not in a game' });
             return;
@@ -171,31 +189,58 @@ export function registerGameHandlers(
                 // Execute AI logic for this faction
                 room.gameState = processSingleFactionAITurn(room.gameState, result.nextFaction);
 
-                // Auto-resolve any AI combats generated during AI turn
+                // Handle any combats generated during AI turn
                 while (room.gameState.combatState) {
                     const combat = room.gameState.combatState;
                     const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
                     const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
+                    const attackerIsHuman = attackerSocketId !== null;
+                    const defenderIsHuman = defenderSocketId !== null;
 
-                    if (!attackerSocketId && !defenderSocketId) {
-                        // Neither is human - auto-resolve
+                    if (!attackerIsHuman && !defenderIsHuman) {
+                        // Neither is human (AI vs AI or AI vs Neutral) - auto-resolve
                         console.log(`[Game] ${code}: Auto-resolving AI combat: ${combat.attackerFaction} vs ${combat.defenderFaction}`);
                         const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
                         room.gameState = { ...room.gameState, ...updates };
+                    } else if (!attackerIsHuman && defenderIsHuman) {
+                        // AI attacker vs Human defender - AI fights, ask defender
+                        console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender`);
+                        gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
+                        gameRoomManager.setAttackerChoice(code, 'FIGHT');
+                        room.gameState.combatState = null;
+                        io.to(defenderSocketId!).emit('combat_choice_requested', {
+                            combatState: combat,
+                            role: 'DEFENDER'
+                        });
+                        break; // Wait for human response
+                    } else if (attackerIsHuman && !defenderIsHuman) {
+                        // Human attacker vs AI/Neutral - Should not happen during AI turn, but handle it
+                        console.log(`[Game] ${code}: Human attacker during AI turn - unexpected, auto-resolving`);
+                        const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
+                        room.gameState = { ...room.gameState, ...updates };
                     } else {
-                        // Combat involves a human - break and let combat handlers deal with it
-                        console.log(`[Game] ${code}: AI combat involves human player - requesting choice`);
-                        // TODO: Emit combat_choice_requested to the human player
+                        // Human vs Human - Should not happen during AI turn
+                        console.log(`[Game] ${code}: PvP combat during AI turn - unexpected`);
                         break;
                     }
                 }
 
-                // Send updates after AI turn
-                io.to(code).emit('state_update', { gameState: getClientState(room.gameState) });
+                // Send updates after AI turn - EXCLUDE combatState if there's pending combat
+                const aiClientState = getClientState(room.gameState);
+                const aiStateForBroadcast = room.pendingCombat
+                    ? { ...aiClientState, combatState: null }
+                    : aiClientState;
+                io.to(code).emit('state_update', { gameState: aiStateForBroadcast });
                 io.to(code).emit('turn_changed', {
                     currentFaction: room.gameState.currentTurnFaction,
                     turnNumber: room.gameState.turn
                 });
+
+                // If there's pending combat with a human, stop advancing turns
+                if (room.pendingCombat) {
+                    console.log(`[Game] ${code}: Waiting for human combat response`);
+                    break;
+                }
 
                 // Advance to next player after AI finishes
                 result = await advanceTurn(room.gameState);
