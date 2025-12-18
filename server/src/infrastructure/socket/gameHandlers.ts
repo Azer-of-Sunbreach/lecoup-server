@@ -71,6 +71,8 @@ export function registerGameHandlers(
                 console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender only`);
                 gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
                 gameRoomManager.setAttackerChoice(code, 'FIGHT');
+                // Clear combatState from server state - it's now tracked in pendingCombat
+                room.gameState.combatState = null;
                 io.to(defenderSocketId).emit('combat_choice_requested', {
                     combatState: combat,
                     role: 'DEFENDER'
@@ -79,6 +81,8 @@ export function registerGameHandlers(
                 // Human attacker vs AI/Neutral defender - ask attacker only, AI auto-responds
                 console.log(`[Game] ${code}: Human attacker vs AI defender - asking attacker only`);
                 gameRoomManager.initiateCombat(code, combat, socket.id, combat.defenderFaction);
+                // Clear combatState from server state - it's now tracked in pendingCombat
+                room.gameState.combatState = null;
                 socket.emit('combat_choice_requested', {
                     combatState: combat,
                     role: 'ATTACKER'
@@ -87,6 +91,8 @@ export function registerGameHandlers(
                 // Human vs Human (PvP) - ask attacker first, then defender
                 console.log(`[Game] ${code}: PvP combat - asking attacker first`);
                 gameRoomManager.initiateCombat(code, combat, attackerSocketId!, combat.defenderFaction);
+                // Clear combatState from server state - it's now tracked in pendingCombat
+                room.gameState.combatState = null;
                 io.to(attackerSocketId!).emit('combat_choice_requested', {
                     combatState: combat,
                     role: 'ATTACKER'

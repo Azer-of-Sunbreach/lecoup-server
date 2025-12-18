@@ -40,6 +40,9 @@ export function registerCombatHandlers(
                         combatState: combat.combatState,
                         role: 'DEFENDER'
                     });
+                    // Early return - wait for defender's response before checking isCombatReady
+                    // The defender's choice will trigger another combat_choice event
+                    return;
                 } else {
                     // Defender is AI - auto-choose FIGHT and resolve immediately
                     console.log(`[Game] ${code}: AI defender - auto-choosing FIGHT`);
