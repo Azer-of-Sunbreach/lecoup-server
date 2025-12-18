@@ -42,9 +42,24 @@ export const detectBattles = (locations: Location[], armies: Army[], roads: Road
             // In Scenario 3, defenderFaction is loc.faction. Invader is factions[0]. invaderFactions has 1 element.
             // If Scenario 3 and loc.faction is in factions? No, covered by Scenario 1.
 
-            if (invaderFactions.length === 0 && factions.length > 0 && factions[0] !== loc.faction) {
-                // Should be covered by invaderFactions (factions[0] !== defenderFaction).
-                // Double check Scenario 3: factions=[A], loc.faction=B. defender=B. invader=A. invader!=defender. OK.
+            // Scenario 3 Correction: If loc.faction is Neutral and Insurgents are Neutral, they are "Invaders" against the "Owner" (if owner is not Neutral)?
+            // No, Insurgents have their own property `isInsurgent`.
+            // If `isInsurgent` is true, they effectively act as an aggressive faction against the location controller.
+
+            const insurgentArmies = armiesHere.filter(a => a.isInsurgent);
+            if (insurgentArmies.length > 0) {
+                // Even if faction is same (e.g. Civil War or Neutral Instability), they fight.
+                const insurgentFactions = Array.from(new Set(insurgentArmies.map(a => a.faction)));
+                insurgentFactions.forEach(insFa => {
+                    // Prevent duplicate if already in invaderFactions
+                    if (!invaderFactions.includes(insFa) && insFa !== defenderFaction) {
+                        invaderFactions.push(insFa);
+                    }
+                    // Special case: Rebel vs Same Faction (Civil War) - rare in this design but possible
+                    // The logic below filters `attackerFaction !== defenderFaction`.
+                    // If we need Same-Faction combat (Rebels), we might need to adjust logic.
+                    // But for Neutral vs Human, they are different, so valid.
+                });
             }
 
             invaderFactions.forEach(attackerFaction => {
