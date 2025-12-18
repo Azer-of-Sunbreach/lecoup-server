@@ -46,6 +46,30 @@ export function registerGameHandlers(
             return;
         }
 
+        // Block actions if there's a pending combat that involves this player
+        if (room.pendingCombat) {
+            const combat = room.pendingCombat;
+            const playerIsInvolvedInCombat =
+                socket.id === combat.attackerSocketId ||
+                socket.id === combat.defenderSocketId ||
+                combat.combatState.attackerFaction === playerFaction ||
+                combat.combatState.defenderFaction === playerFaction;
+
+            if (playerIsInvolvedInCombat) {
+                socket.emit('action_result', {
+                    success: false,
+                    error: 'Cannot perform action while combat is pending. Resolve the combat first.'
+                });
+                // Re-send the combat request in case client missed it
+                const role = combat.combatState.attackerFaction === playerFaction ? 'ATTACKER' : 'DEFENDER';
+                socket.emit('combat_choice_requested', {
+                    combatState: combat.combatState,
+                    role
+                });
+                return;
+            }
+        }
+
         // Process action on server using shared game logic
         console.log(`[Game] ${code}: Processing ${action.type} from ${playerFaction}`);
         const sharedAction = { ...action, faction: playerFaction }; // Add faction for shared type
