@@ -90,78 +90,72 @@ export function registerCombatHandlers(
             room.gameState.combatState = room.pendingCombat.combatState;
 
             const updates = resolveCombatResult(room.gameState, finalAction, finalSiegeCost);
+
+            // APPLY UPDATES TO SERVER STATE
+            // This includes loss of troops, movement, etc.
             room.gameState = { ...room.gameState, ...updates };
 
-            // Clear pending combat
+            // Clear pending combat NOW, as it is resolved.
             gameRoomManager.clearCombat(code);
-            room.gameState.combatState = null; // Ensure the *resolved* combat is cleared
 
-            // CRITICAL FIX: Check if `updates.combatState` contains a NEW battle from the queue!
-            // `resolveCombatResult` detects subsquent battles and puts them in `combatState`.
-            // If we just broadcast this, EVERYONE sees it.
-            // We must "initiate" it properly (Private flow).
+            // However, `updates.combatState` might contain the NEXT battle in the queue.
+            // We need to decide what to do with it.
+            // If we leave it in `room.gameState.combatState`, it will be broadcasted to everyone as "Battle Imminent".
+            // We want to hide it, but KEEP the results of the previous battle (armies moved/died).
 
-            let nextCombat = updates.combatState;
+            let nextCombat = updates.combatState; // This is the next battle derived by resolveCombatResult
 
-            // Note: resolveCombatResult populates combatState with the *next* battle if available.
-            // If the user's logic in resolveCombatResult is correct, `updates.combatState` holds it.
-            // However, `room.gameState` has it merged now.
-            // So we check `room.gameState.combatState`.
+            // Capture the state to broadcast - this state includes the RESULTS of the fight (deaths/moves)
+            // But we must sanitize `combatState` if it exists, to prevent public leak of the NEXT battle.
+            const rawStateForBroadcast = { ...room.gameState };
 
-            if (room.gameState.combatState) {
+            // If there is a next combat, we must initiate it properly (Private) and hide it from Public
+            if (nextCombat) {
                 console.log(`[Game] ${code}: Subsequent combat detected after resolution!`);
-                const newCombat = room.gameState.combatState;
 
                 // Identify participants
-                const attackerSocketId = gameRoomManager.getSocketForFaction(code, newCombat.attackerFaction);
-                const defenderSocketId = gameRoomManager.getSocketForFaction(code, newCombat.defenderFaction);
+                const attackerSocketId = gameRoomManager.getSocketForFaction(code, nextCombat.attackerFaction);
+                const defenderSocketId = gameRoomManager.getSocketForFaction(code, nextCombat.defenderFaction);
                 const attackerIsHuman = attackerSocketId !== null;
                 const defenderIsHuman = defenderSocketId !== null;
 
-                // Move to Pending Logic immediately
                 if (!attackerIsHuman && !defenderIsHuman) {
-                    // Auto-resolve non-human chain
+                    // Auto-resolve non-human chain immediately
+                    // This is recursive/iterative ideally, but for now single step
                     const autoUpdates = resolveCombatResult(room.gameState, 'FIGHT', 0);
                     room.gameState = { ...room.gameState, ...autoUpdates };
-                    // We might need a loop here for full recursion, but let's assume 1 level for now to avoid stack depth
+                    // Update the broadcast state with the result of this auto-resolve too
+                    Object.assign(rawStateForBroadcast, room.gameState);
                 } else {
-                    // Initiate Pending Combat for the next battle
-                    // This prevents it from "leaking" to public in the broadcast below
-
-                    if (attackerIsHuman && defenderIsHuman) {
-                        gameRoomManager.initiateCombat(code, newCombat, attackerSocketId!, newCombat.defenderFaction);
-                        // Notify ATTACKER only (PvP flow start)
+                    // Human involved: Initiate Private Pending Combat
+                    if (attackerIsHuman) {
+                        gameRoomManager.initiateCombat(code, nextCombat, attackerSocketId!, nextCombat.defenderFaction);
+                        // Notify ATTACKER
                         io.to(attackerSocketId!).emit('combat_choice_requested', {
-                            combatState: newCombat,
-                            role: 'ATTACKER'
-                        });
-                    } else if (attackerIsHuman) {
-                        gameRoomManager.initiateCombat(code, newCombat, attackerSocketId!, newCombat.defenderFaction);
-                        socket.emit('combat_choice_requested', {
-                            combatState: newCombat,
+                            combatState: nextCombat,
                             role: 'ATTACKER'
                         });
                     } else if (defenderIsHuman) {
-                        gameRoomManager.initiateCombat(code, newCombat, 'AI', newCombat.defenderFaction);
-                        gameRoomManager.setAttackerChoice(code, 'FIGHT'); // AI Attacker Ready
+                        // AI vs Human - AI chooses FIGHT, ask Defender
+                        gameRoomManager.initiateCombat(code, nextCombat, 'AI', nextCombat.defenderFaction);
+                        gameRoomManager.setAttackerChoice(code, 'FIGHT');
                         io.to(defenderSocketId!).emit('combat_choice_requested', {
-                            combatState: newCombat,
+                            combatState: nextCombat,
                             role: 'DEFENDER'
                         });
                     }
-
-                    // Clear from public state so it doesn't show "Battle Imminent" to everyone
-                    room.gameState.combatState = null;
                 }
+
+                // HIDE combatState from the public broadcast
+                // The server state `room.gameState` might have it set (from updates), or cleared (if initiated via gameRoomManager which usually doesn't clear it from gameState, but we should).
+                // Actually `initiateCombat` puts it in `pendingCombat`.
+                // We should ensure `room.gameState.combatState` is NULL so it doesn't block others or show UI.
+                room.gameState.combatState = null;
             }
 
-            // Broadcast updates
-            const clientState = getClientState(room.gameState);
-
-            // Privacy Filter: Ensure no leaked combatState
-            const stateForBroadcast = room.pendingCombat
-                ? { ...clientState, combatState: null }
-                : clientState;
+            // Broadcast the state (with combatState nullified for privacy)
+            const clientState = getClientState(rawStateForBroadcast);
+            const stateForBroadcast = { ...clientState, combatState: null }; // Ensure null for public
 
             io.to(code).emit('state_update', { gameState: stateForBroadcast });
             io.to(code).emit('combat_resolved', { result: 'Combat ended' });
