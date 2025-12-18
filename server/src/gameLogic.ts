@@ -323,10 +323,12 @@ export async function advanceTurn(
     let updatedState = { ...state };
     if (newIndex === 0) {
         // Process turn for ALL factions (AI movement, economy, etc.)
+        // IMPORTANT: Pass humanFactions so resolveAIBattles can exclude human battles
         const processed = await processTurn({
             ...updatedState,
-            playerFaction: state.aiFaction || FactionId.NEUTRAL // Let AI faction be processed
-        });
+            playerFaction: state.aiFaction || FactionId.NEUTRAL, // Let AI faction be processed
+            humanFactions: state.humanFactions // Pass human factions for correct battle filtering
+        } as any);
         updatedState = {
             ...processed as MultiplayerGameState,
             humanFactions: state.humanFactions,
