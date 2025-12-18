@@ -50,8 +50,8 @@ export const detectBattles = (locations: Location[], armies: Army[], roads: Road
             invaderFactions.forEach(attackerFaction => {
                 // STRICT FILTERING: Only include armies belonging to the designated attacker or defender.
                 // Third parties wait for the next resolution cycle.
-                // Fix Anomaly (Siege Loop): Ignore GARRISONED invaders. They are laying siege/waiting and do not trigger auto-combat.
-                const attackers = armiesHere.filter(a => a.faction === attackerFaction && !a.isGarrisoned);
+                // Fix Anomaly (Siege Loop): Ignore GARRISONED invaders, UNLESS they are Insurgents (who must fight).
+                const attackers = armiesHere.filter(a => a.faction === attackerFaction && (!a.isGarrisoned || a.isInsurgent));
                 const defenders = armiesHere.filter(a => a.faction === defenderFaction);
 
                 // Spec 7.5.1: If entering enemy zone without troops, no combat.
@@ -135,7 +135,10 @@ export const detectBattles = (locations: Location[], armies: Army[], roads: Road
                         roadId: road.id, stageIndex: stage.index,
                         attackerFaction: attackerFac,
                         defenderFaction: finalDefenderFac,
-                        attackers: armiesHere.filter(a => a.faction === attackerFac && !a.isGarrisoned),
+                        // Fix for Roads: Include armies even if they are "Garrisoned" if it's a road?
+                        // Usually road armies aren't garrisoned unless strictly "Camped".
+                        // Use !isGarrisoned generally, but ensure "Just Moved" ones are active.
+                        attackers: armiesHere.filter(a => a.faction === attackerFac && (!a.isGarrisoned || a.justMoved)),
                         defenders: armiesHere.filter(a => a.faction === finalDefenderFac),
                         defenseBonus: appliedDefense,
                         isInsurgentBattle: false
