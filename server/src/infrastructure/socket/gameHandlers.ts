@@ -53,45 +53,41 @@ export function registerGameHandlers(
         // Check if combat was triggered by this action
         if (result.newState.combatState) {
             const combat = result.newState.combatState;
-            const attackerIsAI = combat.attackerFaction === room.aiFaction;
-            const defenderIsAI = combat.defenderFaction === room.aiFaction;
+            // Check if participants are human by socket presence (covers AI and NEUTRAL)
+            const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
+            const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
+            const attackerIsHuman = attackerSocketId !== null;
+            const defenderIsHuman = defenderSocketId !== null;
 
-            console.log(`[Game] ${code}: Combat detected - Attacker: ${combat.attackerFaction} (AI: ${attackerIsAI}), Defender: ${combat.defenderFaction} (AI: ${defenderIsAI})`);
+            console.log(`[Game] ${code}: Combat detected - Attacker: ${combat.attackerFaction} (Human: ${attackerIsHuman}), Defender: ${combat.defenderFaction} (Human: ${defenderIsHuman})`);
 
-            if (attackerIsAI && defenderIsAI) {
-                // AI vs AI - auto resolve with FIGHT
-                console.log(`[Game] ${code}: AI vs AI combat - auto-resolving`);
+            if (!attackerIsHuman && !defenderIsHuman) {
+                // AI/Neutral vs AI/Neutral - auto resolve with FIGHT
+                console.log(`[Game] ${code}: Non-human combat - auto-resolving`);
                 const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
                 room.gameState = { ...room.gameState, ...updates };
-            } else if (attackerIsAI) {
-                // AI attacker vs Human defender - AI always fights, ask defender
-                console.log(`[Game] ${code}: AI attacker - auto-choosing FIGHT, asking defender`);
-                const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
-                if (defenderSocketId) {
-                    gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
-                    gameRoomManager.setAttackerChoice(code, 'FIGHT');
-                    io.to(defenderSocketId).emit('combat_choice_requested', {
-                        combatState: combat,
-                        role: 'DEFENDER'
-                    });
-                } else {
-                    // Defender is also AI (shouldn't happen) - auto resolve
-                    const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
-                    room.gameState = { ...room.gameState, ...updates };
-                }
-            } else if (defenderIsAI) {
-                // Human attacker vs AI defender - ask attacker, AI will auto-respond
-                console.log(`[Game] ${code}: Human attacker vs AI defender - asking attacker`);
+            } else if (!attackerIsHuman && defenderIsHuman) {
+                // AI/Neutral attacker vs Human defender - AI always fights, ask defender
+                console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender only`);
+                gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
+                gameRoomManager.setAttackerChoice(code, 'FIGHT');
+                io.to(defenderSocketId).emit('combat_choice_requested', {
+                    combatState: combat,
+                    role: 'DEFENDER'
+                });
+            } else if (attackerIsHuman && !defenderIsHuman) {
+                // Human attacker vs AI/Neutral defender - ask attacker only, AI auto-responds
+                console.log(`[Game] ${code}: Human attacker vs AI defender - asking attacker only`);
                 gameRoomManager.initiateCombat(code, combat, socket.id, combat.defenderFaction);
                 socket.emit('combat_choice_requested', {
                     combatState: combat,
                     role: 'ATTACKER'
                 });
             } else {
-                // Human vs Human - ask attacker first
-                console.log(`[Game] ${code}: PvP combat - asking attacker`);
-                gameRoomManager.initiateCombat(code, combat, socket.id, combat.defenderFaction);
-                socket.emit('combat_choice_requested', {
+                // Human vs Human (PvP) - ask attacker first, then defender
+                console.log(`[Game] ${code}: PvP combat - asking attacker first`);
+                gameRoomManager.initiateCombat(code, combat, attackerSocketId!, combat.defenderFaction);
+                io.to(attackerSocketId!).emit('combat_choice_requested', {
                     combatState: combat,
                     role: 'ATTACKER'
                 });
