@@ -136,9 +136,16 @@ export function registerGameHandlers(
         // Broadcast updated state to ALL players
         // Exclude combatState from broadcast - it's sent only to involved players via combat_choice_requested
         const clientState = getClientState(room.gameState);
-        const stateForBroadcast = room.pendingCombat
-            ? { ...clientState, combatState: null }
-            : clientState;
+        // Broadcast updated state to ALL players
+        // Exclude combatState from broadcast - it's sent only to involved players via combat_choice_requested
+        const clientState = getClientState(room.gameState);
+
+        // FIX: Ensure combatState is NULL in the broadcast unless we specifically want to show it (which we don't, for privacy)
+        // Previous logic: `room.pendingCombat ? ... : ...`
+        // But if pendingCombat is SET, we definitely want to HIDE the `combatState` property in the public broadcast.
+        // And even if it's NOT set (resolved), we don't want to leak "active" combat unless it's intended.
+        const stateForBroadcast = { ...clientState, combatState: null };
+
         io.to(code).emit('state_update', { gameState: stateForBroadcast });
 
         socket.emit('action_result', { success: true });

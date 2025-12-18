@@ -87,9 +87,13 @@ export function registerCombatHandlers(
             else finalAction = 'FIGHT';
 
             // IMPORTANT: We need to put the combat back into state.combatState for the resolver to find it!
-            room.gameState.combatState = room.pendingCombat.combatState;
+            // The handler cleared it earlier to put it into pendingCombat
+            const stateToResolve = {
+                ...room.gameState,
+                combatState: room.pendingCombat.combatState
+            };
 
-            const updates = resolveCombatResult(room.gameState, finalAction, finalSiegeCost);
+            const updates = resolveCombatResult(stateToResolve, finalAction, finalSiegeCost);
 
             // APPLY UPDATES TO SERVER STATE
             // This includes loss of troops, movement, etc.
