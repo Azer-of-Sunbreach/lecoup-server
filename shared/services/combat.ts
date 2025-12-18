@@ -137,7 +137,21 @@ export const resolveCombatResult = (
     let playerBattles: typeof currentBattles = [];
 
     if (prevState.playerFaction === FactionId.NEUTRAL) {
-        playerBattles = currentBattles; // Server sees all
+        // Server sees all battles involving humans or otherwise important ones
+        // In multiplayer, we likely want to catch ANY chain reaction involving a human
+        const humanFactions = (prevState as any).humanFactions || [];
+        playerBattles = currentBattles.filter(b =>
+            humanFactions.includes(b.attackerFaction) ||
+            humanFactions.includes(b.defenderFaction)
+        );
+        // If no human battles, but there are AI battles, maybe we should return them too?
+        // But for now, let's focus on Human vs X
+        if (playerBattles.length === 0 && currentBattles.length > 0) {
+            // Fallback: If we just resolved a battle and there are MORE battles, 
+            // we shouldn't just ignore them if they are relevant to the game flow.
+            // But usually AI battles are auto-resolved. 
+            // Let's stick to Human battles for the "Queue".
+        }
     } else {
         playerBattles = getPlayerBattles(currentBattles, prevState.playerFaction);
     }

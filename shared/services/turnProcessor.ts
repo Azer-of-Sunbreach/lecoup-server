@@ -154,7 +154,23 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
 
     // Detect player battles
     const battles = detectBattles(state.locations, state.armies, state.roads);
-    const playerBattles = getPlayerBattles(battles, state.playerFaction);
+
+    // FIX: On server (NEUTRAL) or simply for robust detection, we want ANY battle involving a human.
+    // If state.playerFaction is NEUTRAL, getPlayerBattles(NEUTRAL) returns nothing useful for humans.
+    let playerBattles: typeof battles = [];
+
+    const humanFactions = (state as any).humanFactions || [state.playerFaction];
+
+    if (state.playerFaction === FactionId.NEUTRAL) {
+        // Server side: Get battles for ALL humans
+        playerBattles = battles.filter(b =>
+            humanFactions.includes(b.attackerFaction) ||
+            humanFactions.includes(b.defenderFaction)
+        );
+    } else {
+        // Client side or specific faction processing
+        playerBattles = getPlayerBattles(battles, state.playerFaction);
+    }
 
     // --- PHASE 7: NARRATIVE ---
     const narrativeEvents = [...logs];
