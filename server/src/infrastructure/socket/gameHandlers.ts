@@ -95,8 +95,12 @@ export function registerGameHandlers(
         }
 
         // Broadcast updated state to ALL players
+        // Exclude combatState from broadcast - it's sent only to involved players via combat_choice_requested
         const clientState = getClientState(room.gameState);
-        io.to(code).emit('state_update', { gameState: clientState });
+        const stateForBroadcast = room.pendingCombat
+            ? { ...clientState, combatState: null }
+            : clientState;
+        io.to(code).emit('state_update', { gameState: stateForBroadcast });
 
         socket.emit('action_result', { success: true });
         console.log(`[Game] ${code}: Action ${action.type} processed successfully`);
