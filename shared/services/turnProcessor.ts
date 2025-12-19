@@ -74,12 +74,18 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
     logs.push(...moveResult.logs);
 
     // --- PHASE 4: EVENTS & ACTIONS ---
+    console.log('[TURN] Phase 4: Processing insurrections...');
     const revoltResult = processInsurrections(state.locations, state.characters, state.armies, state.playerFaction);
     state.locations = revoltResult.locations;
     state.characters = revoltResult.characters;
     state.armies = revoltResult.armies;
     logs.push(...revoltResult.logs);
     let insurrectionNotification = revoltResult.notification;
+
+    // DEBUG: Count insurgent armies after processing
+    const insurgentArmies = state.armies.filter(a => a.isInsurgent);
+    console.log(`[TURN] After insurrections: ${insurgentArmies.length} insurgent armies exist`);
+    insurgentArmies.forEach(a => console.log(`[TURN]   - ${a.id} at ${a.locationId}, faction=${a.faction}, strength=${a.strength}`));
 
     if (revoltResult.refunds) {
         Object.entries(revoltResult.refunds).forEach(([faction, amount]) => {
@@ -153,13 +159,17 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
     insurrectionNotification = battleResult.insurrectionNotification;
 
     // Detect player battles
+    console.log('[TURN] Detecting battles...');
     const battles = detectBattles(state.locations, state.armies, state.roads);
+    console.log(`[TURN] detectBattles returned ${battles.length} total battles`);
+    battles.forEach(b => console.log(`[TURN]   - Battle at ${b.locationId || b.roadId}: ${b.attackerFaction} vs ${b.defenderFaction}`));
 
     // FIX: On server (NEUTRAL) or simply for robust detection, we want ANY battle involving a human.
     // If state.playerFaction is NEUTRAL, getPlayerBattles(NEUTRAL) returns nothing useful for humans.
     let playerBattles: typeof battles = [];
 
     const humanFactions = (state as any).humanFactions || [state.playerFaction];
+    console.log(`[TURN] playerFaction=${state.playerFaction}, humanFactions=${JSON.stringify(humanFactions)}`);
 
     if (state.playerFaction === FactionId.NEUTRAL) {
         // Server side: Get battles for ALL humans
@@ -167,9 +177,11 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
             humanFactions.includes(b.attackerFaction) ||
             humanFactions.includes(b.defenderFaction)
         );
+        console.log(`[TURN] Server mode: Filtered to ${playerBattles.length} human-involved battles`);
     } else {
         // Client side or specific faction processing
         playerBattles = getPlayerBattles(battles, state.playerFaction);
+        console.log(`[TURN] Client mode: Filtered to ${playerBattles.length} player battles`);
     }
 
     // --- PHASE 7: NARRATIVE ---
