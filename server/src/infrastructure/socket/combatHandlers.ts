@@ -44,8 +44,9 @@ export function registerCombatHandlers(
             if (choice === 'FIGHT' || choice === 'RETREAT' || choice === 'SIEGE') {
                 gameRoomManager.setAttackerChoice(code, choice, siegeCost);
 
-                // If defender is human, request their choice
-                if (combat.defenderSocketId) {
+                // ONLY for FIGHT: If defender is human, request their choice
+                // RETREAT and SIEGE don't require defender response - they resolve immediately
+                if (choice === 'FIGHT' && combat.defenderSocketId) {
                     // Notify attacker they're waiting for defender
                     io.to(socket.id).emit('attacker_waiting', {
                         combatState: combat.combatState,
@@ -59,6 +60,10 @@ export function registerCombatHandlers(
                     // Early return - wait for defender's response before checking isCombatReady
                     // The defender's choice will trigger another combat_choice event
                     return;
+                } else if (choice === 'RETREAT' || choice === 'SIEGE') {
+                    // RETREAT or SIEGE: Auto-set defender to FIGHT and resolve immediately
+                    console.log(`[Game] ${code}: Attacker chose ${choice} - no defender input needed, auto-resolving`);
+                    gameRoomManager.setDefenderChoice(code, 'FIGHT');
                 } else {
                     // Defender is AI - auto-choose FIGHT and resolve immediately
                     console.log(`[Game] ${code}: AI defender - auto-choosing FIGHT`);
