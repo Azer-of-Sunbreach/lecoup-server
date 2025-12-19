@@ -113,13 +113,16 @@ export const resolveCombatResult = (
     }
 
     // Auto-resolve cascading AI battles
+    // Pass humanFactions so it knows which factions are human in multiplayer
+    const humanFactions = (prevState as any).humanFactions as FactionId[] | undefined;
     const cascadeResult = resolveAIBattleCascade(
         prevState.playerFaction,
         newArmies,
         newCharacters,
         newLocations,
         newRoads,
-        newStats
+        newStats,
+        humanFactions
     );
     newArmies = cascadeResult.armies;
     newLocations = cascadeResult.locations;
@@ -138,7 +141,7 @@ export const resolveCombatResult = (
     // Previously checked playerFaction === NEUTRAL, but server sets playerFaction to AI faction
     let playerBattles: typeof currentBattles = [];
 
-    const humanFactions = (prevState as any).humanFactions as FactionId[] | undefined;
+    // humanFactions already defined above
     const isServerMode = Array.isArray(humanFactions) && humanFactions.length > 0;
 
     console.log(`[COMBAT_RESOLVE] humanFactions=${JSON.stringify(humanFactions)}, isServerMode=${isServerMode}`);
