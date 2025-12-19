@@ -93,6 +93,8 @@ export function registerCombatHandlers(
                 combatState: room.pendingCombat.combatState
             };
 
+            console.log(`[COMBAT_HANDLER] stateToResolve.humanFactions = ${JSON.stringify((stateToResolve as any).humanFactions)}`);
+
             const updates = resolveCombatResult(stateToResolve, finalAction, finalSiegeCost);
 
             // APPLY UPDATES TO SERVER STATE
@@ -108,6 +110,7 @@ export function registerCombatHandlers(
             // We want to hide it, but KEEP the results of the previous battle (armies moved/died).
 
             let nextCombat = updates.combatState; // This is the next battle derived by resolveCombatResult
+            console.log(`[COMBAT_HANDLER] updates.combatState = ${nextCombat ? `${nextCombat.attackerFaction} vs ${nextCombat.defenderFaction}` : 'NULL'}`);
 
             // Capture the state to broadcast - this state includes the RESULTS of the fight (deaths/moves)
             // But we must sanitize `combatState` if it exists, to prevent public leak of the NEXT battle.
