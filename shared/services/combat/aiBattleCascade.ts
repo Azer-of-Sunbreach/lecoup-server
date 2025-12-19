@@ -17,6 +17,14 @@ export interface CascadeResult {
 /**
  * Auto-resolve all AI vs AI battles (neither faction is player)
  * Loops until no more AI battles exist (max 10 iterations for safety)
+ * 
+ * @param playerFaction - The player's faction (or AI faction in multiplayer)
+ * @param armies - Current armies
+ * @param characters - Current characters
+ * @param locations - Current locations
+ * @param roads - Current roads
+ * @param stats - Current game stats
+ * @param humanFactions - Array of human-controlled factions (for multiplayer)
  */
 export const resolveAIBattleCascade = (
     playerFaction: FactionId,
@@ -24,7 +32,8 @@ export const resolveAIBattleCascade = (
     characters: Character[],
     locations: Location[],
     roads: Road[],
-    stats: GameStats
+    stats: GameStats,
+    humanFactions?: FactionId[]
 ): CascadeResult => {
     let newArmies = [...armies];
     let newCharacters = [...characters];
@@ -38,9 +47,19 @@ export const resolveAIBattleCascade = (
 
     while (loops < 10) {
         loops++;
+
+        // FIX: In multiplayer, check against ALL human factions, not just playerFaction
+        // In single-player, humanFactions is undefined so we fall back to playerFaction check
+        const isHumanFaction = (faction: FactionId) => {
+            if (humanFactions && humanFactions.length > 0) {
+                return humanFactions.includes(faction);
+            }
+            return faction === playerFaction;
+        };
+
         const aiBattles = currentBattles.filter(b =>
-            b.attackerFaction !== playerFaction &&
-            b.defenderFaction !== playerFaction &&
+            !isHumanFaction(b.attackerFaction) &&
+            !isHumanFaction(b.defenderFaction) &&
             !b.attackers.some(a => a.isSieging)
         );
 
@@ -114,7 +133,7 @@ export const resolveAIBattleCascade = (
                     newCharacters = newCharacters.map(c => c.id === l.id ? { ...c, status: CharacterStatus.DEAD } : c);
                     logMessages.push(`${l.name} died.`);
                 } else {
-                    newCharacters = newCharacters.map(c => c.id === l.id ? { ...c, status: CharacterStatus.AVAILABLE, armyId: undefined } : c);
+                    newCharacters = newCharacters.map(c => c.id === l.id ? { ...c, status: CharacterStatus.AVAILABLE, armyId: null } : c);
                 }
             }
         });
