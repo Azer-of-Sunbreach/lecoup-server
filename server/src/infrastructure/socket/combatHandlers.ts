@@ -7,6 +7,7 @@ import { Server, Socket } from 'socket.io';
 import { GameRoomManager } from '../../gameRoom';
 import { getClientState } from '../../gameLogic';
 import { resolveCombatResult } from '../../../../shared/services/combat';
+import { emitCombatPhaseUpdate, emitCombatPhaseEnded, createBattleResolutionPhase } from './battlePhaseUtils';
 
 export function registerCombatHandlers(
     io: Server,
@@ -161,6 +162,29 @@ export function registerCombatHandlers(
 
             io.to(code).emit('state_update', { gameState: stateForBroadcast });
             io.to(code).emit('combat_resolved', { result: 'Combat ended' });
+
+            // Update battle phase tracking
+            const phaseInfo = gameRoomManager.getBattlePhaseInfo(code);
+            if (phaseInfo.active) {
+                gameRoomManager.incrementBattleResolved(code);
+
+                // Check if there are more battles to resolve
+                if (nextCombat || (room.gameState.combatQueue && room.gameState.combatQueue.length > 0)) {
+                    // Emit phase update with new progress
+                    emitCombatPhaseUpdate(
+                        io,
+                        code,
+                        nextCombat,
+                        room.gameState.combatQueue || [],
+                        room.gameState,
+                        gameRoomManager.getBattlePhaseInfo(code).resolved
+                    );
+                } else {
+                    // No more battles - end the phase
+                    gameRoomManager.endBattlePhase(code);
+                    emitCombatPhaseEnded(io, code);
+                }
+            }
 
             // NOW send combat_choice_requested AFTER client has processed state_update
             if (pendingCombatRequest) {

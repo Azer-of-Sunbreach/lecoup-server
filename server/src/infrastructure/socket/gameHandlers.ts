@@ -7,6 +7,7 @@ import { Server, Socket } from 'socket.io';
 import { GameRoomManager } from '../../gameRoom';
 import { processPlayerAction, advanceTurn, getClientState, processSingleFactionAITurn } from '../../gameLogic';
 import { resolveCombatResult } from '../../../../shared/services/combat';
+import { emitCombatPhaseStarted, emitCombatPhaseEnded, emitCombatPhaseUpdate } from './battlePhaseUtils';
 
 export function registerGameHandlers(
     io: Server,
@@ -203,6 +204,19 @@ export function registerGameHandlers(
                 room.gameState.combatState = nextBattle;
                 room.gameState.combatQueue = remainingQueue;
                 console.log(`[END_TURN] Popped: ${nextBattle.attackerFaction} vs ${nextBattle.defenderFaction}. Remaining queue: ${remainingQueue.length}`);
+            }
+
+            // START BATTLE PHASE if there are any battles to resolve
+            if (room.gameState.combatState) {
+                const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
+                gameRoomManager.startBattlePhase(code, totalBattles);
+                emitCombatPhaseStarted(
+                    io,
+                    code,
+                    room.gameState.combatState,
+                    room.gameState.combatQueue || [],
+                    room.gameState
+                );
             }
 
             while (room.gameState.combatState) {
