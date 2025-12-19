@@ -260,6 +260,26 @@ export interface SiegeNotification {
   attackerName: string;
 }
 
+/**
+ * Battle info for display in Battle Resolution Phase panel
+ */
+export interface BattleInfo {
+  attackerFaction: FactionId;
+  defenderFaction: FactionId;
+  locationName: string;
+}
+
+/**
+ * Battle Resolution Phase state (multiplayer only)
+ * Tracks the combat resolution phase for all players
+ */
+export interface BattleResolutionPhase {
+  isActive: boolean;
+  currentIndex: number;    // 1-based for display (current battle being resolved)
+  totalBattles: number;    // Initial total when phase started
+  battles: BattleInfo[];   // List of battles in queue for display
+}
+
 // --- AI SPECIFIC TYPES ---
 export interface AITheater {
   id: number;
@@ -409,6 +429,9 @@ export interface CoreGameState {
     defenderFaction: FactionId;
     awaitingDefenderChoice: boolean;
   };
+
+  // Battle Resolution Phase (multiplayer only)
+  battleResolutionPhase?: BattleResolutionPhase;
 
   aiState?: { [key in FactionId]?: FactionAIState };
   stats: GameStats;
