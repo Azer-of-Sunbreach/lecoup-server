@@ -95,11 +95,25 @@ export function registerGameHandlers(
 
             console.log(`[Game] ${code}: Combat detected - Attacker: ${combat.attackerFaction} (Human: ${attackerIsHuman}), Defender: ${combat.defenderFaction} (Human: ${defenderIsHuman})`);
 
+            // START BATTLE PHASE - even for single combat triggered by action
+            const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
+            gameRoomManager.startBattlePhase(code, totalBattles);
+            emitCombatPhaseStarted(
+                io,
+                code,
+                combat,
+                room.gameState.combatQueue || [],
+                room.gameState
+            );
+
             if (!attackerIsHuman && !defenderIsHuman) {
                 // AI/Neutral vs AI/Neutral - auto resolve with FIGHT
                 console.log(`[Game] ${code}: Non-human combat - auto-resolving`);
                 const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
                 room.gameState = { ...room.gameState, ...updates };
+                // End phase immediately for auto-resolved
+                gameRoomManager.endBattlePhase(code);
+                emitCombatPhaseEnded(io, code);
             } else if (!attackerIsHuman && defenderIsHuman) {
                 // AI/Neutral attacker vs Human defender - AI always fights, ask defender
                 console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender only`);
