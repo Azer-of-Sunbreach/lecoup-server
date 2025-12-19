@@ -311,6 +311,15 @@ export function registerGameHandlers(
             // Loop to auto-resolve AI vs AI battles, and route human battles properly
             let pendingCombatRequest: { socketId: string; combatState: any; role: 'ATTACKER' | 'DEFENDER' } | null = null;
 
+            // FIX: If combatState is NULL but combatQueue has battles, pop the first one
+            if (!room.gameState.combatState && room.gameState.combatQueue && room.gameState.combatQueue.length > 0) {
+                console.log(`[END_TURN] combatState is NULL but queue has ${room.gameState.combatQueue.length} battles. Popping first...`);
+                const [nextBattle, ...remainingQueue] = room.gameState.combatQueue;
+                room.gameState.combatState = nextBattle;
+                room.gameState.combatQueue = remainingQueue;
+                console.log(`[END_TURN] Popped: ${nextBattle.attackerFaction} vs ${nextBattle.defenderFaction}. Remaining queue: ${remainingQueue.length}`);
+            }
+
             while (room.gameState.combatState) {
                 const combat = room.gameState.combatState;
                 const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
