@@ -164,22 +164,23 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
     console.log(`[TURN] detectBattles returned ${battles.length} total battles`);
     battles.forEach(b => console.log(`[TURN]   - Battle at ${b.locationId || b.roadId}: ${b.attackerFaction} vs ${b.defenderFaction}`));
 
-    // FIX: On server (NEUTRAL) or simply for robust detection, we want ANY battle involving a human.
-    // If state.playerFaction is NEUTRAL, getPlayerBattles(NEUTRAL) returns nothing useful for humans.
+    // FIX: Detect server mode by checking if humanFactions array exists (passed from multiplayer gameLogic)
+    // Previously checked playerFaction === NEUTRAL, but server sets playerFaction to the AI faction, not NEUTRAL
     let playerBattles: typeof battles = [];
 
-    const humanFactions = (state as any).humanFactions || [state.playerFaction];
-    console.log(`[TURN] playerFaction=${state.playerFaction}, humanFactions=${JSON.stringify(humanFactions)}`);
+    const humanFactions = (state as any).humanFactions as FactionId[] | undefined;
+    const isServerMode = Array.isArray(humanFactions) && humanFactions.length > 0;
+    console.log(`[TURN] playerFaction=${state.playerFaction}, humanFactions=${JSON.stringify(humanFactions)}, isServerMode=${isServerMode}`);
 
-    if (state.playerFaction === FactionId.NEUTRAL) {
-        // Server side: Get battles for ALL humans
+    if (isServerMode) {
+        // Server side: Get battles for ANY human faction
         playerBattles = battles.filter(b =>
             humanFactions.includes(b.attackerFaction) ||
             humanFactions.includes(b.defenderFaction)
         );
         console.log(`[TURN] Server mode: Filtered to ${playerBattles.length} human-involved battles`);
     } else {
-        // Client side or specific faction processing
+        // Client side or single-player
         playerBattles = getPlayerBattles(battles, state.playerFaction);
         console.log(`[TURN] Client mode: Filtered to ${playerBattles.length} player battles`);
     }
