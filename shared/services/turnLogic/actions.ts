@@ -143,6 +143,15 @@ export const processInsurrections = (
                     if (numInsurgents > 0) {
                         // Create Neutral Insurgent Army
                         const insurgentArmyId = `neutral_rising_${loc.id}_${Math.random()}`;
+
+                        // DEBUG: Log insurrection creation
+                        console.log(`[INSURRECTION] Creating Neutral insurgent army at ${loc.name} (${loc.id})`);
+                        console.log(`[INSURRECTION] - Location owner: ${loc.faction}`);
+                        console.log(`[INSURRECTION] - Insurgent strength: ${numInsurgents}`);
+                        const existingArmiesAtLoc = nextArmies.filter(a => a.locationType === 'LOCATION' && a.locationId === loc.id);
+                        console.log(`[INSURRECTION] - Existing armies at location: ${existingArmiesAtLoc.length}`);
+                        existingArmiesAtLoc.forEach(a => console.log(`[INSURRECTION]   - Army ${a.id}: faction=${a.faction}, strength=${a.strength}`));
+
                         nextArmies.push({
                             id: insurgentArmyId,
                             faction: FactionId.NEUTRAL,
