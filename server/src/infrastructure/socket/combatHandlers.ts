@@ -116,6 +116,9 @@ export function registerCombatHandlers(
             // But we must sanitize `combatState` if it exists, to prevent public leak of the NEXT battle.
             const rawStateForBroadcast = { ...room.gameState };
 
+            // Store any pending combat request to send AFTER state_update
+            let pendingCombatRequest: { socketId: string; combatState: any; role: 'ATTACKER' | 'DEFENDER' } | null = null;
+
             // If there is a next combat, we must initiate it properly (Private) and hide it from Public
             if (nextCombat) {
                 console.log(`[Game] ${code}: Subsequent combat detected after resolution!`);
@@ -137,26 +140,18 @@ export function registerCombatHandlers(
                     // Human involved: Initiate Private Pending Combat
                     if (attackerIsHuman) {
                         gameRoomManager.initiateCombat(code, nextCombat, attackerSocketId!, nextCombat.defenderFaction);
-                        // Notify ATTACKER
-                        io.to(attackerSocketId!).emit('combat_choice_requested', {
-                            combatState: nextCombat,
-                            role: 'ATTACKER'
-                        });
+                        // Store for later emission AFTER state_update
+                        pendingCombatRequest = { socketId: attackerSocketId!, combatState: nextCombat, role: 'ATTACKER' };
                     } else if (defenderIsHuman) {
                         // AI vs Human - AI chooses FIGHT, ask Defender
                         gameRoomManager.initiateCombat(code, nextCombat, 'AI', nextCombat.defenderFaction);
                         gameRoomManager.setAttackerChoice(code, 'FIGHT');
-                        io.to(defenderSocketId!).emit('combat_choice_requested', {
-                            combatState: nextCombat,
-                            role: 'DEFENDER'
-                        });
+                        // Store for later emission AFTER state_update
+                        pendingCombatRequest = { socketId: defenderSocketId!, combatState: nextCombat, role: 'DEFENDER' };
                     }
                 }
 
                 // HIDE combatState from the public broadcast
-                // The server state `room.gameState` might have it set (from updates), or cleared (if initiated via gameRoomManager which usually doesn't clear it from gameState, but we should).
-                // Actually `initiateCombat` puts it in `pendingCombat`.
-                // We should ensure `room.gameState.combatState` is NULL so it doesn't block others or show UI.
                 room.gameState.combatState = null;
             }
 
@@ -166,6 +161,15 @@ export function registerCombatHandlers(
 
             io.to(code).emit('state_update', { gameState: stateForBroadcast });
             io.to(code).emit('combat_resolved', { result: 'Combat ended' });
+
+            // NOW send combat_choice_requested AFTER client has processed state_update
+            if (pendingCombatRequest) {
+                io.to(pendingCombatRequest.socketId).emit('combat_choice_requested', {
+                    combatState: pendingCombatRequest.combatState,
+                    role: pendingCombatRequest.role
+                });
+                console.log(`[COMBAT_HANDLER] Sent combat_choice_requested for next battle to ${pendingCombatRequest.role}`);
+            }
 
             console.log(`[Game] ${code}: Combat resolved with action ${finalAction}`);
 
