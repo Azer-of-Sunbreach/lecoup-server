@@ -167,17 +167,12 @@ export function registerCombatHandlers(
             console.log(`[Game] ${code}: Combat resolved with action ${finalAction}`);
 
         } else {
-            // Waiting for other player - This part was correct, but let's double check message
+            // Waiting for other player
+            const isAttacker = socket.id === combat.attackerSocketId;
             const otherSocketId = isAttacker ? combat.defenderSocketId : combat.attackerSocketId;
-            if (otherSocketId) {
-                // If I am attacker (waiting for defender)
-                if (isAttacker) {
-                    // Do nothing, UI handles "Waiting..." via local state or we can emit info
-                }
-                // If I am defender and I just chose -> effectively resolved instantly if Attacker is ready.
-                // So this else block is mostly for Attacker waiting for Defender.
 
-                // If Attacker committed, notify Defender
+            if (otherSocketId) {
+                // If I am attacker and just committed, notify defender
                 if (isAttacker && combat.attackerChoice) {
                     io.to(combat.defenderSocketId!).emit('combat_choice_requested', {
                         combatState: combat.combatState,
@@ -185,9 +180,8 @@ export function registerCombatHandlers(
                     });
                     socket.emit('action_result', { success: true, message: 'Attacking... Waiting for defender.' });
                 }
-            } else {
-                // AI Opponent case - Should be handled by isCombatReady auto-resolving or setup
             }
+            // AI Opponent case is handled by isCombatReady auto-resolving or setup
         }
     });
 }
