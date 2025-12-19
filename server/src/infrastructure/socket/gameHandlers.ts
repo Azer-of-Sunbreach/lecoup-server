@@ -446,6 +446,71 @@ export function registerGameHandlers(
                 });
             }
 
+            // CRITICAL FIX: After AI turn loop completes, check for any battles that need routing
+            // This catches insurrection battles from processTurn that weren't detected during the loop
+            if (room.gameState.combatState && !room.pendingCombat) {
+                console.log(`[END_TURN] Post-AI check: Found unrouted combat!`);
+                const combat = room.gameState.combatState;
+                const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
+                const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
+                const attackerIsHuman = attackerSocketId !== null;
+                const defenderIsHuman = defenderSocketId !== null;
+
+                console.log(`[END_TURN] Post-AI combat: ${combat.attackerFaction} vs ${combat.defenderFaction}, attackerHuman=${attackerIsHuman}, defenderHuman=${defenderIsHuman}`);
+
+                if (!attackerIsHuman && !defenderIsHuman) {
+                    // Auto-resolve non-human combat
+                    const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
+                    room.gameState = { ...room.gameState, ...updates };
+                } else if (!attackerIsHuman && defenderIsHuman) {
+                    // AI/Neutral attacker vs Human defender
+                    gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
+                    gameRoomManager.setAttackerChoice(code, 'FIGHT');
+                    room.gameState.combatState = null;
+
+                    // Broadcast sanitized state FIRST
+                    const clientState = getClientState(room.gameState);
+                    io.to(code).emit('state_update', { gameState: { ...clientState, combatState: null } });
+
+                    // THEN send combat request
+                    io.to(defenderSocketId!).emit('combat_choice_requested', {
+                        combatState: combat,
+                        role: 'DEFENDER'
+                    });
+                    console.log(`[END_TURN] Sent combat_choice_requested to defender`);
+                } else if (attackerIsHuman && !defenderIsHuman) {
+                    // Human attacker vs AI/Neutral defender
+                    gameRoomManager.initiateCombat(code, combat, attackerSocketId!, combat.defenderFaction);
+                    room.gameState.combatState = null;
+
+                    // Broadcast sanitized state FIRST
+                    const clientState = getClientState(room.gameState);
+                    io.to(code).emit('state_update', { gameState: { ...clientState, combatState: null } });
+
+                    // THEN send combat request
+                    io.to(attackerSocketId!).emit('combat_choice_requested', {
+                        combatState: combat,
+                        role: 'ATTACKER'
+                    });
+                    console.log(`[END_TURN] Sent combat_choice_requested to attacker`);
+                } else {
+                    // PvP - route to attacker first
+                    gameRoomManager.initiateCombat(code, combat, attackerSocketId!, combat.defenderFaction);
+                    room.gameState.combatState = null;
+
+                    // Broadcast sanitized state FIRST
+                    const clientState = getClientState(room.gameState);
+                    io.to(code).emit('state_update', { gameState: { ...clientState, combatState: null } });
+
+                    // THEN send combat request
+                    io.to(attackerSocketId!).emit('combat_choice_requested', {
+                        combatState: combat,
+                        role: 'ATTACKER'
+                    });
+                    console.log(`[END_TURN] Sent PvP combat_choice_requested to attacker`);
+                }
+            }
+
         } catch (err: any) {
             console.error(`[Game] ${code}: Error ending turn:`, err);
             socket.emit('error', { message: 'Failed to process end turn' });
