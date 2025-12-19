@@ -131,6 +131,9 @@ export const resolveCombatResult = (
     // Detect remaining player battles
     const currentBattles = detectBattles(newLocations, newArmies, newRoads);
 
+    console.log(`[COMBAT_RESOLVE] detectBattles found ${currentBattles.length} total battles after resolution`);
+    currentBattles.forEach(b => console.log(`[COMBAT_RESOLVE]   - ${b.locationId || b.roadId}: ${b.attackerFaction} vs ${b.defenderFaction}`));
+
     // FIX: Detect server mode by checking for humanFactions array (same as processTurn fix)
     // Previously checked playerFaction === NEUTRAL, but server sets playerFaction to AI faction
     let playerBattles: typeof currentBattles = [];
@@ -138,12 +141,16 @@ export const resolveCombatResult = (
     const humanFactions = (prevState as any).humanFactions as FactionId[] | undefined;
     const isServerMode = Array.isArray(humanFactions) && humanFactions.length > 0;
 
+    console.log(`[COMBAT_RESOLVE] humanFactions=${JSON.stringify(humanFactions)}, isServerMode=${isServerMode}`);
+
     if (isServerMode) {
         // Server sees all battles involving humans
         playerBattles = currentBattles.filter(b =>
             humanFactions.includes(b.attackerFaction) ||
             humanFactions.includes(b.defenderFaction)
         );
+        console.log(`[COMBAT_RESOLVE] After human filter: ${playerBattles.length} battles`);
+
         // Additional: Include NEUTRAL vs Human battles (insurrections)
         if (playerBattles.length === 0 && currentBattles.length > 0) {
             // Check for neutral attackers against humans
@@ -151,13 +158,17 @@ export const resolveCombatResult = (
                 (b.attackerFaction === FactionId.NEUTRAL && humanFactions.includes(b.defenderFaction)) ||
                 (b.defenderFaction === FactionId.NEUTRAL && humanFactions.includes(b.attackerFaction))
             );
+            console.log(`[COMBAT_RESOLVE] After NEUTRAL fallback: ${playerBattles.length} battles`);
         }
     } else {
         playerBattles = getPlayerBattles(currentBattles, prevState.playerFaction);
+        console.log(`[COMBAT_RESOLVE] Client mode: ${playerBattles.length} player battles`);
     }
 
     const nextBattle = playerBattles.length > 0 ? playerBattles[0] : null;
     const nextQueue = playerBattles.length > 1 ? playerBattles.slice(1) : [];
+
+    console.log(`[COMBAT_RESOLVE] nextBattle=${nextBattle ? `${nextBattle.attackerFaction} vs ${nextBattle.defenderFaction}` : 'NULL'}, queue=${nextQueue.length}`);
 
     if (nextBattle && !prevState.combatState) {
         logMsg += " Another conflict has erupted!";
