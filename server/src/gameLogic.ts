@@ -319,9 +319,14 @@ export async function advanceTurn(
     let newIndex = (state.currentTurnIndex + 1) % state.turnOrder.length;
     const nextFaction = state.turnOrder[newIndex];
 
+    console.log(`[ADVANCE_TURN] currentTurnIndex=${state.currentTurnIndex} -> newIndex=${newIndex}`);
+    console.log(`[ADVANCE_TURN] turnOrder=${JSON.stringify(state.turnOrder)}, nextFaction=${nextFaction}`);
+    console.log(`[ADVANCE_TURN] Will processTurn run? newIndex === 0 ? ${newIndex === 0}`);
+
     // If we wrapped around, process the full turn (AI, economy, etc.)
     let updatedState = { ...state };
     if (newIndex === 0) {
+        console.log(`[ADVANCE_TURN] Round wrapped! Calling processTurn...`);
         // Process turn for ALL factions (AI movement, economy, etc.)
         // IMPORTANT: Pass humanFactions so resolveAIBattles can exclude human battles
         const processed = await processTurn({
@@ -329,6 +334,13 @@ export async function advanceTurn(
             playerFaction: state.aiFaction || FactionId.NEUTRAL, // Let AI faction be processed
             humanFactions: state.humanFactions // Pass human factions for correct battle filtering
         } as any);
+
+        console.log(`[ADVANCE_TURN] processTurn returned. combatState=${processed.combatState ? 'SET' : 'NULL'}`);
+        if (processed.combatState) {
+            console.log(`[ADVANCE_TURN] combatState: attacker=${processed.combatState.attackerFaction}, defender=${processed.combatState.defenderFaction}`);
+        }
+        console.log(`[ADVANCE_TURN] combatQueue length=${processed.combatQueue?.length || 0}`);
+
         updatedState = {
             ...processed as MultiplayerGameState,
             humanFactions: state.humanFactions,
@@ -337,12 +349,16 @@ export async function advanceTurn(
             currentTurnIndex: newIndex,
             currentTurnFaction: nextFaction
         };
+
+        console.log(`[ADVANCE_TURN] After merge: updatedState.combatState=${updatedState.combatState ? 'SET' : 'NULL'}`);
     } else {
+        console.log(`[ADVANCE_TURN] No round wrap, skipping processTurn.`);
         updatedState.currentTurnIndex = newIndex;
         updatedState.currentTurnFaction = nextFaction;
     }
 
     const isAITurn = nextFaction === state.aiFaction;
+    console.log(`[ADVANCE_TURN] Returning. isAITurn=${isAITurn}`);
 
     return { newState: updatedState, nextFaction, isAITurn };
 }
