@@ -131,26 +131,26 @@ export const resolveCombatResult = (
     // Detect remaining player battles
     const currentBattles = detectBattles(newLocations, newArmies, newRoads);
 
-    // FIX: If running on server (NEUTRAL playerFaction), DO NOT filter battles.
-    // The server needs to know about ALL battles to resolve them.
-    // Filtering by "playerFaction" (Neutral) would return empty list, clearing combatState.
+    // FIX: Detect server mode by checking for humanFactions array (same as processTurn fix)
+    // Previously checked playerFaction === NEUTRAL, but server sets playerFaction to AI faction
     let playerBattles: typeof currentBattles = [];
 
-    if (prevState.playerFaction === FactionId.NEUTRAL) {
-        // Server sees all battles involving humans or otherwise important ones
-        // In multiplayer, we likely want to catch ANY chain reaction involving a human
-        const humanFactions = (prevState as any).humanFactions || [];
+    const humanFactions = (prevState as any).humanFactions as FactionId[] | undefined;
+    const isServerMode = Array.isArray(humanFactions) && humanFactions.length > 0;
+
+    if (isServerMode) {
+        // Server sees all battles involving humans
         playerBattles = currentBattles.filter(b =>
             humanFactions.includes(b.attackerFaction) ||
             humanFactions.includes(b.defenderFaction)
         );
-        // If no human battles, but there are AI battles, maybe we should return them too?
-        // But for now, let's focus on Human vs X
+        // Additional: Include NEUTRAL vs Human battles (insurrections)
         if (playerBattles.length === 0 && currentBattles.length > 0) {
-            // Fallback: If we just resolved a battle and there are MORE battles, 
-            // we shouldn't just ignore them if they are relevant to the game flow.
-            // But usually AI battles are auto-resolved. 
-            // Let's stick to Human battles for the "Queue".
+            // Check for neutral attackers against humans
+            playerBattles = currentBattles.filter(b =>
+                (b.attackerFaction === FactionId.NEUTRAL && humanFactions.includes(b.defenderFaction)) ||
+                (b.defenderFaction === FactionId.NEUTRAL && humanFactions.includes(b.attackerFaction))
+            );
         }
     } else {
         playerBattles = getPlayerBattles(currentBattles, prevState.playerFaction);
