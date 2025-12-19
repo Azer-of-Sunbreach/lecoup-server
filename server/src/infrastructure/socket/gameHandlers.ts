@@ -95,25 +95,26 @@ export function registerGameHandlers(
 
             console.log(`[Game] ${code}: Combat detected - Attacker: ${combat.attackerFaction} (Human: ${attackerIsHuman}), Defender: ${combat.defenderFaction} (Human: ${defenderIsHuman})`);
 
-            // START BATTLE PHASE - even for single combat triggered by action
-            const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
-            gameRoomManager.startBattlePhase(code, totalBattles);
-            emitCombatPhaseStarted(
-                io,
-                code,
-                combat,
-                room.gameState.combatQueue || [],
-                room.gameState
-            );
+            // START BATTLE PHASE - ONLY if at least one participant is human
+            if (attackerIsHuman || defenderIsHuman) {
+                const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
+                gameRoomManager.startBattlePhase(code, totalBattles);
+                console.log(`[COMBAT_PHASE] EMITTING combat_phase_started to room ${code} - ${totalBattles} battles`);
+                emitCombatPhaseStarted(
+                    io,
+                    code,
+                    combat,
+                    room.gameState.combatQueue || [],
+                    room.gameState
+                );
+            }
 
             if (!attackerIsHuman && !defenderIsHuman) {
                 // AI/Neutral vs AI/Neutral - auto resolve with FIGHT
                 console.log(`[Game] ${code}: Non-human combat - auto-resolving`);
                 const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
                 room.gameState = { ...room.gameState, ...updates };
-                // End phase immediately for auto-resolved
-                gameRoomManager.endBattlePhase(code);
-                emitCombatPhaseEnded(io, code);
+                // No need to end phase - it was never started for AI vs AI
             } else if (!attackerIsHuman && defenderIsHuman) {
                 // AI/Neutral attacker vs Human defender - AI always fights, ask defender
                 console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender only`);
@@ -220,17 +221,28 @@ export function registerGameHandlers(
                 console.log(`[END_TURN] Popped: ${nextBattle.attackerFaction} vs ${nextBattle.defenderFaction}. Remaining queue: ${remainingQueue.length}`);
             }
 
-            // START BATTLE PHASE if there are any battles to resolve
+            // START BATTLE PHASE only if there are human-involved battles
             if (room.gameState.combatState) {
-                const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
-                gameRoomManager.startBattlePhase(code, totalBattles);
-                emitCombatPhaseStarted(
-                    io,
-                    code,
-                    room.gameState.combatState,
-                    room.gameState.combatQueue || [],
-                    room.gameState
-                );
+                // Check if ANY battle involves humans (current + queue)
+                const allCombats = [room.gameState.combatState, ...(room.gameState.combatQueue || [])];
+                const hasHumanInvolved = allCombats.some(combat => {
+                    const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
+                    const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
+                    return attackerSocketId !== null || defenderSocketId !== null;
+                });
+
+                if (hasHumanInvolved) {
+                    const totalBattles = allCombats.length;
+                    gameRoomManager.startBattlePhase(code, totalBattles);
+                    console.log(`[COMBAT_PHASE] EMITTING combat_phase_started in end_turn to room ${code} - ${totalBattles} battles`);
+                    emitCombatPhaseStarted(
+                        io,
+                        code,
+                        room.gameState.combatState,
+                        room.gameState.combatQueue || [],
+                        room.gameState
+                    );
+                }
             }
 
             while (room.gameState.combatState) {
@@ -293,6 +305,15 @@ export function registerGameHandlers(
                     role: pendingCombatRequest.role
                 });
                 console.log(`[Game] ${code}: Sent combat_choice_requested to ${pendingCombatRequest.role}`);
+            } else {
+                // No pending combat request means all combats were AI vs AI and auto-resolved
+                // End the battle phase if it was started
+                const phaseInfo = gameRoomManager.getBattlePhaseInfo(code);
+                if (phaseInfo.active && !room.gameState.combatState && (!room.gameState.combatQueue || room.gameState.combatQueue.length === 0)) {
+                    console.log(`[Game] ${code}: All combats auto-resolved, ending battle phase`);
+                    gameRoomManager.endBattlePhase(code);
+                    emitCombatPhaseEnded(io, code);
+                }
             }
 
             // 2. If it's an AI turn, process it immediately
