@@ -1,8 +1,9 @@
 // Famine Module - Process food shortages and their consequences
 
-import { GameState, Location, Army, FactionId, LocationType } from '../../types';
+import { GameState, Location, Army, FactionId, LocationType, LogEntry } from '../../types';
 import { applySequentialLosses } from '../combat';
 import { FamineProcessingResult } from './types';
+import { createFamineLog } from '../logs/logFactory';
 
 /**
  * Process famine effects for all cities.
@@ -18,7 +19,7 @@ import { FamineProcessingResult } from './types';
  * @returns Updated locations, armies, stats and famine notification
  */
 export function processFamine(state: GameState): FamineProcessingResult {
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
     let locations = state.locations.map(l => ({ ...l }));
     let armies = [...state.armies];
     let stats = { ...state.stats };
@@ -36,7 +37,9 @@ export function processFamine(state: GameState): FamineProcessingResult {
                 cityIdsInFamine.push(loc.id);
                 const newStab = Math.max(0, loc.stability - 30);
                 if (loc.stability > 0) {
-                    logs.push(`Famine in ${loc.name}! Stability plummets.`);
+                    // Updated message per user request
+                    const famineLog = createFamineLog(loc.name, loc.faction, state.turn);
+                    logs.push(famineLog);
                 }
                 return { ...loc, foodStock: 0, stability: newStab };
             } else if (projectedStock < 50) {
@@ -59,20 +62,15 @@ export function processFamine(state: GameState): FamineProcessingResult {
         const city = locations[cityIndex];
 
         // Population deaths and refugees (separate random values)
-        // New rules: > 10000 pop = 1-5000, 2500-10000 pop = 1-1000, <= 2500 pop = nothing
         if (city.population > 2500) {
             const maxLoss = city.population > 10000 ? 5000 : 1000;
             const deaths = Math.floor(Math.random() * maxLoss) + 1;
             const refugees = Math.floor(Math.random() * maxLoss) + 1;
             const totalLoss = deaths + refugees;
 
-            // City loses both deaths and refugees
             locations[cityIndex].population = Math.max(0, city.population - totalLoss);
-
-            // Only deaths count towards death toll
             stats.deathToll += deaths;
 
-            // Only refugees flee to rural area (not the dead)
             if (city.linkedLocationId) {
                 const ruralIdx = locations.findIndex(l => l.id === city.linkedLocationId);
                 if (ruralIdx !== -1) {
@@ -80,7 +78,6 @@ export function processFamine(state: GameState): FamineProcessingResult {
                 }
             }
         }
-        // If population <= 2500, no deaths or refugees occur
 
         // Army deaths in city
         const cityArmies = armies.filter(a =>
@@ -107,8 +104,6 @@ export function processFamine(state: GameState): FamineProcessingResult {
             if (rural && rural.foodIncome <= 0) {
                 famineNotification = { cityName: city.name, ruralName: rural.name };
 
-                // Rural population deaths (same tiered rules as cities)
-                // > 10000 pop = 1-5000, 2500-10000 pop = 1-1000, <= 2500 pop = nothing
                 if (rural.population > 2500) {
                     const maxLoss = rural.population > 10000 ? 5000 : 1000;
                     const rDeaths = Math.floor(Math.random() * maxLoss) + 1;
@@ -119,7 +114,6 @@ export function processFamine(state: GameState): FamineProcessingResult {
                     }
                 }
 
-                // Rural army deaths
                 const ruralArmies = armies.filter(a =>
                     a.locationId === rural.id &&
                     a.locationType === 'LOCATION' &&

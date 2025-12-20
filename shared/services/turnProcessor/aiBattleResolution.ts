@@ -5,12 +5,14 @@ import {
     FactionId,
     CharacterStatus,
     FACTION_NAMES,
-    CombatState
+    CombatState,
+    LogEntry
 } from '../../types';
 import { FORTIFICATION_LEVELS } from '../../constants';
 import { detectBattles } from '../combatDetection';
 import { calculateCombatStrength, applySequentialLosses } from '../combat';
 import { AIBattleResolutionResult } from './types';
+import { createLeaderDiedLog } from '../logs/logFactory';
 
 /**
  * Resolve all AI vs AI battles for the current turn.
@@ -26,7 +28,7 @@ export function resolveAIBattles(
     state: GameState,
     existingInsurrectionNotification: any
 ): AIBattleResolutionResult {
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
     let locations = state.locations.map(l => ({ ...l }));
     let roads = state.roads.map(r => ({ ...r, stages: r.stages.map(s => ({ ...s })) }));
     let armies = [...state.armies];
@@ -41,8 +43,6 @@ export function resolveAIBattles(
         loops++;
         battles = detectBattles(locations, armies, roads);
 
-        // Get human factions - in multiplayer, state.humanFactions exists
-        // In solo mode, fallback to [state.playerFaction]
         const humanFactions: FactionId[] = (state as any).humanFactions || [state.playerFaction];
 
         // Filter out battles involving ANY human faction, and sieging battles
@@ -53,18 +53,7 @@ export function resolveAIBattles(
         );
 
         if (activeAiBattles.length === 0) {
-            // Log sieges only on first pass
-            if (loops === 1) {
-                const siegeBattles = battles.filter(b =>
-                    !humanFactions.includes(b.attackerFaction) &&
-                    !humanFactions.includes(b.defenderFaction) &&
-                    b.attackers.some(a => a.isSieging)
-                );
-                siegeBattles.forEach(b => {
-                    const locName = locations.find(l => l.id === b.locationId)?.name;
-                    logs.push(`AI: ${FACTION_NAMES[b.attackerFaction]} lays siege to ${FACTION_NAMES[b.defenderFaction]} at ${locName}.`);
-                });
-            }
+            // AI siege logs removed per user request
             break;
         }
 
@@ -137,10 +126,10 @@ export function resolveAIBattles(
                 }
             }
 
-            logs.push(`AI Battle: ${FACTION_NAMES[battle.attackerFaction]} seized control from ${FACTION_NAMES[battle.defenderFaction]}.`);
+            // AI Battle log removed per user request
         } else {
             stats.deathToll += Math.min(deadDef, losses) + deadAtt;
-            logs.push(`AI Battle: ${FACTION_NAMES[battle.defenderFaction]} repelled ${FACTION_NAMES[battle.attackerFaction]}.`);
+            // AI Battle log removed per user request
 
             // Failure notification for non-neutral insurrections
             if (battle.isInsurgentBattle && !insurrectionNotification && battle.attackerFaction !== FactionId.NEUTRAL) {
@@ -188,7 +177,9 @@ export function resolveAIBattles(
                                 ? { ...c, status: CharacterStatus.DEAD }
                                 : c
                         );
-                        logs.push(`${leader.name} died in battle.`);
+                        // Leader death log - INFO severity
+                        const deathLog = createLeaderDiedLog(leader.name, state.turn);
+                        logs.push(deathLog);
                     } else {
                         const escapeLocs = locations.filter(loc => loc.faction === leader.faction);
                         const target = escapeLocs.length

@@ -1,7 +1,8 @@
 // Negotiations Module - Process pending diplomatic negotiations
 
-import { GameState, FactionId, Location, Army, LocationType, FACTION_NAMES } from '../../types';
+import { GameState, FactionId, Location, Army, LocationType, FACTION_NAMES, LogEntry } from '../../types';
 import { NegotiationProcessingResult } from './types';
+import { createNegotiationsSuccessLog, createNegotiationsFailedLog } from '../logs/logFactory';
 
 /**
  * Process pending negotiations with neutral territories.
@@ -22,7 +23,7 @@ import { NegotiationProcessingResult } from './types';
  * @returns Updated locations, armies, pending negotiations and logs
  */
 export function processNegotiations(state: GameState): NegotiationProcessingResult {
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
     let locations = state.locations.map(l => ({ ...l }));
     let armies = [...state.armies];
     const nextNegotiations: typeof state.pendingNegotiations = [];
@@ -37,8 +38,6 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
                 const success = score > 60;
 
                 if (success) {
-                    // Use the negotiating faction's ID
-                    // Fallback to Player if undefined (Legacy/Save compat)
                     const winnerFaction = neg.factionId || state.playerFaction;
 
                     // Update location
@@ -52,7 +51,6 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
                     armies = armies.map(a => {
                         if (a.locationId === target.id && a.faction === FactionId.NEUTRAL) {
                             let newArmy = { ...a, faction: winnerFaction };
-                            // Cap troop strength at 1000, return excess to population
                             if (newArmy.strength > 1000) {
                                 locations[targetIndex].population += (newArmy.strength - 1000);
                                 newArmy.strength = 1000;
@@ -67,9 +65,22 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
                         locations[targetIndex].foodStock += neg.foodOffer;
                     }
 
-                    logs.push(`Negotiations successful! ${target.name} has joined ${FACTION_NAMES[winnerFaction] || winnerFaction}.`);
+                    // Success log - visible to all, WARNING for enemies, INFO for winner
+                    const successLog = createNegotiationsSuccessLog(
+                        target.name,
+                        target.id,
+                        winnerFaction,
+                        state.turn
+                    );
+                    logs.push(successLog);
                 } else {
-                    logs.push(`Negotiations failed with ${target.name}.`);
+                    // Failed log - visible only to initiator per user request
+                    const failedLog = createNegotiationsFailedLog(
+                        target.name,
+                        neg.factionId || state.playerFaction,
+                        state.turn
+                    );
+                    logs.push(failedLog);
                 }
             }
         } else {

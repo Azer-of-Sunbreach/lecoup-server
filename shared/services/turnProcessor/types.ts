@@ -1,6 +1,6 @@
 // Turn Processor Types - Interfaces for turn processing phases
 
-import { GameState, FactionId, Location, Army, Character, Road, Convoy, NavalConvoy, CombatState } from '../../types';
+import { GameState, FactionId, Location, Army, Character, Road, Convoy, NavalConvoy, CombatState, LogEntry } from '../../types';
 
 /**
  * Result of convoy processing
@@ -8,7 +8,7 @@ import { GameState, FactionId, Location, Army, Character, Road, Convoy, NavalCon
 export interface ConvoyProcessingResult {
     convoys: Convoy[];
     locations: Location[];
-    logs: string[];
+    logs: LogEntry[];
 }
 
 /**
@@ -17,7 +17,7 @@ export interface ConvoyProcessingResult {
 export interface NavalConvoyProcessingResult {
     navalConvoys: NavalConvoy[];
     locations: Location[];
-    logs: string[];
+    logs: LogEntry[];
 }
 
 /**
@@ -28,7 +28,7 @@ export interface FamineProcessingResult {
     armies: Army[];
     stats: GameState['stats'];
     famineNotification: { cityName: string; ruralName: string } | null;
-    logs: string[];
+    logs: LogEntry[];
 }
 
 /**
@@ -38,7 +38,7 @@ export interface NegotiationProcessingResult {
     locations: Location[];
     armies: Army[];
     pendingNegotiations: GameState['pendingNegotiations'];
-    logs: string[];
+    logs: LogEntry[];
 }
 
 /**
@@ -50,7 +50,7 @@ export interface AIBattleResolutionResult {
     armies: Army[];
     characters: Character[];
     stats: GameState['stats'];
-    logs: string[];
+    logs: LogEntry[];
     insurrectionNotification: any;
 }
 
@@ -66,5 +66,5 @@ export interface StabilityProcessingResult {
  */
 export interface TurnPhaseContext {
     state: GameState;
-    logs: string[];
+    logs: LogEntry[];
 }

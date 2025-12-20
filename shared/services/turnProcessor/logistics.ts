@@ -1,7 +1,8 @@
 // Logistics Module - Convoy processing and delivery
 
-import { GameState, Convoy, NavalConvoy, Location, Road } from '../../types';
+import { GameState, Convoy, NavalConvoy, Location, Road, LogEntry } from '../../types';
 import { ConvoyProcessingResult, NavalConvoyProcessingResult } from './types';
+import { createConvoyArrivalLog, createNavalConvoyArrivalLog } from '../logs/logFactory';
 
 /**
  * Process land convoy movements and deliveries.
@@ -10,14 +11,16 @@ import { ConvoyProcessingResult, NavalConvoyProcessingResult } from './types';
  * @param convoys - Current list of active convoys
  * @param roads - All roads in the game
  * @param locations - All locations (will be modified for food delivery)
+ * @param currentTurn - Current game turn for log creation
  * @returns Updated convoys, locations and logs
  */
 export function processConvoys(
     convoys: Convoy[],
     roads: Road[],
-    locations: Location[]
+    locations: Location[],
+    currentTurn: number = 1
 ): ConvoyProcessingResult {
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
     const updatedLocations = locations.map(l => ({ ...l }));
     const nextConvoys: Convoy[] = [];
 
@@ -32,7 +35,12 @@ export function processConvoys(
             const destCityIndex = updatedLocations.findIndex(l => l.id === convoy.destinationCityId);
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
-                logs.push(`Convoy arrived at ${updatedLocations[destCityIndex].name} with ${convoy.foodAmount} food.`);
+                const arrivalLog = createConvoyArrivalLog(
+                    updatedLocations[destCityIndex].name,
+                    convoy.foodAmount,
+                    currentTurn
+                );
+                logs.push(arrivalLog);
             }
         } else {
             // Convoy continues moving
@@ -53,13 +61,15 @@ export function processConvoys(
  * 
  * @param navalConvoys - Current list of active naval convoys
  * @param locations - All locations (will be modified for food delivery)
+ * @param currentTurn - Current game turn for log creation
  * @returns Updated naval convoys, locations and logs
  */
 export function processNavalConvoys(
     navalConvoys: NavalConvoy[],
-    locations: Location[]
+    locations: Location[],
+    currentTurn: number = 1
 ): NavalConvoyProcessingResult {
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
     const updatedLocations = locations.map(l => ({ ...l }));
     const nextNavalConvoys: NavalConvoy[] = [];
 
@@ -71,7 +81,12 @@ export function processNavalConvoys(
             const destCityIndex = updatedLocations.findIndex(l => l.id === convoy.destinationCityId);
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
-                logs.push(`Naval convoy arrived at ${updatedLocations[destCityIndex].name} with ${convoy.foodAmount} food.`);
+                const navalArrivalLog = createNavalConvoyArrivalLog(
+                    updatedLocations[destCityIndex].name,
+                    convoy.foodAmount,
+                    currentTurn
+                );
+                logs.push(navalArrivalLog);
             }
         } else {
             // Naval convoy continues voyage
