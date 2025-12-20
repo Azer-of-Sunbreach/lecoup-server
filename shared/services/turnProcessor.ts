@@ -1,18 +1,16 @@
 // Turn Processor - Main turn orchestration logic
-// Refactored to use modular components
+// Shared module: Used by both client (solo) and server (multiplayer)
+// AI functions are injected to allow client-specific AI logic
 
-import { GameState, FactionId, FACTION_NAMES } from '../types';
+import { GameState, FactionId, FACTION_NAMES, LogEntry, LogSeverity, LogType } from '../types';
 import { calculateEconomyAndFood } from '../utils/economy';
-// AI functions stubbed - server handles AI via gameLogic.ts directly
-const processAITurn = (state: GameState): GameState => state;
-const generateTurnNarrative = async (_turn: number, _events: string[], _faction: FactionId): Promise<string> => "The war continues...";
 import { detectBattles } from './combatDetection';
 
-// Import from turnLogic (already existed)
+// Import from turnLogic
 import { resolveMovements } from './turnLogic/movement';
 import { processInsurrections, processConstruction, processAutoCapture } from './turnLogic/actions';
 
-// Import from new modular structure
+// Import from turnProcessor modules
 import {
     processConvoys,
     processNavalConvoys,
@@ -22,6 +20,23 @@ import {
     resolveAIBattles,
     getPlayerBattles
 } from './turnProcessor/index';
+
+// Import log factory
+import { createTurnMarkerLog, createNarrativeLog } from './logs/logFactory';
+
+/**
+ * AI function types for injection
+ */
+export interface TurnProcessorOptions {
+    /** Process AI turn (client-only, handles AI planning and execution) */
+    processAITurn?: (state: GameState) => GameState;
+    /** Generate narrative flavor text (client-only, may use external API) */
+    generateTurnNarrative?: (turn: number, events: string[], faction: FactionId) => Promise<string>;
+}
+
+// Default stubs (used by server)
+const defaultProcessAITurn = (state: GameState): GameState => state;
+const defaultGenerateTurnNarrative = async (_turn: number, _events: string[], _faction: FactionId): Promise<string> => "The war continues...";
 
 /**
  * Process a complete game turn.
@@ -36,19 +51,31 @@ import {
  * 7. Narrative & Victory Check
  * 
  * @param initialState - Game state before the turn
+ * @param options - Optional AI functions to inject (client provides these)
  * @returns Promise resolving to the updated game state
  */
-export const processTurn = async (initialState: GameState): Promise<GameState> => {
+export const processTurn = async (
+    initialState: GameState,
+    options: TurnProcessorOptions = {}
+): Promise<GameState> => {
+    const {
+        processAITurn = defaultProcessAITurn,
+        generateTurnNarrative = defaultGenerateTurnNarrative
+    } = options;
+
     let state = { ...initialState };
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
 
     // --- PHASE 1: AI PLANNING & EXECUTION ---
-    // Reset justMoved BEFORE AI turn, so previous-turn armies can be moved by AI
     state.armies = state.armies.map(a => ({ ...a, justMoved: false }));
     state = processAITurn(state);
 
     // --- PHASE 2: TURN ADVANCEMENT & RESET ---
     state.turn += 1;
+
+    // Add turn separator log
+    logs.push(createTurnMarkerLog(state.turn));
+
     state.locations = state.locations.map(l => ({
         ...l,
         actionsTaken: { recruit: 0, seizeGold: 0, seizeFood: 0, incite: 0 },
@@ -59,7 +86,7 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
         stages: r.stages.map(s => ({ ...s, hasBeenSiegedThisTurn: false }))
     }));
 
-    // Reset Army Statuses (Spec 7.7)
+    // Reset Army Statuses
     state.armies = state.armies.map(a => ({
         ...a,
         isSpent: false,
@@ -75,17 +102,15 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
 
     // --- PHASE 4: EVENTS & ACTIONS ---
     console.log('[TURN] Phase 4: Processing insurrections...');
-    const revoltResult = processInsurrections(state.locations, state.characters, state.armies, state.playerFaction);
+    const revoltResult = processInsurrections(state.locations, state.characters, state.armies, state.playerFaction, state.turn);
     state.locations = revoltResult.locations;
     state.characters = revoltResult.characters;
     state.armies = revoltResult.armies;
     logs.push(...revoltResult.logs);
     let insurrectionNotification = revoltResult.notification;
 
-    // DEBUG: Count insurgent armies after processing
     const insurgentArmies = state.armies.filter(a => a.isInsurgent);
     console.log(`[TURN] After insurrections: ${insurgentArmies.length} insurgent armies exist`);
-    insurgentArmies.forEach(a => console.log(`[TURN]   - ${a.id} at ${a.locationId}, faction=${a.faction}, strength=${a.strength}`));
 
     if (revoltResult.refunds) {
         Object.entries(revoltResult.refunds).forEach(([faction, amount]) => {
@@ -99,23 +124,22 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
     state.armies = buildResult.armies;
     logs.push(...buildResult.logs);
 
-    const captureResult = processAutoCapture(state.locations, state.roads, state.armies, state.playerFaction);
+    const captureResult = processAutoCapture(state.locations, state.roads, state.armies, state.playerFaction, state.turn);
     state.locations = captureResult.locations;
     state.roads = captureResult.roads;
     logs.push(...captureResult.logs);
 
-    // Prioritize Embargo notification if it exists, otherwise allow Restore notification
     const grainTradeNotification = state.grainTradeNotification || captureResult.tradeNotification;
 
     // --- PHASE 5: LOGISTICS ---
     // 5.1 Land Convoys
-    const convoyResult = processConvoys(state.convoys, state.roads, state.locations);
+    const convoyResult = processConvoys(state.convoys, state.roads, state.locations, state.turn);
     state.convoys = convoyResult.convoys;
     state.locations = convoyResult.locations;
     logs.push(...convoyResult.logs);
 
     // 5.2 Naval Convoys
-    const navalResult = processNavalConvoys(state.navalConvoys, state.locations);
+    const navalResult = processNavalConvoys(state.navalConvoys, state.locations, state.turn);
     state.navalConvoys = navalResult.navalConvoys;
     state.locations = navalResult.locations;
     logs.push(...navalResult.logs);
@@ -137,7 +161,7 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
         state.resources[fid].gold += income;
     });
 
-    // 5.6 Stability (Leader modifiers + Low tax recovery)
+    // 5.6 Stability
     const stabilityResult = processStability(state.locations, state.characters);
     state.locations = stabilityResult.locations;
 
@@ -162,31 +186,23 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
     console.log('[TURN] Detecting battles...');
     const battles = detectBattles(state.locations, state.armies, state.roads);
     console.log(`[TURN] detectBattles returned ${battles.length} total battles`);
-    battles.forEach(b => console.log(`[TURN]   - Battle at ${b.locationId || b.roadId}: ${b.attackerFaction} vs ${b.defenderFaction}`));
 
-    // FIX: Detect server mode by checking if humanFactions array exists (passed from multiplayer gameLogic)
-    // Previously checked playerFaction === NEUTRAL, but server sets playerFaction to the AI faction, not NEUTRAL
     let playerBattles: typeof battles = [];
-
     const humanFactions = (state as any).humanFactions as FactionId[] | undefined;
     const isServerMode = Array.isArray(humanFactions) && humanFactions.length > 0;
-    console.log(`[TURN] playerFaction=${state.playerFaction}, humanFactions=${JSON.stringify(humanFactions)}, isServerMode=${isServerMode}`);
 
     if (isServerMode) {
-        // Server side: Get battles for ANY human faction
         playerBattles = battles.filter(b =>
             humanFactions.includes(b.attackerFaction) ||
             humanFactions.includes(b.defenderFaction)
         );
-        console.log(`[TURN] Server mode: Filtered to ${playerBattles.length} human-involved battles`);
     } else {
-        // Client side or single-player
         playerBattles = getPlayerBattles(battles, state.playerFaction);
-        console.log(`[TURN] Client mode: Filtered to ${playerBattles.length} player battles`);
     }
 
     // --- PHASE 7: NARRATIVE ---
-    const narrativeEvents = [...logs];
+    // Extract messages from LogEntry[] for narrative generation
+    const narrativeEvents = logs.map(l => l.message);
     if (playerBattles.length > 0) {
         narrativeEvents.push("Battles have erupted involving your forces.");
     }
@@ -195,7 +211,7 @@ export const processTurn = async (initialState: GameState): Promise<GameState> =
     try {
         flavorText = await generateTurnNarrative(state.turn, narrativeEvents, state.playerFaction);
     } catch (e) { }
-    logs.push(flavorText);
+    logs.push(createNarrativeLog(flavorText, state.turn));
 
     // --- VICTORY CHECK ---
     const activeFactions = [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
