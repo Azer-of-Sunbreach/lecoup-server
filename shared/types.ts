@@ -33,6 +33,63 @@ export enum CharacterStatus {
   DEAD = 'DEAD'
 }
 
+// --- STRUCTURED LOG SYSTEM ---
+
+export enum LogSeverity {
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  CRITICAL = 'CRITICAL'
+}
+
+export enum LogType {
+  TURN_MARKER = 'TURN_MARKER',
+  GAME_START = 'GAME_START',
+  MOVEMENT = 'MOVEMENT',
+  CAPTURE = 'CAPTURE',
+  CONVOY = 'CONVOY',
+  INSURRECTION = 'INSURRECTION',
+  NEGOTIATION = 'NEGOTIATION',
+  FAMINE = 'FAMINE',
+  COMBAT = 'COMBAT',
+  ECONOMY = 'ECONOMY',
+  COMMERCE = 'COMMERCE',
+  LEADER = 'LEADER',
+  NARRATIVE = 'NARRATIVE'
+}
+
+export interface LogHighlightTarget {
+  type: 'LOCATION' | 'ARMY' | 'ROAD_STAGE';
+  id: string;
+  stageIndex?: number;
+}
+
+/**
+ * Structured log entry with personalization and hover highlighting support.
+ * Logs can be filtered by faction and have dynamic severity based on viewer.
+ */
+export interface LogEntry {
+  id: string;                        // Unique ID for React keys
+  type: LogType;                     // Category for filtering/styling
+  message: string;                   // Display text
+  turn: number;                      // Turn number when created
+
+  // Personalization - which factions can see this log
+  // Empty array = visible to all
+  visibleToFactions: FactionId[];
+
+  // Base severity (used if viewer not in critical/warning lists)
+  baseSeverity: LogSeverity;
+
+  // Factions for whom this log should show as CRITICAL
+  criticalForFactions?: FactionId[];
+
+  // Factions for whom this log should show as WARNING
+  warningForFactions?: FactionId[];
+
+  // Element to highlight on map when hovering this log
+  highlightTarget?: LogHighlightTarget;
+}
+
 export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND';
 
 export interface Coordinates {
@@ -340,7 +397,7 @@ export interface GameState {
     }
   };
   pendingNegotiations: NegotiationMission[];
-  logs: string[];
+  logs: LogEntry[];
   stats: GameStats;
   pendingCombatResponse?: CoreGameState['pendingCombatResponse'];
 
@@ -435,7 +492,7 @@ export interface CoreGameState {
 
   aiState?: { [key in FactionId]?: FactionAIState };
   stats: GameStats;
-  logs: string[];
+  logs: LogEntry[];
   victory?: { winner: FactionId; message: string };
 }
 
