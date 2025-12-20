@@ -1,16 +1,14 @@
 
-import { GameState, Army, Character, CharacterStatus, RoadQuality, FactionId } from '../../types';
+import { GameState, Army, Character, CharacterStatus, RoadQuality, FactionId, LogEntry } from '../../types';
 import { calculateEconomyAndFood } from '../../utils/economy';
 
 // Helper to check hostility
 const areHostile = (f1: FactionId, f2: FactionId): boolean => {
     if (f1 === f2) return false;
-    // Assuming everyone is hostile to everyone except Neutral/Self for simplicity in this war logic
-    // Adjust if alliances are introduced
     return true;
 };
 
-// Helper to generate a unique key for any position (City, Rural, or Road Stage)
+// Helper to generate a unique key for any position
 const getPositionKey = (locationType: 'LOCATION' | 'ROAD', locationId: string | null, roadId: string | null, stageIndex: number): string => {
     if (locationType === 'LOCATION' && locationId) {
         return `LOC:${locationId}`;
@@ -21,9 +19,8 @@ const getPositionKey = (locationType: 'LOCATION' | 'ROAD', locationId: string | 
     return 'UNKNOWN';
 };
 
-export const resolveMovements = (state: GameState): { armies: Army[], characters: Character[], logs: string[] } => {
+export const resolveMovements = (state: GameState): { armies: Army[], characters: Character[], logs: LogEntry[] } => {
     // 0. Snapshot Start of Turn Position for History/Retreat Logic
-    // This is critical for robust 'Retreat' and 'Reverse' mechanics.
     const armiesWithSnapshot = state.armies.map(army => ({
         ...army,
         startOfTurnPosition: {
@@ -35,20 +32,16 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
 
     let nextArmies = armiesWithSnapshot.map(a => ({ ...a }));
     let nextCharacters = state.characters.map(c => ({ ...c }));
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
 
     // 1. Calculate Intended Moves
-    // We store the intended next state for every army without applying it yet
     const moves: Map<string, { armyIndex: number, nextLocationId: string | null, nextRoadId: string | null, nextStageIndex: number, isMoveFinished: boolean }> = new Map();
 
     nextArmies.forEach((army, index) => {
-        // Skip armies that already moved this turn (e.g., AI moved them in Phase 1)
-        // justMoved is reset in Phase 2 of turnProcessor, so this only blocks same-turn double moves
         if (army.justMoved) {
-            return; // FIX: Prevent double movement for AI armies
+            return;
         }
 
-        // Skip if spent, sieging, occupied OR GARRISONED
         if (army.isSpent || army.isSieging || army.action || army.isGarrisoned) return;
 
         // MOVEMENT FROM ROAD
@@ -59,7 +52,6 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
             let nextIndex = army.stageIndex + (army.direction === 'FORWARD' ? 1 : -1);
 
             if (nextIndex < 0 || nextIndex >= road.stages.length) {
-                // Arriving at destination
                 const destId = army.destinationId;
                 if (destId) {
                     moves.set(army.id, {
@@ -71,7 +63,6 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
                     });
                 }
             } else {
-                // Continuing on road
                 moves.set(army.id, {
                     armyIndex: index,
                     nextLocationId: null,
@@ -81,16 +72,12 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
                 });
             }
         }
-        // NOTE: LOCATION-to-ROAD entry is handled by executeArmyMove (UI action) or AI movement.
-        // REGIONAL roads should NOT be duplicated here - that causes double movement (2 stages in 1 turn).
-        // However, LOCAL roads (city↔rural) ARE instant and should be processed here.
         else if (army.locationType === 'LOCATION' && army.destinationId && army.locationId) {
             const connectingRoad = state.roads.find(r =>
                 (r.from === army.locationId && r.to === army.destinationId) ||
                 (r.to === army.locationId && r.from === army.destinationId)
             );
 
-            // ONLY process LOCAL roads here. REGIONAL roads are already on the road via UI/AI action.
             if (connectingRoad && connectingRoad.quality === 'LOCAL') {
                 moves.set(army.id, {
                     armyIndex: index,
@@ -100,7 +87,6 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
                     isMoveFinished: true
                 });
             }
-            // REGIONAL roads: Do NOT process here. Army should already be on road if intended to move.
         }
     });
 
@@ -108,12 +94,6 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
     const collisionsToBlock = new Set<string>();
 
     nextArmies.forEach(armyA => {
-        // Even if A isn't moving, it can block B. But strictly we check interactions of moving units mostly.
-        // However, standard combat handles static vs moving. 
-        // Here we handle:
-        // A) SWAP: A moves to B's spot, B moves to A's spot.
-        // B) ENGAGEMENT: A and B are ALREADY on the same spot and try to move away.
-
         const posCurrentA = getPositionKey(armyA.locationType, armyA.locationId, armyA.roadId, armyA.stageIndex);
 
         let posNextA = posCurrentA;
@@ -145,12 +125,7 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
             }
 
             // RULE 1: HEAD-ON COLLISION (SWAP)
-            // A moves to where B is/was, AND B moves to where A is/was.
-            // FIX: Instead of blocking both, let ONE advance to trigger combat.
-            // The first one found (A) advances, B is blocked. They meet and fight.
             if (posNextA === posCurrentB && posNextB === posCurrentA) {
-                // Block B if A's ID is "smaller" (deterministic tie-breaker), let A advance.
-                // This ensures one moves and the other stays, causing them to meet on the same tile -> Combat.
                 if (armyA.id < armyB.id) {
                     // Do not block A
                 } else {
@@ -158,40 +133,15 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
                 }
             }
 
-            // RULE 2: ENGAGEMENT AT CONTACT (Co-located Start)
-            // A and B start on the same tile (e.g. both entered Road Stage 0).
-            // They MUST fight. 
-            // FIX: Only block ONE of them (tie-breaker), not both!
-            // If both are blocked, Turn 4 stall happens. One must "advance" (stay) to trigger combat.
+            // RULE 2: ENGAGEMENT AT CONTACT
             if (posCurrentA === posCurrentB) {
-                // If they are on the same tile, they are engaged.
-                // Block ONE army using tie-breaker. The other "stays" (but can still fight).
-                // Actually, if both are trying to move AWAY from each other, we should block both
-                // to force the fight. But if they're moving to the same place... complex.
-                // Simple fix: Just block the one with higher ID to keep them engaged.
                 if (armyA.id < armyB.id) {
                     if (moveA) collisionsToBlock.add(armyA.id);
-                } else {
-                    // Block B in the other comparison iteration
                 }
             }
 
-            // RULE 3: APPROACH DETECTION (NEW FIX)
-            // A moves to B's tile, but B is NOT moving (garrisoned, spent, or no move order).
-            // Let A advance - they will meet on B's tile and trigger combat.
-            // This fixes the bug where both armies were stuck on adjacent tiles.
-            if (posNextA === posCurrentB && !moveB) {
-                // A is approaching a stationary B. Do NOT block A.
-                // Combat detection (combatDetection.ts) will find both on same tile and trigger battle.
-                // No action needed here - just don't block A, which is the default.
-            }
-
-            // RULE 4: ZONE OF CONTROL (NEW - Fixes pass-through bug)
-            // If A is trying to move, and B is STATIONARY at A's CURRENT position,
-            // then A is attempting to "escape" from combat. Block A so combat triggers.
+            // RULE 4: ZONE OF CONTROL
             if (posCurrentA === posCurrentB && !moveB && moveA) {
-                // A is on the same tile as stationary B and trying to move away.
-                // A must fight B before moving. Block A.
                 collisionsToBlock.add(armyA.id);
             }
         });
@@ -201,15 +151,12 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
     // 3. Execute Valid Moves
     moves.forEach((move, armyId) => {
         if (collisionsToBlock.has(armyId)) {
-            // Move Cancelled due to collision/engagement
             return;
         }
 
         const army = nextArmies[move.armyIndex];
 
         if (move.isMoveFinished && move.nextLocationId) {
-            // Arrival Logic
-            // Update Food Source Logic (Spec: consume from new location if Rural/City)
             const destLoc = state.locations.find(l => l.id === move.nextLocationId);
             let newFoodSource = army.foodSourceId;
             if (destLoc) {
@@ -224,18 +171,17 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
                 stageIndex: 0,
                 destinationId: null,
                 turnsUntilArrival: 0,
-                justMoved: true, // FIX: Army has arrived this turn
+                justMoved: true,
                 foodSourceId: newFoodSource,
                 lastSafePosition: { type: 'LOCATION', id: move.nextLocationId }
             };
         } else {
-            // Road Advance Logic
             nextArmies[move.armyIndex] = {
                 ...army,
                 roadId: move.nextRoadId,
                 stageIndex: move.nextStageIndex,
                 turnsUntilArrival: Math.max(0, army.turnsUntilArrival - 1),
-                justMoved: true // FIX: Army has moved on road this turn
+                justMoved: true
             };
         }
     });
