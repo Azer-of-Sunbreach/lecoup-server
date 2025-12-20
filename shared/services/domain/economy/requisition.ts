@@ -92,8 +92,8 @@ export const executeRequisition = (
         success: true,
         newState: {
             locations: newLocations,
-            resources: newResources,
-            logs: [...state.logs, `Seized ${type} from ${loc.name}.`].slice(-50)
+            resources: newResources
+            // Requisition log removed - player action doesn't need logging
         },
         message: `Seized ${type} from ${loc.name}`
     };
