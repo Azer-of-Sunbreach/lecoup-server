@@ -16,147 +16,153 @@ export function registerGameHandlers(
 ): void {
 
     socket.on('player_action', ({ action }) => {
-        console.log(`[Game] Received player_action from socket ${socket.id}:`, action?.type);
+        try {
+            console.log(`[Game] Received player_action from socket ${socket.id}:`, action?.type);
 
-        // Try to get gameCode from socket data, or recover it from room manager
-        let code = socket.data.gameCode;
-        if (!code) {
-            code = gameRoomManager.getGameCodeForSocket(socket.id);
-            if (code) {
-                socket.data.gameCode = code; // Restore it
-                console.log(`[Game] Recovered gameCode ${code} for socket ${socket.id}`);
+            // Try to get gameCode from socket data, or recover it from room manager
+            let code = socket.data.gameCode;
+            if (!code) {
+                code = gameRoomManager.getGameCodeForSocket(socket.id);
+                if (code) {
+                    socket.data.gameCode = code; // Restore it
+                    console.log(`[Game] Recovered gameCode ${code} for socket ${socket.id}`);
+                }
             }
-        }
 
-        if (!code) {
-            console.log(`[Game] ERROR: No gameCode for socket ${socket.id}`);
-            socket.emit('error', { message: 'Not in a game' });
-            return;
-        }
-
-        const room = gameRoomManager.getRoom(code);
-        if (!room) {
-            socket.emit('error', { message: 'Game room not found' });
-            return;
-        }
-
-        // Get player's faction
-        const playerFaction = room.playerFactions.get(socket.id);
-        if (!playerFaction) {
-            socket.emit('action_result', { success: false, error: 'Player faction not found' });
-            return;
-        }
-
-        // Block actions if there's a pending combat that involves this player
-        if (room.pendingCombat) {
-            const combat = room.pendingCombat;
-            const playerIsInvolvedInCombat =
-                socket.id === combat.attackerSocketId ||
-                socket.id === combat.defenderSocketId ||
-                combat.combatState.attackerFaction === playerFaction ||
-                combat.combatState.defenderFaction === playerFaction;
-
-            if (playerIsInvolvedInCombat) {
-                socket.emit('action_result', {
-                    success: false,
-                    error: 'Cannot perform action while combat is pending. Resolve the combat first.'
-                });
-                // Re-send the combat request in case client missed it
-                const role = combat.combatState.attackerFaction === playerFaction ? 'ATTACKER' : 'DEFENDER';
-                socket.emit('combat_choice_requested', {
-                    combatState: combat.combatState,
-                    role
-                });
+            if (!code) {
+                console.log(`[Game] ERROR: No gameCode for socket ${socket.id}`);
+                socket.emit('error', { message: 'Not in a game' });
                 return;
             }
-        }
 
-        // Process action on server using shared game logic
-        console.log(`[Game] ${code}: Processing ${action.type} from ${playerFaction}`);
-        const sharedAction = { ...action, faction: playerFaction }; // Add faction for shared type
-        const result = processPlayerAction(room.gameState, sharedAction as any, playerFaction);
-
-        if (!result.success) {
-            socket.emit('action_result', { success: false, error: result.error });
-            return;
-        }
-
-        // Update server state
-        room.gameState = result.newState;
-
-        // Check if combat was triggered by this action
-        if (result.newState.combatState) {
-            const combat = result.newState.combatState;
-            // Check if participants are human by socket presence (covers AI and NEUTRAL)
-            const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
-            const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
-            const attackerIsHuman = attackerSocketId !== null;
-            const defenderIsHuman = defenderSocketId !== null;
-
-            console.log(`[Game] ${code}: Combat detected - Attacker: ${combat.attackerFaction} (Human: ${attackerIsHuman}), Defender: ${combat.defenderFaction} (Human: ${defenderIsHuman})`);
-
-            // START BATTLE PHASE - ONLY if at least one participant is human
-            if (attackerIsHuman || defenderIsHuman) {
-                const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
-                gameRoomManager.startBattlePhase(code, totalBattles);
-                console.log(`[COMBAT_PHASE] EMITTING combat_phase_started to room ${code} - ${totalBattles} battles`);
-                emitCombatPhaseStarted(
-                    io,
-                    code,
-                    combat,
-                    room.gameState.combatQueue || [],
-                    room.gameState
-                );
+            const room = gameRoomManager.getRoom(code);
+            if (!room) {
+                socket.emit('error', { message: 'Game room not found' });
+                return;
             }
 
-            if (!attackerIsHuman && !defenderIsHuman) {
-                // AI/Neutral vs AI/Neutral - auto resolve with FIGHT
-                console.log(`[Game] ${code}: Non-human combat - auto-resolving`);
-                const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
-                room.gameState = { ...room.gameState, ...updates };
-                // No need to end phase - it was never started for AI vs AI
-            } else if (!attackerIsHuman && defenderIsHuman) {
-                // AI/Neutral attacker vs Human defender - AI always fights, ask defender
-                console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender only`);
-                gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
-                gameRoomManager.setAttackerChoice(code, 'FIGHT');
-                // Clear combatState from server state - it's now tracked in pendingCombat
-                room.gameState.combatState = null;
-                io.to(defenderSocketId).emit('combat_choice_requested', {
-                    combatState: combat,
-                    role: 'DEFENDER'
-                });
-            } else if (attackerIsHuman && !defenderIsHuman) {
-                // Human attacker vs AI/Neutral defender - ask attacker only, AI auto-responds
-                console.log(`[Game] ${code}: Human attacker vs AI defender - asking attacker only`);
-                gameRoomManager.initiateCombat(code, combat, socket.id, combat.defenderFaction);
-                // Clear combatState from server state - it's now tracked in pendingCombat
-                room.gameState.combatState = null;
-                socket.emit('combat_choice_requested', {
-                    combatState: combat,
-                    role: 'ATTACKER'
-                });
-            } else {
-                // Human vs Human (PvP) - ask attacker first, then defender
-                console.log(`[Game] ${code}: PvP combat - asking attacker first`);
-                gameRoomManager.initiateCombat(code, combat, attackerSocketId!, combat.defenderFaction);
-                // Clear combatState from server state - it's now tracked in pendingCombat
-                room.gameState.combatState = null;
-                io.to(attackerSocketId!).emit('combat_choice_requested', {
-                    combatState: combat,
-                    role: 'ATTACKER'
-                });
+            // Get player's faction
+            const playerFaction = room.playerFactions.get(socket.id);
+            if (!playerFaction) {
+                socket.emit('action_result', { success: false, error: 'Player faction not found' });
+                return;
             }
+
+            // Block actions if there's a pending combat that involves this player
+            const combat = room.pendingCombat;
+            if (combat) {
+                const playerIsInvolvedInCombat =
+                    socket.id === combat.attackerSocketId ||
+                    socket.id === combat.defenderSocketId ||
+                    combat.combatState.attackerFaction === playerFaction ||
+                    combat.combatState.defenderFaction === playerFaction;
+
+                if (playerIsInvolvedInCombat) {
+                    socket.emit('action_result', {
+                        success: false,
+                        error: 'Cannot perform action while combat is pending. Resolve the combat first.'
+                    });
+                    // Re-send the combat request in case client missed it
+                    const role = combat.combatState.attackerFaction === playerFaction ? 'ATTACKER' : 'DEFENDER';
+                    socket.emit('combat_choice_requested', {
+                        combatState: combat.combatState,
+                        role
+                    });
+                    return;
+                }
+            }
+
+            // Process action on server using shared game logic
+            console.log(`[Game] ${code}: Processing ${action.type} from ${playerFaction}`);
+            const sharedAction = { ...action, faction: playerFaction }; // Add faction for shared type
+            const result = processPlayerAction(room.gameState, sharedAction as any, playerFaction);
+
+            if (!result.success) {
+                socket.emit('action_result', { success: false, error: result.error });
+                return;
+            }
+
+            // Update server state
+            room.gameState = result.newState;
+
+            // Check if combat was triggered by this action
+            if (result.newState.combatState) {
+                const combat = result.newState.combatState;
+                // Check if participants are human by socket presence (covers AI and NEUTRAL)
+                const attackerSocketId = gameRoomManager.getSocketForFaction(code, combat.attackerFaction);
+                const defenderSocketId = gameRoomManager.getSocketForFaction(code, combat.defenderFaction);
+                const attackerIsHuman = attackerSocketId !== null;
+                const defenderIsHuman = defenderSocketId !== null;
+
+                console.log(`[Game] ${code}: Combat detected - Attacker: ${combat.attackerFaction} (Human: ${attackerIsHuman}), Defender: ${combat.defenderFaction} (Human: ${defenderIsHuman})`);
+
+                // START BATTLE PHASE - ONLY if at least one participant is human
+                if (attackerIsHuman || defenderIsHuman) {
+                    const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
+                    gameRoomManager.startBattlePhase(code, totalBattles);
+                    console.log(`[COMBAT_PHASE] EMITTING combat_phase_started to room ${code} - ${totalBattles} battles`);
+                    emitCombatPhaseStarted(
+                        io,
+                        code,
+                        combat,
+                        room.gameState.combatQueue || [],
+                        room.gameState
+                    );
+                }
+
+                if (!attackerIsHuman && !defenderIsHuman) {
+                    // AI/Neutral vs AI/Neutral - auto resolve with FIGHT
+                    console.log(`[Game] ${code}: Non-human combat - auto-resolving`);
+                    const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
+                    room.gameState = { ...room.gameState, ...updates };
+                    // No need to end phase - it was never started for AI vs AI
+                } else if (!attackerIsHuman && defenderIsHuman) {
+                    // AI/Neutral attacker vs Human defender - AI always fights, ask defender
+                    console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender only`);
+                    gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
+                    gameRoomManager.setAttackerChoice(code, 'FIGHT');
+                    // Clear combatState from server state - it's now tracked in pendingCombat
+                    room.gameState.combatState = null;
+                    io.to(defenderSocketId).emit('combat_choice_requested', {
+                        combatState: combat,
+                        role: 'DEFENDER'
+                    });
+                } else if (attackerIsHuman && !defenderIsHuman) {
+                    // Human attacker vs AI/Neutral defender - ask attacker only, AI auto-responds
+                    console.log(`[Game] ${code}: Human attacker vs AI defender - asking attacker only`);
+                    gameRoomManager.initiateCombat(code, combat, attackerSocketId!, combat.defenderFaction);
+                    // Clear combatState from server state - it's now tracked in pendingCombat
+                    room.gameState.combatState = null;
+                    io.to(attackerSocketId!).emit('combat_choice_requested', {
+                        combatState: combat,
+                        role: 'ATTACKER'
+                    });
+                } else {
+                    // Both human (PvP) - ask attacker first
+                    console.log(`[Game] ${code}: PvP combat - asking attacker first`);
+                    gameRoomManager.initiateCombat(code, combat, attackerSocketId!, combat.defenderFaction);
+                    // Clear combatState from server state - it's now tracked in pendingCombat
+                    room.gameState.combatState = null;
+                    io.to(attackerSocketId!).emit('combat_choice_requested', {
+                        combatState: combat,
+                        role: 'ATTACKER'
+                    });
+                }
+            }
+
+            // Broadcast updated state to all players (with combatState null for non-involved players)
+            const clientState = getClientState(room.gameState);
+            // ALWAYS broadcast with null combatState - individual players get private combat requests
+            const stateForBroadcast = { ...clientState, combatState: null };
+            io.to(code).emit('state_update', { gameState: stateForBroadcast });
+
+            socket.emit('action_result', { success: true });
+            console.log(`[Game] ${code}: Action ${action.type} processed successfully`);
+        } catch (err: any) {
+            console.error(`[Game] ERROR in player_action handler:`, err);
+            console.error('Stack:', err.stack);
+            socket.emit('action_result', { success: false, error: 'Server error processing action' });
         }
-
-        // Broadcast updated state to ALL players
-        // Exclude combatState from broadcast - it's sent only to involved players via combat_choice_requested
-        const clientState = getClientState(room.gameState);
-        const stateForBroadcast = { ...clientState, combatState: null };
-        io.to(code).emit('state_update', { gameState: stateForBroadcast });
-
-        socket.emit('action_result', { success: true });
-        console.log(`[Game] ${code}: Action ${action.type} processed successfully`);
     });
 
     // NOTE: combat_choice handler is defined in combatHandlers.ts
