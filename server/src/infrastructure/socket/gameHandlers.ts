@@ -416,6 +416,20 @@ export function registerGameHandlers(
 
                 console.log(`[END_TURN] Post-AI combat: ${combat.attackerFaction} vs ${combat.defenderFaction}, attackerHuman=${attackerIsHuman}, defenderHuman=${defenderIsHuman}`);
 
+                // START BATTLE PHASE for human-involved combat (if not already active)
+                if ((attackerIsHuman || defenderIsHuman) && !gameRoomManager.getBattlePhaseInfo(code).active) {
+                    const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
+                    gameRoomManager.startBattlePhase(code, totalBattles);
+                    console.log(`[COMBAT_PHASE] EMITTING combat_phase_started in post-AI check - ${totalBattles} battles`);
+                    emitCombatPhaseStarted(
+                        io,
+                        code,
+                        combat,
+                        room.gameState.combatQueue || [],
+                        room.gameState
+                    );
+                }
+
                 if (!attackerIsHuman && !defenderIsHuman) {
                     // Auto-resolve non-human combat
                     const updates = resolveCombatResult(room.gameState, 'FIGHT', 0);
