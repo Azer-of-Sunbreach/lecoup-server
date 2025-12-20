@@ -150,8 +150,8 @@ export const executeFortify = (
                     ...state.resources[faction],
                     gold: state.resources[faction].gold - fortData.cost
                 }
-            },
-            logs: [...state.logs, `Construction of ${fortData.name} started.`].slice(-50)
+            }
+            // Construction log removed - player action doesn't need logging
         },
         message: `Construction of ${fortData.name} started`
     };
