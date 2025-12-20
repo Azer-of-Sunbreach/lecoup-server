@@ -52,8 +52,8 @@ export const executeSendConvoy = (
         newState: {
             ...state,
             locations: newLocations,
-            convoys: [...state.convoys, newConvoy],
-            logs: [...state.logs, `Convoy dispatched to ${destCity.name}.`]
+            convoys: [...state.convoys, newConvoy]
+            // Convoy dispatch log removed - player action doesn't need logging
         }
     };
 };
@@ -96,8 +96,8 @@ export const executeSendNavalConvoy = (
         newState: {
             ...state,
             locations: newLocations,
-            navalConvoys: [...state.navalConvoys, newNavalConvoy],
-            logs: [...state.logs, `Naval convoy dispatched to ${destCity.name}.`]
+            navalConvoys: [...state.navalConvoys, newNavalConvoy]
+            // Naval convoy dispatch log removed - player action doesn't need logging
         }
     };
 };
