@@ -64,8 +64,8 @@ export const executeNegotiate = (
                     foodSourceCityIds: foodSourceIds,
                     turnsRemaining: 0
                 }
-            ],
-            logs: [...state.logs, `Agent sent to negotiate with ${targetName}.`].slice(-50)
+            ]
+            // Negotiation log removed - player action doesn't need logging
         },
         message: `Agent sent to negotiate with ${targetName}`
     };

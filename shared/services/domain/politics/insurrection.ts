@@ -15,6 +15,7 @@
  */
 
 import { GameState, FactionId, CharacterStatus } from '../../../types';
+import { createInsurrectionPreparationLog } from '../../logs/logFactory';
 
 export interface InciteResult {
     success: boolean;
@@ -84,8 +85,9 @@ export const executeIncite = (
                     ...state.resources[faction],
                     gold: state.resources[faction].gold - finalCost
                 }
-            },
-            logs: [...state.logs, `${character.name} is preparing an insurrection in ${loc.name}.`].slice(-50)
+            }
+            // Insurrection preparation log removed - player actions don't generate logs
+            // AI insurrection logs are generated separately in AI diplomacy module
         },
         message: `${character.name} is preparing an insurrection in ${loc.name}`
     };

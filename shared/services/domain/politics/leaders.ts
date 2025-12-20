@@ -95,8 +95,8 @@ export const executeMoveLeader = (
                     turnsUntilArrival: turns,
                     status
                 } : c
-            ),
-            logs: [...state.logs, `${char.name} ${turns === 0 ? 'relocated' : 'travelling'} to ${destName}.`].slice(-50)
+            )
+            // Movement log removed - player action doesn't need logging
         },
         message: `${char.name} ${turns === 0 ? 'relocated' : 'travelling'} to ${destName}`
     };
