@@ -17,6 +17,7 @@ export interface RetreatResult {
 
 /**
  * Handle attacker retreat (RETREAT choice)
+ * FIX BUG RETRAITE 2: After retreat, advance blocked defenders one step
  */
 export const handleAttackerRetreat = (
     combat: CombatState,
@@ -78,6 +79,59 @@ export const handleAttackerRetreat = (
         } else {
             // Army was not in newArmies, add it
             newArmies.push(updatedArmy);
+        }
+    });
+
+    // FIX BUG RETRAITE 2: Advance blocked defenders
+    // Defenders who were blocked by collision (not justMoved, have destination, not garrisoned)
+    // should now advance one step since the attacker retreated
+    combat.defenders.forEach(defenderSnapshot => {
+        const defender = newArmies.find(a => a.id === defenderSnapshot.id);
+        if (!defender) return;
+
+        // Only advance if:
+        // 1. Not already moved this turn (was blocked by collision)
+        // 2. Has a destination (was intending to move)
+        // 3. Not garrisoned (not stationary)
+        // 4. On a road (road-to-road movement)
+        if (!defender.justMoved &&
+            defender.destinationId &&
+            !defender.isGarrisoned &&
+            defender.locationType === 'ROAD' &&
+            defender.roadId) {
+
+            const road = roads.find(r => r.id === defender.roadId);
+            if (!road) return;
+
+            // Calculate next stage index based on direction
+            const nextIndex = defender.stageIndex + (defender.direction === 'FORWARD' ? 1 : -1);
+
+            // Check if arriving at destination
+            if (nextIndex < 0 || nextIndex >= road.stages.length) {
+                // Arriving at destination location
+                const destLoc = locations.find(l => l.id === defender.destinationId);
+                if (destLoc) {
+                    newArmies = newArmies.map(a => a.id === defender.id ? {
+                        ...a,
+                        locationType: 'LOCATION' as const,
+                        locationId: defender.destinationId,
+                        roadId: null,
+                        stageIndex: 0,
+                        destinationId: null,
+                        turnsUntilArrival: 0,
+                        justMoved: true,
+                        lastSafePosition: { type: 'LOCATION' as const, id: defender.destinationId! }
+                    } : a);
+                }
+            } else {
+                // Continue on road
+                newArmies = newArmies.map(a => a.id === defender.id ? {
+                    ...a,
+                    stageIndex: nextIndex,
+                    turnsUntilArrival: Math.max(0, a.turnsUntilArrival - 1),
+                    justMoved: true
+                } : a);
+            }
         }
     });
 

@@ -95,7 +95,7 @@ export const handleSiege = (
                     ...sieger,
                     ...retreatPos, // Move to retreat position
                     strength: remainder,
-                    isSpent: true,  // Spent this turn
+                    isSpent: false,  // FIX BUG SIEGE 1: Can continue acting (attack weakened position, etc.)
                     isSieging: false,
                     isGarrisoned: true, // Stay in place, don't auto-move
                     destinationId: null, // CRITICAL: Clear destination to prevent auto-attack
@@ -144,10 +144,10 @@ export const handleSiege = (
                     isSieging: true,
                     isGarrisoned: true,
                     isSpent: true,
-                    destinationId: a.destinationId || roadSiegeTargetId,
-                    tripDestinationId: a.tripDestinationId || roadSiegeTargetId,
+                    destinationId: a.destinationId ?? roadSiegeTargetId ?? null,
+                    tripDestinationId: a.tripDestinationId ?? roadSiegeTargetId ?? null,
                     turnsUntilArrival: 0
-                };
+                } as Army;
             }
             return a;
         });
