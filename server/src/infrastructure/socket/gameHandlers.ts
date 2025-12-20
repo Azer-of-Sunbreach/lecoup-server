@@ -340,6 +340,21 @@ export function registerGameHandlers(
                     } else if (!attackerIsHuman && defenderIsHuman) {
                         // AI attacker vs Human defender - AI fights, ask defender
                         console.log(`[Game] ${code}: AI attacker vs Human defender - asking defender`);
+
+                        // START BATTLE PHASE for AI vs Human combat
+                        if (!gameRoomManager.getBattlePhaseInfo(code).active) {
+                            const totalBattles = 1 + (room.gameState.combatQueue?.length || 0);
+                            gameRoomManager.startBattlePhase(code, totalBattles);
+                            console.log(`[COMBAT_PHASE] EMITTING combat_phase_started during AI turn - ${totalBattles} battles`);
+                            emitCombatPhaseStarted(
+                                io,
+                                code,
+                                combat,
+                                room.gameState.combatQueue || [],
+                                room.gameState
+                            );
+                        }
+
                         gameRoomManager.initiateCombat(code, combat, 'AI', combat.defenderFaction);
                         gameRoomManager.setAttackerChoice(code, 'FIGHT');
                         room.gameState.combatState = null;
