@@ -74,6 +74,7 @@ export const handleSiege = (
                 const siegeArmyId = `siege_force_${Date.now()}`;
                 const siegeTargetId = combat.locationId || combat.roadId;
 
+                // Siege army retreats to build siege weapons
                 const siegeArmy: Army = {
                     ...sieger,
                     ...retreatPos,
@@ -88,18 +89,21 @@ export const handleSiege = (
                     turnsUntilArrival: 0
                 } as Army;
 
-                // FIX: Remainder army should NOT have enemy city as destination!
-                // Clear destination and garrison to prevent auto-attack next turn
+                // Remainder army STAYS at combat location to attack the weakened fortification
                 const siegerExists = newArmies.some(a => a.id === sieger.id);
                 const remainderArmy: Army = {
                     ...sieger,
-                    ...retreatPos, // Move to retreat position
+                    // Keep at combat location, NOT retreat position
+                    locationType: 'LOCATION',
+                    locationId: combat.locationId,
+                    roadId: null,
+                    stageIndex: 0,
                     strength: remainder,
-                    isSpent: false,  // FIX BUG SIEGE 1: Can continue acting (attack weakened position, etc.)
+                    isSpent: false,  // Can continue acting (attack weakened position)
                     isSieging: false,
-                    isGarrisoned: true, // Stay in place, don't auto-move
-                    destinationId: null, // CRITICAL: Clear destination to prevent auto-attack
-                    tripDestinationId: null, // Clear trip destination too
+                    isGarrisoned: false, // Will try to attack
+                    destinationId: combat.locationId, // Keep destination to attack
+                    tripDestinationId: combat.locationId,
                     turnsUntilArrival: 0
                 } as Army;
 
@@ -143,11 +147,41 @@ export const handleSiege = (
 
         const sortedAttackers = newArmies.filter(a => attIds.includes(a.id)).sort((a, b) => b.strength - a.strength);
 
-        if (sortedAttackers.length > 0) {
+        if (sortedAttackers.length > 0 && road) {
             const sieger = sortedAttackers[0];
 
-            // Get correct position for siege army (stay at current road stage)
-            const siegePosition = {
+            // Calculate retreat position for siege army (one stage back from combat)
+            // The siege force retreats to build siege weapons while remainder attacks
+            const retreatStageIndex = sieger.direction === 'FORWARD'
+                ? Math.max(0, combat.stageIndex - 1)  // Going forward, retreat is stage behind
+                : Math.min(road.stages.length - 1, combat.stageIndex + 1);  // Going backward, retreat is stage ahead
+
+            // Check if we can retreat - if at stage 0 going forward or last stage going backward,
+            // retreat to the origin location instead
+            const canRetreatOnRoad = (sieger.direction === 'FORWARD' && combat.stageIndex > 0) ||
+                (sieger.direction === 'BACKWARD' && combat.stageIndex < road.stages.length - 1);
+
+            let siegePosition: any;
+            if (canRetreatOnRoad) {
+                siegePosition = {
+                    locationType: 'ROAD' as const,
+                    locationId: null,
+                    roadId: combat.roadId,
+                    stageIndex: retreatStageIndex
+                };
+            } else {
+                // Retreat to origin location
+                const originLocId = sieger.direction === 'FORWARD' ? road.from : road.to;
+                siegePosition = {
+                    locationType: 'LOCATION' as const,
+                    locationId: originLocId,
+                    roadId: null,
+                    stageIndex: 0
+                };
+            }
+
+            // Combat position for remainder (stays at combat stage to fight)
+            const combatPosition = {
                 locationType: 'ROAD' as const,
                 locationId: null,
                 roadId: combat.roadId,
@@ -159,13 +193,14 @@ export const handleSiege = (
                 const remainder = sieger.strength - reqMen;
                 const siegeArmyId = `siege_force_${Date.now()}`;
 
+                // Siege army retreats to build siege weapons
                 const siegeArmy: Army = {
                     ...sieger,
                     ...siegePosition,
                     id: siegeArmyId,
                     strength: reqMen,
                     isSieging: true,
-                    isGarrisoned: true,
+                    isGarrisoned: false, // Will try to advance next turn
                     isSpent: true,
                     action: undefined,
                     destinationId: sieger.destinationId,
@@ -173,15 +208,15 @@ export const handleSiege = (
                     turnsUntilArrival: 0
                 } as Army;
 
-                // Remainder army stays at the same stage, can continue acting
+                // Remainder army stays at combat stage to attack
                 const siegerExists = newArmies.some(a => a.id === sieger.id);
                 const remainderArmy: Army = {
                     ...sieger,
-                    ...siegePosition,
+                    ...combatPosition,
                     strength: remainder,
                     isSpent: false,  // Can continue acting (attack weakened position)
                     isSieging: false,
-                    isGarrisoned: true, // Stay in place
+                    isGarrisoned: false, // Will try to advance next turn
                     turnsUntilArrival: 0
                 } as Army;
 
@@ -193,7 +228,7 @@ export const handleSiege = (
                 newArmies.push(siegeArmy);
 
             } else {
-                // Entire army becomes siege force
+                // Entire army becomes siege force and retreats
                 const siegerExists = newArmies.some(a => a.id === sieger.id);
                 const updatedSieger: Army = {
                     ...sieger,
