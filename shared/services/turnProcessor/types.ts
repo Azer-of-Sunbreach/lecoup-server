@@ -55,10 +55,11 @@ export interface AIBattleResolutionResult {
 }
 
 /**
- * Result of stability processing (leader bonuses + low tax recovery)
+ * Result of stability processing (leader bonuses + low tax recovery + high tax penalties)
  */
 export interface StabilityProcessingResult {
     locations: Location[];
+    logs: LogEntry[];
 }
 
 /**

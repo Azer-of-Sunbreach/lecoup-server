@@ -12,6 +12,7 @@ export { processFamine } from './famine';
 export {
     applyLeaderStabilityModifiers,
     applyLowTaxStabilityRecovery,
+    applyHighTaxStabilityPenalty,
     processStability
 } from './stability';
 

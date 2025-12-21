@@ -3,7 +3,7 @@
 import { GameState, Location, Army, FactionId, LocationType, LogEntry } from '../../types';
 import { applySequentialLosses } from '../combat';
 import { FamineProcessingResult } from './types';
-import { createFamineLog } from '../logs/logFactory';
+import { createFamineLog, createLowFoodWarningLog } from '../logs/logFactory';
 
 /**
  * Process famine effects for all cities.
@@ -43,8 +43,13 @@ export function processFamine(state: GameState): FamineProcessingResult {
                 }
                 return { ...loc, foodStock: 0, stability: newStab };
             } else if (projectedStock < 50) {
-                // Low food warning
+                // Low food warning - only generate log for human-controlled cities
                 const newStab = Math.max(0, loc.stability - 5);
+                // Generate warning log for low food stocks
+                if (loc.faction !== FactionId.NEUTRAL) {
+                    const lowFoodLog = createLowFoodWarningLog(loc.name, loc.id, loc.faction, state.turn);
+                    logs.push(lowFoodLog);
+                }
                 return { ...loc, foodStock: projectedStock, stability: newStab };
             } else {
                 // Normal food levels
