@@ -12,6 +12,9 @@ export const executeSendConvoy = (
     const loc = state.locations.find(l => l.id === locationId);
     if (!loc) return { success: false, newState: state, error: 'Location not found' };
 
+    // Validation: Cannot send convoy to itself
+    if (locationId === destinationId) return { success: false, newState: state, error: 'Cannot send convoy to same location' };
+
     // Validation (simplified)
     if (loc.faction !== faction) return { success: false, newState: state, error: 'Not your location' };
     if (loc.foodStock < amount) return { success: false, newState: state, error: 'Not enough food' };
