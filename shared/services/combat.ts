@@ -3,6 +3,7 @@
 
 import { GameState, FactionId } from '../types';
 import { detectBattles } from './combatDetection';
+import { createGenericLog } from './logs/logFactory';
 
 // Import from new modular structure
 import {
@@ -186,6 +187,6 @@ export const resolveCombatResult = (
         stats: newStats,
         combatState: nextBattle,
         combatQueue: nextQueue,
-        logs: [...prevState.logs, logMsg]
+        logs: logMsg ? [...prevState.logs, createGenericLog(logMsg, prevState.turn)] : prevState.logs
     };
 };
