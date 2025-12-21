@@ -13,13 +13,7 @@ export interface LogisticsResult {
 /**
  * Manage food logistics for a faction.
  * Anticipates food shortages and sends convoys (naval or land).
- * 
- * @param state - Current game state
- * @param faction - Faction to process
- * @param locations - Locations array (modified in place)
- * @param convoys - Convoys array (modified in place)
- * @param navalConvoys - Naval convoys array (modified in place)
- * @returns Updated logistics state
+ * Uses smart routing to find the fastest path: naval, land, or hybrid.
  */
 export function manageLogistics(
     state: GameState,
@@ -36,16 +30,22 @@ export function manageLogistics(
         const needsFood = checkFoodNeed(city, faction, convoys, navalConvoys);
 
         if (needsFood.needsFood) {
-            const navalSent = tryNavalConvoy(
-                city, myCities, faction, needsFood.neededAmount,
-                locations, navalConvoys
-            );
+            // Try to find the BEST route (fastest) among all options
+            const bestRoute = findBestRoute(city, myCities, faction, needsFood.neededAmount, state, locations);
 
-            if (!navalSent) {
-                tryLandConvoy(
-                    city, myCities, faction, needsFood.neededAmount,
-                    state, locations, convoys
-                );
+            if (bestRoute) {
+                if (bestRoute.type === 'NAVAL') {
+                    // Direct naval convoy
+                    sendNavalConvoy(bestRoute.source, city, bestRoute.amount, faction, navalConvoys);
+                } else if (bestRoute.type === 'LAND') {
+                    // Pure land convoy
+                    sendLandConvoy(bestRoute.source, city, bestRoute.amount, bestRoute.path, faction, state, convoys);
+                } else if (bestRoute.type === 'HYBRID') {
+                    // Hybrid: Naval to transit port, then land convoy from there
+                    // Step 1: Send naval convoy to transit port (food will be redistributed next turn)
+                    sendNavalConvoy(bestRoute.source, bestRoute.transitPort, bestRoute.amount, faction, navalConvoys);
+                    console.log(`[AI HYBRID ROUTE] Naval: ${bestRoute.source.id} → ${bestRoute.transitPort.id} (${bestRoute.navalCost} turns), then land → ${city.id} (${bestRoute.landCost} stages)`);
+                }
             }
         }
     }
@@ -56,6 +56,188 @@ export function manageLogistics(
 interface FoodNeedResult {
     needsFood: boolean;
     neededAmount: number;
+}
+
+// Route types for smart routing
+type RouteOption =
+    | { type: 'NAVAL'; source: Location; amount: number; cost: number }
+    | { type: 'LAND'; source: Location; amount: number; cost: number; path: string[] }
+    | { type: 'HYBRID'; source: Location; transitPort: Location; amount: number; navalCost: number; landCost: number; landPath: string[] };
+
+/**
+ * Find the best route (fastest) to deliver food to target city.
+ * Considers: direct naval, pure land, and hybrid (naval + land) routes.
+ */
+function findBestRoute(
+    targetCity: Location,
+    myCities: Location[],
+    faction: FactionId,
+    neededAmount: number,
+    state: GameState,
+    locations: Location[]
+): RouteOption | null {
+    const sources = myCities.filter(c => c.id !== targetCity.id && c.foodStock > 100);
+    let bestRoute: RouteOption | null = null;
+    let bestCost = Infinity;
+
+    const targetRuralId = targetCity.linkedLocationId;
+    const isTargetPort = PORT_SEQUENCE.includes(targetCity.id);
+
+    for (const source of sources) {
+        const safetyBuffer = source.foodIncome > 0 ? 60 : 150;
+        const available = source.foodStock - safetyBuffer;
+        if (available <= 50) continue;
+
+        const amount = Math.min(neededAmount, available);
+        const isSourcePort = PORT_SEQUENCE.includes(source.id);
+        const sourceRuralId = source.linkedLocationId;
+
+        // Option 1: Direct naval (both are ports)
+        if (isSourcePort && isTargetPort) {
+            const navalCost = getNavalTravelTime(source.id, targetCity.id);
+            if (navalCost < bestCost) {
+                bestCost = navalCost;
+                bestRoute = { type: 'NAVAL', source, amount, cost: navalCost };
+            }
+        }
+
+        // Option 2: Pure land route
+        if (sourceRuralId && targetRuralId) {
+            const path = findSafePath(sourceRuralId, targetRuralId, state, faction);
+            if (path && path.length > 0) {
+                const filteredPath = path.filter(roadId => {
+                    const road = state.roads.find(r => r.id === roadId);
+                    return road && road.stages.length > 0;
+                });
+
+                if (filteredPath.length > 0) {
+                    // Calculate land cost: sum of all stages
+                    const landCost = filteredPath.reduce((total, roadId) => {
+                        const road = state.roads.find(r => r.id === roadId);
+                        return total + (road ? road.stages.length : 1);
+                    }, 0);
+
+                    if (landCost < bestCost) {
+                        bestCost = landCost;
+                        bestRoute = { type: 'LAND', source, amount, cost: landCost, path: filteredPath };
+                    }
+                }
+            }
+        }
+
+        // Option 3: Hybrid (source is port, target is inland) - via intermediate port
+        if (isSourcePort && !isTargetPort && targetRuralId) {
+            // Find all friendly ports that could serve as transit
+            const transitPorts = myCities.filter(p =>
+                PORT_SEQUENCE.includes(p.id) &&
+                p.id !== source.id &&
+                p.id !== targetCity.id
+            );
+
+            for (const transitPort of transitPorts) {
+                const transitRuralId = transitPort.linkedLocationId;
+                if (!transitRuralId) continue;
+
+                // Calculate: naval to transit + land from transit to target
+                const navalToTransit = getNavalTravelTime(source.id, transitPort.id);
+                const landPath = findSafePath(transitRuralId, targetRuralId, state, faction);
+
+                if (landPath && landPath.length > 0) {
+                    const filteredLandPath = landPath.filter(roadId => {
+                        const road = state.roads.find(r => r.id === roadId);
+                        return road && road.stages.length > 0;
+                    });
+
+                    if (filteredLandPath.length > 0) {
+                        const landCost = filteredLandPath.reduce((total, roadId) => {
+                            const road = state.roads.find(r => r.id === roadId);
+                            return total + (road ? road.stages.length : 1);
+                        }, 0);
+
+                        const totalCost = navalToTransit + landCost;
+                        if (totalCost < bestCost) {
+                            bestCost = totalCost;
+                            bestRoute = {
+                                type: 'HYBRID',
+                                source,
+                                transitPort,
+                                amount,
+                                navalCost: navalToTransit,
+                                landCost,
+                                landPath: filteredLandPath
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return bestRoute;
+}
+
+/**
+ * Send a naval convoy from source to destination.
+ */
+function sendNavalConvoy(
+    source: Location,
+    destination: Location,
+    amount: number,
+    faction: FactionId,
+    navalConvoys: NavalConvoy[]
+): void {
+    source.foodStock -= amount;
+    const days = getNavalTravelTime(source.id, destination.id);
+
+    navalConvoys.push({
+        id: `ai_naval_${Math.random()}`,
+        faction,
+        foodAmount: amount,
+        sourceCityId: source.id,
+        destinationCityId: destination.id,
+        daysRemaining: days
+    });
+
+    console.log(`[AI CONVOY] Naval: ${source.id} → ${destination.id}, amount=${amount}, turns=${days}`);
+}
+
+/**
+ * Send a land convoy from source to destination.
+ */
+function sendLandConvoy(
+    source: Location,
+    destination: Location,
+    amount: number,
+    path: string[],
+    faction: FactionId,
+    state: GameState,
+    convoys: Convoy[]
+): void {
+    const sourceRuralId = source.linkedLocationId;
+    if (!sourceRuralId || path.length === 0) return;
+
+    source.foodStock -= amount;
+    const roadId = path[0];
+    const road = state.roads.find(r => r.id === roadId)!;
+
+    convoys.push({
+        id: `ai_convoy_${Math.random()}`,
+        faction,
+        foodAmount: amount,
+        sourceCityId: source.id,
+        destinationCityId: destination.id,
+        locationType: 'ROAD',
+        roadId: roadId,
+        stageIndex: road.from === sourceRuralId ? 0 : road.stages.length - 1,
+        direction: road.from === sourceRuralId ? 'FORWARD' : 'BACKWARD',
+        isCaptured: false,
+        locationId: null,
+        lastSafePosition: { type: 'LOCATION', id: sourceRuralId },
+        path: path,
+        pathIndex: 0
+    });
+
+    console.log(`[AI CONVOY] Land: ${source.id} → ${destination.id}, amount=${amount}, path=${path.join(' -> ')}`);
 }
 
 function checkFoodNeed(
@@ -80,103 +262,4 @@ function checkFoodNeed(
     const neededAmount = Math.max(100, 400 - (city.foodStock + incoming));
 
     return { needsFood, neededAmount };
-}
-
-function tryNavalConvoy(
-    targetCity: Location,
-    myCities: Location[],
-    faction: FactionId,
-    neededAmount: number,
-    locations: Location[],
-    navalConvoys: NavalConvoy[]
-): boolean {
-    if (!PORT_SEQUENCE.includes(targetCity.id)) return false;
-
-    const portSources = myCities.filter(c =>
-        c.id !== targetCity.id &&
-        PORT_SEQUENCE.includes(c.id) &&
-        c.foodStock > 100
-    );
-
-    if (portSources.length === 0) return false;
-
-    const bestSource = portSources.sort((a, b) => b.foodStock - a.foodStock)[0];
-    const safetyBuffer = bestSource.foodIncome > 0 ? 50 : 150;
-    const availableToSend = bestSource.foodStock - safetyBuffer;
-    const amount = Math.min(neededAmount, availableToSend);
-
-    if (amount <= 50) return false;
-
-    const days = getNavalTravelTime(bestSource.id, targetCity.id);
-
-    bestSource.foodStock -= amount;
-    navalConvoys.push({
-        id: `ai_naval_${Math.random()}`,
-        faction,
-        foodAmount: amount,
-        sourceCityId: bestSource.id,
-        destinationCityId: targetCity.id,
-        daysRemaining: days
-    });
-
-    return true;
-}
-
-function tryLandConvoy(
-    targetCity: Location,
-    myCities: Location[],
-    faction: FactionId,
-    neededAmount: number,
-    state: GameState,
-    locations: Location[],
-    convoys: Convoy[]
-): boolean {
-    const sources = myCities.filter(l => l.id !== targetCity.id && l.foodStock > 100);
-    let bestSource: string | null = null;
-    let shortestPath: string[] | null = null;
-    let bestSourceAmount = 0;
-
-    for (const source of sources) {
-        const safetyBuffer = source.foodIncome > 0 ? 60 : 150;
-        const available = source.foodStock - safetyBuffer;
-
-        if (available > 50) {
-            const path = findSafePath(source.id, targetCity.id, state, faction);
-            if (path && path.length > 0) {
-                if (!shortestPath || path.length < shortestPath.length) {
-                    shortestPath = path;
-                    bestSource = source.id;
-                    bestSourceAmount = Math.min(neededAmount, available);
-                }
-            }
-        }
-    }
-
-    if (!bestSource || !shortestPath || bestSourceAmount <= 0) return false;
-
-    const sourceLoc = locations.find(l => l.id === bestSource)!;
-    const sourceRuralId = sourceLoc.linkedLocationId;
-
-    if (!sourceRuralId) return false;
-
-    sourceLoc.foodStock -= bestSourceAmount;
-    const roadId = shortestPath[0];
-    const road = state.roads.find(r => r.id === roadId)!;
-
-    convoys.push({
-        id: `ai_convoy_${Math.random()}`,
-        faction,
-        foodAmount: bestSourceAmount,
-        sourceCityId: sourceLoc.id,
-        destinationCityId: targetCity.id,
-        locationType: 'ROAD',
-        roadId: roadId,
-        stageIndex: road.from === sourceRuralId ? 0 : road.stages.length - 1,
-        direction: road.from === sourceRuralId ? 'FORWARD' : 'BACKWARD',
-        isCaptured: false,
-        locationId: null,
-        lastSafePosition: { type: 'LOCATION', id: sourceRuralId }
-    });
-
-    return true;
 }
