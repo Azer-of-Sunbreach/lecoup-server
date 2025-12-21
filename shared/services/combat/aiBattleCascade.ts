@@ -86,12 +86,23 @@ export const resolveAIBattleCascade = (
                 newLocations = newLocations.map(l => {
                     if (l.id === battle.locationId) {
                         const newFort = Math.max(0, l.fortificationLevel - 1);
+                        // Stability handling for insurgent victories:
+                        // - Faction insurrections (attackerFaction != NEUTRAL): +10 stability max
+                        // - Spontaneous neutral uprisings (attackerFaction == NEUTRAL): no change
+                        let newStability = l.stability;
+                        if (battle.isInsurgentBattle) {
+                            if (battle.attackerFaction !== FactionId.NEUTRAL) {
+                                // Faction insurrection victory: +10 stability max
+                                newStability = Math.min(l.stability + 10, 100);
+                            }
+                            // Neutral spontaneous uprising: no stability change
+                        }
                         return {
                             ...l,
                             faction: battle.attackerFaction,
                             defense: FORTIFICATION_LEVELS[newFort].bonus,
                             fortificationLevel: newFort,
-                            stability: battle.isInsurgentBattle ? Math.max(49, l.stability) : l.stability
+                            stability: newStability
                         };
                     }
                     return l;

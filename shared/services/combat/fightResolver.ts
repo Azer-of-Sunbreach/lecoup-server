@@ -118,7 +118,17 @@ export const resolveFight = (
                 if (l.id === combat.locationId) {
                     const newFortLevel = Math.max(0, l.fortificationLevel - 1);
                     const newDefense = FORTIFICATION_LEVELS[newFortLevel].bonus;
-                    const newStability = combat.isInsurgentBattle ? Math.max(49, l.stability) : l.stability;
+                    // Stability handling for insurgent victories:
+                    // - Faction insurrections (attackerFaction != NEUTRAL): +10 stability max
+                    // - Spontaneous neutral uprisings (attackerFaction == NEUTRAL): no change
+                    let newStability = l.stability;
+                    if (combat.isInsurgentBattle) {
+                        if (combat.attackerFaction !== FactionId.NEUTRAL) {
+                            // Faction insurrection victory: +10 stability max
+                            newStability = Math.min(l.stability + 10, 100);
+                        }
+                        // Neutral spontaneous uprising: no stability change
+                    }
                     return {
                         ...l,
                         faction: combat.attackerFaction,

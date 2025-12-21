@@ -1,6 +1,6 @@
 // Retreat Handler - Handles RETREAT and RETREAT_CITY choices
 
-import { Army, Location, Road, CombatState } from '../../types';
+import { Army, Location, Road, CombatState, FactionId } from '../../types';
 import {
     getArmiesAtCombatLocation,
     calculateRetreatPosition,
@@ -174,7 +174,17 @@ export const handleDefenderRetreatToCity = (
 
             newLocations = newLocations.map(l => {
                 if (l.id === combat.locationId) {
-                    const newStability = isInsurgentBattle ? Math.max(49, l.stability) : l.stability;
+                    // Stability handling for insurgent victories:
+                    // - Faction insurrections (attackerFaction != NEUTRAL): +10 stability max
+                    // - Spontaneous neutral uprisings (attackerFaction == NEUTRAL): no change
+                    let newStability = l.stability;
+                    if (isInsurgentBattle) {
+                        if (combat.attackerFaction !== FactionId.NEUTRAL) {
+                            // Faction insurrection victory: +10 stability max
+                            newStability = Math.min(l.stability + 10, 100);
+                        }
+                        // Neutral spontaneous uprising: no stability change
+                    }
                     return {
                         ...l,
                         faction: combat.attackerFaction,
