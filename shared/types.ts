@@ -233,6 +233,10 @@ export interface Convoy {
   lastSafePosition: SafePosition;
 
   isCaptured: boolean;
+
+  // Multi-road path support (for AI and long-distance convoys)
+  path?: string[];      // Array of road IDs to traverse
+  pathIndex?: number;   // Current index in path array (which road we're on)
 }
 
 export interface NavalConvoy {
