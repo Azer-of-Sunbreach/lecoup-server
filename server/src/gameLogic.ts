@@ -9,7 +9,9 @@ import {
     CoreGameState,
     GameAction,
     CombatState,
-    FACTION_NAMES
+    FACTION_NAMES,
+    LogType,
+    LogSeverity
 } from '../../shared/types';
 import { createInitialState, getInitialResources } from '../../shared/data/initialState';
 import {
@@ -93,7 +95,7 @@ export function createMultiplayerGameState(
         currentTurnFaction: turnOrder[0],
         turnOrder,
         currentTurnIndex: 0,
-        logs: ['Multiplayer game started.']
+        logs: [{ id: 'mp_start', type: LogType.GAME_START, message: 'Multiplayer game started.', turn: 1, visibleToFactions: [] as FactionId[], baseSeverity: LogSeverity.INFO }]
     };
 }
 
