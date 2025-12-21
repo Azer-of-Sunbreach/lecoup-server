@@ -134,23 +134,83 @@ export const handleSiege = (
                 }
             }
         }
-    } else {
-        // Road siege
-        const roadSiegeTargetId = combat.roadId;
-        newArmies = newArmies.map(a => {
-            if (attIds.includes(a.id)) {
-                return {
-                    ...a,
+    } else if (combat.roadId && combat.stageIndex !== undefined) {
+        // Road siege - same split logic as location sieges
+        const road = roads.find(r => r.id === combat.roadId);
+        const stage = road?.stages.find(s => s.index === combat.stageIndex);
+        const curLevel = stage ? stage.fortificationLevel : 0;
+        const reqMen = curLevel >= 3 ? 1000 : 500;
+
+        const sortedAttackers = newArmies.filter(a => attIds.includes(a.id)).sort((a, b) => b.strength - a.strength);
+
+        if (sortedAttackers.length > 0) {
+            const sieger = sortedAttackers[0];
+
+            // Get correct position for siege army (stay at current road stage)
+            const siegePosition = {
+                locationType: 'ROAD' as const,
+                locationId: null,
+                roadId: combat.roadId,
+                stageIndex: combat.stageIndex
+            };
+
+            if (sieger.strength > reqMen) {
+                // Split army: siege force + remainder
+                const remainder = sieger.strength - reqMen;
+                const siegeArmyId = `siege_force_${Date.now()}`;
+
+                const siegeArmy: Army = {
+                    ...sieger,
+                    ...siegePosition,
+                    id: siegeArmyId,
+                    strength: reqMen,
                     isSieging: true,
                     isGarrisoned: true,
                     isSpent: true,
-                    destinationId: a.destinationId ?? roadSiegeTargetId ?? null,
-                    tripDestinationId: a.tripDestinationId ?? roadSiegeTargetId ?? null,
+                    action: undefined,
+                    destinationId: sieger.destinationId,
+                    tripDestinationId: sieger.tripDestinationId,
                     turnsUntilArrival: 0
                 } as Army;
+
+                // Remainder army stays at the same stage, can continue acting
+                const siegerExists = newArmies.some(a => a.id === sieger.id);
+                const remainderArmy: Army = {
+                    ...sieger,
+                    ...siegePosition,
+                    strength: remainder,
+                    isSpent: false,  // Can continue acting (attack weakened position)
+                    isSieging: false,
+                    isGarrisoned: true, // Stay in place
+                    turnsUntilArrival: 0
+                } as Army;
+
+                if (siegerExists) {
+                    newArmies = newArmies.map(a => a.id === sieger.id ? remainderArmy : a);
+                } else {
+                    newArmies.push(remainderArmy);
+                }
+                newArmies.push(siegeArmy);
+
+            } else {
+                // Entire army becomes siege force
+                const siegerExists = newArmies.some(a => a.id === sieger.id);
+                const updatedSieger: Army = {
+                    ...sieger,
+                    ...siegePosition,
+                    isSieging: true,
+                    isGarrisoned: true,
+                    isSpent: true,
+                    turnsUntilArrival: 0
+                } as Army;
+
+                if (siegerExists) {
+                    newArmies = newArmies.map(a => a.id === sieger.id ? updatedSieger : a);
+                } else {
+                    newArmies.push(updatedSieger);
+                }
             }
-            return a;
-        });
+        }
     }
 
     // Update fortification levels
