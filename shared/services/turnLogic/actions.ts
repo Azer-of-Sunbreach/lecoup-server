@@ -261,6 +261,25 @@ export const processConstruction = (state: GameState): { locations: Location[], 
     nextRoads = nextRoads.map(r => ({
         ...r,
         stages: r.stages.map(s => {
+            // Check for enemy presence on this road stage
+            const enemyPresent = nextArmies.some(a =>
+                a.locationType === 'ROAD' &&
+                a.roadId === r.id &&
+                a.stageIndex === s.index &&
+                a.faction !== s.faction &&
+                a.strength > 0
+            );
+
+            // Cancel construction if enemy is present
+            if (enemyPresent && s.activeConstruction) {
+                const builder = nextArmies.find(a => a.id === s.activeConstruction!.armyId);
+                if (builder) {
+                    const idx = nextArmies.findIndex(a => a.id === builder.id);
+                    if (idx !== -1) nextArmies[idx] = { ...builder, action: undefined };
+                }
+                return { ...s, activeConstruction: undefined };
+            }
+
             if (s.activeConstruction) {
                 const remaining = s.activeConstruction.turnsRemaining - 1;
                 if (remaining <= 0) {
