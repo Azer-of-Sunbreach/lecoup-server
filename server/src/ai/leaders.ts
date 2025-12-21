@@ -1,12 +1,13 @@
 
-import { GameState, FactionId, CharacterStatus, LocationType, Character } from '../../../shared/types';
+import { GameState, FactionId, CharacterStatus, LocationType, Character, LogEntry } from '../../../shared/types';
 import { getLeaderProfile, LeaderProfile, LeaderRole } from './leaders_config';
 import { findSafePath } from './utils';
 import { AITheater } from './types';
+import { createGenericLog } from '../../../shared/services/logs/logFactory';
 
 export const manageLeaders = (state: GameState, faction: FactionId): Partial<GameState> => {
     let characters = [...state.characters];
-    let logs: string[] = [];
+    let logs: LogEntry[] = [];
 
     const myLeaders = characters.filter(c => c.faction === faction && c.status === CharacterStatus.AVAILABLE);
     const activeMissions = state.aiState?.[faction]?.missions || [];
@@ -167,7 +168,7 @@ function evaluateAndAssignRole(
     faction: FactionId,
     missions: any[],
     allCharacters: Character[],
-    logs: string[]
+    logs: LogEntry[]
 ): boolean {
     if (!leader.locationId) return false;
 
@@ -195,7 +196,7 @@ function handleCommanderRole(
     faction: FactionId,
     missions: any[],
     allCharacters: Character[],
-    logs: string[]
+    logs: LogEntry[]
 ): boolean {
     // Look for ACTIVE or PLANNING missions needing a general
     // Prioritize attacking (CAMPAIGN) over defending (DEFEND) for Commanders
@@ -238,7 +239,7 @@ function handleCommanderRole(
                 const idx = allCharacters.findIndex(c => c.id === leader.id);
                 if (idx !== -1) {
                     allCharacters[idx] = { ...leader, armyId: armyWithoutLeader.id, status: CharacterStatus.AVAILABLE }; // Occupied?
-                    logs.push(`${leader.name} took command of an army for operation ${mission.id}.`);
+                    logs.push(createGenericLog(`${leader.name} took command of an army for operation ${mission.id}.`, state.turn));
                     return true;
                 }
             } else {
@@ -255,7 +256,7 @@ function handleManagerRole(
     state: GameState,
     faction: FactionId,
     allCharacters: Character[],
-    logs: string[]
+    logs: LogEntry[]
 ): boolean {
     if (leader.stats.ability.includes('MANAGER')) {
         // Find best city (Income) without manager
@@ -281,7 +282,7 @@ function handleStabilizerRole(
     state: GameState,
     faction: FactionId,
     allCharacters: Character[],
-    logs: string[],
+    logs: LogEntry[],
     isProtector: boolean = false,
     explicitTargetId: string | null = null
 ): boolean {
@@ -358,7 +359,7 @@ function moveLeaderStart(
     targetId: string,
     state: GameState,
     allCharacters: Character[],
-    logs: string[],
+    logs: LogEntry[],
     reason: string
 ): boolean {
     const path = findSafePath(leader.locationId!, targetId, state, leader.faction);
@@ -401,7 +402,7 @@ function moveLeaderStart(
         }
 
         if (shouldLog) {
-            logs.push(logMsg);
+            logs.push(createGenericLog(logMsg, state.turn));
         }
         return true;
     }
