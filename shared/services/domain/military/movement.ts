@@ -4,9 +4,10 @@
  * Extracted from useGameEngine.ts moveArmy()
  */
 
-import { GameState, Army, Character, FactionId, CharacterStatus, RoadQuality, FACTION_NAMES } from '../../../types';
+import { GameState, Army, Character, FactionId, CharacterStatus, RoadQuality, FACTION_NAMES, LogEntry } from '../../../types';
 import { FORTIFICATION_LEVELS } from '../../../data';
 import { calculateEconomyAndFood } from '../../../utils/economy';
+import { createGenericLog, createGrainTradeConquestLog, createLocationSecuredLog } from '../../../services/logs/logFactory';
 
 export interface MoveArmyResult {
     success: boolean;
@@ -78,7 +79,7 @@ export const executeArmyMove = (
     let updatedArmies = [...state.armies];
     let updatedChars = [...state.characters];
     let updatedLocs = [...state.locations];
-    let newLogs = [...state.logs];
+    let newLogs: LogEntry[] = [...state.logs];
     let newTradeNotification = state.grainTradeNotification;
 
     if (road.quality === RoadQuality.LOCAL) {
@@ -159,13 +160,13 @@ export const executeArmyMove = (
                             if (l.id === 'great_plains') return { ...l, stability: Math.min(100, l.stability + 20) };
                             return l;
                         });
-                        newLogs = [...newLogs, "Grain Trade restored by conquest."];
+                        newLogs = [...newLogs, createGrainTradeConquestLog(state.turn)];
                         newTradeNotification = { type: 'RESTORED', factionName: "Changes in control" };
                     }
                 }
             }
 
-            newLogs = [...newLogs, `${destLoc.name} secured by ${FACTION_NAMES[playerFaction]}.`];
+            newLogs = [...newLogs, createLocationSecuredLog(destLoc.name, destLocId, destLoc.faction, playerFaction, state.turn)];
         }
 
     } else {
@@ -215,7 +216,7 @@ export const executeArmyMove = (
         );
 
         const destName = state.locations.find(l => l.id === destLocId)?.name;
-        newLogs = [...newLogs, `Forces marching to ${destName}.`];
+        newLogs = [...newLogs, createGenericLog(`Forces marching to ${destName}.`, state.turn)];
     }
 
     // Recalculate Economy
