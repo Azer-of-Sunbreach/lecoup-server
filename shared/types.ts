@@ -347,7 +347,7 @@ export interface AITheater {
   isContested: boolean;
 }
 
-export type MissionType = 'CAMPAIGN' | 'DEFEND' | 'PATROL' | 'REINFORCE' | 'INSURRECTION' | 'NEGOTIATE' | 'STABILIZE' | 'ROAD_DEFENSE';
+export type MissionType = 'CAMPAIGN' | 'DEFEND' | 'PATROL' | 'REINFORCE' | 'INSURRECTION' | 'NEGOTIATE' | 'STABILIZE' | 'ROAD_DEFENSE' | 'COUNTER_INSURRECTION';
 export type MissionStatus = 'PLANNING' | 'ACTIVE' | 'COMPLETED' | 'FAILED';
 
 export interface AIMission {
