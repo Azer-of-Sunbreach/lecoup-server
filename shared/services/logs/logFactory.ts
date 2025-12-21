@@ -13,6 +13,19 @@ const generateLogId = (): string => {
     return `log_${Date.now()}_${logIdCounter}`;
 };
 
+/**
+ * Create a simple generic log from a string message.
+ * Use for basic logging where no specific type/visibility is needed.
+ */
+export const createGenericLog = (message: string, turn: number = 1): LogEntry => ({
+    id: generateLogId(),
+    type: LogType.NARRATIVE,
+    message,
+    turn,
+    visibleToFactions: [],
+    baseSeverity: LogSeverity.INFO
+});
+
 /** Get all player factions (excludes NEUTRAL) */
 const ALL_PLAYER_FACTIONS: FactionId[] = [
     FactionId.REPUBLICANS,
@@ -339,7 +352,7 @@ export const createLowFoodWarningLog = (
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.FAMINE,
-    message: `The citizens of ${cityName} are worrying about their city's low food stocks.`,
+    message: `Stability drops in ${cityName} as worries mount due to low food stocks.`,
     turn,
     visibleToFactions: cityFaction !== FactionId.NEUTRAL ? [cityFaction] : [],
     baseSeverity: LogSeverity.WARNING,
