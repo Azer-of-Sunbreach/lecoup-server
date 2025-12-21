@@ -1,11 +1,12 @@
 // Embargo Module - Grain trade embargo logic
 
-import { GameState, FactionId, Location, CharacterStatus, FACTION_NAMES, LocationType } from '../../../../shared/types';
+import { GameState, FactionId, Location, CharacterStatus, FACTION_NAMES, LocationType, LogEntry } from '../../../../shared/types';
+import { createGenericLog } from '../../../../shared/services/logs/logFactory';
 import { FactionPersonality } from '../types';
 
 export interface EmbargoResult {
     locations: Location[];
-    logs: string[];
+    logs: LogEntry[];
     grainTradeNotification?: GameState['grainTradeNotification'];
 }
 
@@ -40,7 +41,7 @@ export function handleGrainEmbargo(
     profile: FactionPersonality,
     locations: Location[]
 ): EmbargoResult {
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
     let grainTradeNotification: GameState['grainTradeNotification'] | undefined;
 
     const windward = locations.find(l => l.id === 'windward');
@@ -88,7 +89,7 @@ function handleConspiratorEmbargo(
     state: GameState,
     windward: Location,
     greatPlains: Location,
-    logs: string[],
+    logs: LogEntry[],
     setNotification: (notif: GameState['grainTradeNotification']) => void
 ): void {
     if (windward.isGrainTradeActive) {
@@ -124,7 +125,7 @@ function handleNobleEmbargo(
     locations: Location[],
     windward: Location,
     greatPlains: Location,
-    logs: string[],
+    logs: LogEntry[],
     setNotification: (notif: GameState['grainTradeNotification']) => void
 ): void {
     if (windward.isGrainTradeActive) {
@@ -189,7 +190,7 @@ function applyEmbargo(
     windward: Location,
     greatPlains: Location,
     faction: FactionId,
-    logs: string[],
+    logs: LogEntry[],
     setNotification: (notif: GameState['grainTradeNotification']) => void
 ): void {
     windward.isGrainTradeActive = false;
@@ -197,7 +198,7 @@ function applyEmbargo(
     greatPlains.stability -= 20;
 
     const msg = `Embargo applied on Grain Trade by ${FACTION_NAMES[faction]}!`;
-    logs.push(msg);
+    logs.push(createGenericLog(msg, 1));
 
     setNotification({
         type: 'EMBARGO',

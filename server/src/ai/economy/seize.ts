@@ -1,14 +1,15 @@
 // Seize Module - AI emergency requisition of food and gold
 // Uses existing requisition logic from domain/economy/requisition.ts
 
-import { GameState, FactionId, Location, LocationType, FACTION_NAMES } from '../../../../shared/types';
+import { GameState, FactionId, Location, LocationType, FACTION_NAMES, LogEntry } from '../../../../shared/types';
+import { createGenericLog } from '../../../../shared/services/logs/logFactory';
 import { REQUISITION_AMOUNT, REQUISITION_STABILITY_PENALTY } from '../../../../shared/data';
 
 interface SeizeResult {
     locations: Location[];
     goldGained: number;
     foodGained: number;
-    logs: string[];
+    logs: LogEntry[];
 }
 
 /**
@@ -35,7 +36,7 @@ export function handleSeizeActions(
 ): SeizeResult {
     let goldGained = 0;
     let foodGained = 0;
-    const logs: string[] = [];
+    const logs: LogEntry[] = [];
 
     const myLocations = locations.filter(l => l.faction === faction);
     const factionName = FACTION_NAMES[faction];
@@ -77,7 +78,7 @@ export function handleSeizeActions(
             }
 
             foodGained += REQUISITION_AMOUNT;
-            logs.push(`${factionName} seizes food from ${rural.name} to feed ${city.name}.`);
+            logs.push(createGenericLog(`${factionName} seizes food from ${rural.name} to feed ${city.name}.`, state.turn));
             console.log(`[AI SEIZE ${faction}] Seized ${REQUISITION_AMOUNT} food from ${rural.name} for starving ${city.name}`);
         }
     }
@@ -114,7 +115,7 @@ export function handleSeizeActions(
                 };
 
                 goldGained += REQUISITION_AMOUNT;
-                logs.push(`${factionName} seizes gold from ${city.name}'s treasury.`);
+                logs.push(createGenericLog(`${factionName} seizes gold from ${city.name}'s treasury.`, state.turn));
                 console.log(`[AI SEIZE ${faction}] Seized ${REQUISITION_AMOUNT} gold from ${city.name} (stability was ${city.stability}%)`);
 
                 // Only seize from one city per turn to limit instability
