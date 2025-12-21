@@ -3,7 +3,7 @@
  * Consolidates logic from useGameEngine.ts INITIAL_STATE
  */
 
-import { GameState, FactionId, Army } from '../types';
+import { GameState, FactionId, Army, LogType, LogSeverity } from '../types';
 import { INITIAL_LOCATIONS, INITIAL_GARRISONS } from './locations';
 import { ROADS } from './roads';
 import { CHARACTERS } from './characters';
@@ -81,7 +81,12 @@ export const createInitialState = (): GameState => ({
         [FactionId.NEUTRAL]: { gold: 0 },
     },
     pendingNegotiations: [],
-    logs: ["The coup has begun. Count Rivenberg has claimed the regency for himself.", "Baron Lekal has called on the great Dukes to defend their feudal rights.", "Sir Azer and the Republicans took control of Sunbreach.", "Civil war engulfs Larion."],
+    logs: [
+        { id: 'init_1', type: LogType.GAME_START, message: "The coup has begun. Count Rivenberg has claimed the regency for himself.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
+        { id: 'init_2', type: LogType.GAME_START, message: "Baron Lekal has called on the great Dukes to defend their feudal rights.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
+        { id: 'init_3', type: LogType.GAME_START, message: "Sir Azer and the Republicans took control of Sunbreach.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
+        { id: 'init_4', type: LogType.GAME_START, message: "Civil war engulfs Larion.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO }
+    ],
     stats: { deathToll: 0 },
     selectedType: null,
     selectedId: null,
