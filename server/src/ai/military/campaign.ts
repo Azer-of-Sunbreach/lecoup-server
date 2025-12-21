@@ -9,6 +9,7 @@ import { SIEGE_COST_TABLE } from './types';
 import { getMinGarrison } from './garrison';
 import { moveArmiesTo, pullReinforcements } from './movement';
 import { DEBUG_AI } from '../../../../shared/data/gameConstants';
+import { createGenericLog } from '../../../../shared/services/logs/logFactory';
 
 /**
  * Handle a CAMPAIGN mission - the core offensive operation.
@@ -545,7 +546,7 @@ function executeSiege(
         };
     }
 
-    state.logs.push(`${faction} lays siege to ${targetLoc.name}! Defenses reduce to Level ${newLvl}.`);
+    state.logs.push(createGenericLog(`${faction} lays siege to ${targetLoc.name}! Defenses reduce to Level ${newLvl}.`, state.turn));
     if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] EXECUTED SIEGE at ${targetId}. Cost: ${siegeCost}, Manpower: ${requiredManpower}`);
 
     // 5. POST SIEGE ATTACK DECISION
