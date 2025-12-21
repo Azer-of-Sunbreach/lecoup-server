@@ -327,6 +327,25 @@ export const createFamineLog = (
     criticalForFactions: cityFaction !== FactionId.NEUTRAL ? [cityFaction] : undefined
 });
 
+/**
+ * Create a low food stock warning log
+ * Visible only to city owner when food drops below 50
+ */
+export const createLowFoodWarningLog = (
+    cityName: string,
+    cityId: string,
+    cityFaction: FactionId,
+    turn: number
+): LogEntry => ({
+    id: generateLogId(),
+    type: LogType.FAMINE,
+    message: `The citizens of ${cityName} are worrying about their city's low food stocks.`,
+    turn,
+    visibleToFactions: cityFaction !== FactionId.NEUTRAL ? [cityFaction] : [],
+    baseSeverity: LogSeverity.WARNING,
+    highlightTarget: { type: 'LOCATION', id: cityId }
+});
+
 // ============================================================================
 // COMMERCE LOGS
 // ============================================================================
