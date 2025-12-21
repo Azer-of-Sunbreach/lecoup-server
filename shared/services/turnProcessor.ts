@@ -162,8 +162,9 @@ export const processTurn = async (
     });
 
     // 5.6 Stability
-    const stabilityResult = processStability(state.locations, state.characters);
+    const stabilityResult = processStability(state.locations, state.characters, state.turn);
     state.locations = stabilityResult.locations;
+    logs.push(...stabilityResult.logs);
 
     // 5.7 Negotiations
     const negResult = processNegotiations(state);
