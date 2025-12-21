@@ -31,7 +31,32 @@ export function processConvoys(
         const nextIndex = convoy.stageIndex + (convoy.direction === 'FORWARD' ? 1 : -1);
 
         if (nextIndex < 0 || nextIndex >= road.stages.length) {
-            // Convoy has arrived at destination
+            // Convoy has reached end of current road
+            // Check if there's more roads in the path
+            if (convoy.path && convoy.pathIndex !== undefined && convoy.pathIndex < convoy.path.length - 1) {
+                // Move to next road in path
+                const nextPathIndex = convoy.pathIndex + 1;
+                const nextRoadId = convoy.path[nextPathIndex];
+                const nextRoad = roads.find(r => r.id === nextRoadId);
+
+                if (nextRoad) {
+                    // Determine direction on new road based on connection point
+                    const currentRoadEndLoc = convoy.direction === 'FORWARD' ? road.to : road.from;
+                    const isStartOfNextRoad = nextRoad.from === currentRoadEndLoc;
+
+                    nextConvoys.push({
+                        ...convoy,
+                        roadId: nextRoadId,
+                        stageIndex: isStartOfNextRoad ? 0 : nextRoad.stages.length - 1,
+                        direction: isStartOfNextRoad ? 'FORWARD' : 'BACKWARD',
+                        pathIndex: nextPathIndex,
+                        lastSafePosition: { type: 'LOCATION', id: currentRoadEndLoc }
+                    });
+                    return;
+                }
+            }
+
+            // Final destination reached - deliver food
             const destCityIndex = updatedLocations.findIndex(l => l.id === convoy.destinationCityId);
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
@@ -43,7 +68,7 @@ export function processConvoys(
                 logs.push(arrivalLog);
             }
         } else {
-            // Convoy continues moving
+            // Convoy continues moving on current road
             nextConvoys.push({ ...convoy, stageIndex: nextIndex });
         }
     });
