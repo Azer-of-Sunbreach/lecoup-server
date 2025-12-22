@@ -151,10 +151,17 @@ export function registerGameHandlers(
             }
 
             // Broadcast updated state to all players (with combatState null for non-involved players)
+            console.log(`[Game] ${code}: Preparing state for broadcast...`);
             const clientState = getClientState(room.gameState);
             // ALWAYS broadcast with null combatState - individual players get private combat requests
             const stateForBroadcast = { ...clientState, combatState: null };
+
+            // Log state size to detect potential serialization issues
+            const stateSize = JSON.stringify(stateForBroadcast).length;
+            console.log(`[Game] ${code}: Broadcasting state (${Math.round(stateSize / 1024)}KB)...`);
+
             io.to(code).emit('state_update', { gameState: stateForBroadcast });
+            console.log(`[Game] ${code}: Broadcast complete`);
 
             socket.emit('action_result', { success: true });
             console.log(`[Game] ${code}: Action ${action.type} processed successfully`);
