@@ -208,11 +208,14 @@ export const processTurn = async (
         narrativeEvents.push("Battles have erupted involving your forces.");
     }
 
-    let flavorText = "The war continues...";
-    try {
-        flavorText = await generateTurnNarrative(state.turn, narrativeEvents, state.playerFaction);
-    } catch (e) { }
-    logs.push(createNarrativeLog(flavorText, state.turn));
+
+    // NARRATIVE LOG DISABLED per user request
+    // If you want to re-enable: uncomment the following lines
+    // let flavorText = "The war continues...";
+    // try {
+    //     flavorText = await generateTurnNarrative(state.turn, narrativeEvents, state.playerFaction);
+    // } catch (e) { }
+    // logs.push(createNarrativeLog(flavorText, state.turn));
 
     // --- VICTORY CHECK ---
     const activeFactions = [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
