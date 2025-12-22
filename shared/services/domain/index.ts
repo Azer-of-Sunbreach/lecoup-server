@@ -16,3 +16,6 @@ export * from './retreat';
 
 // Logistics services
 export * from './convoys';
+
+// Territorial services
+export * from './territorial';
