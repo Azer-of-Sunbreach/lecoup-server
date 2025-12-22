@@ -84,6 +84,11 @@ setInterval(() => {
     }
 }, 60000); // Every 60 seconds
 
+// Heartbeat to keep server alive and help diagnose unexpected shutdowns
+setInterval(() => {
+    console.log(`[Heartbeat] Server alive - ${new Date().toISOString()}`);
+}, 5 * 60 * 1000); // Every 5 minutes
+
 // Startup banner
 console.log('=================================');
 console.log('  Le Coup - Multiplayer Server   ');
