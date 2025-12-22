@@ -2,6 +2,7 @@
 import { GameState, FactionId } from '../../../shared/types';
 import { AI_PROFILES } from './profiles';
 import { analyzeTheaters, updateMissions } from './strategy';
+import { executeRepublicanEarlyGame } from './strategy/republicanEarlyGame';
 import { manageEconomy } from './economy';
 import { manageDiplomacy } from './diplomacy';
 import { manageMilitary } from './military';
@@ -73,9 +74,34 @@ export const processSingleFactionAITurn = (gameState: GameState, faction: Factio
     applyBalancedRecruitmentOverride(faction, state, budget, state.armies);
     allocateSiegeBudget(faction, state, budget);
 
+    // REPUBLICAN EARLY GAME SCRIPT (Turns 1-2)
+    if (faction === FactionId.REPUBLICANS && state.turn <= 2) {
+        const earlyResult = executeRepublicanEarlyGame(state, faction, budget);
+        state = { ...state, ...earlyResult };
+    }
+
     // 3. ECONOMY & LOGISTICS
     const ecoResult = manageEconomy(state, faction, profile, budget);
     state = { ...state, ...ecoResult };
+
+    // FIX: Guarantee minimum diplomacy budget for 2 insurrections
+    const MIN_BUDGET_PER_INSURRECTION = 400;
+    const targetInsurrections = 2;
+    const minDiploBudget = targetInsurrections * MIN_BUDGET_PER_INSURRECTION;
+
+    if (profile.subversiveness > 0.5) {
+        console.log(`[AI BUDGET FIX ${faction}] Before final: diplo=${budget.allocations.diplomacy}, recruit=${budget.allocations.recruitment}`);
+
+        if (budget.allocations.diplomacy < minDiploBudget) {
+            const needed = minDiploBudget - budget.allocations.diplomacy;
+            const canTake = Math.max(0, budget.allocations.recruitment - 100);
+            const toTake = Math.min(needed, canTake);
+            budget.allocations.recruitment -= toTake;
+            budget.allocations.diplomacy += toTake;
+
+            console.log(`[AI BUDGET FIX ${faction}] After final: diplo=${budget.allocations.diplomacy}, took=${toTake}`);
+        }
+    }
 
     // 4. DIPLOMACY (Insurrections)
     const dipResult = manageDiplomacy(state, faction, goals, profile, budget);
@@ -164,9 +190,34 @@ export const processAITurn = (gameState: GameState): GameState => {
         // Allocate siege budget for fortified targets
         allocateSiegeBudget(faction, state, budget);
 
+        // REPUBLICAN EARLY GAME SCRIPT (Turns 1-2)
+        if (faction === FactionId.REPUBLICANS && state.turn <= 2) {
+            const earlyResult = executeRepublicanEarlyGame(state, faction, budget);
+            state = { ...state, ...earlyResult };
+        }
+
         // 3. ECONOMY & LOGISTICS (Mutates State)
         const ecoResult = manageEconomy(state, faction, profile, budget);
         state = { ...state, ...ecoResult };
+
+        // FIX: Guarantee minimum diplomacy budget for 2 insurrections
+        const MIN_BUDGET_PER_INSURRECTION = 400;
+        const targetInsurrections = 2;
+        const minDiploBudget = targetInsurrections * MIN_BUDGET_PER_INSURRECTION;
+
+        if (profile.subversiveness > 0.5) {
+            console.log(`[AI BUDGET FIX ${faction}] Before final: diplo=${budget.allocations.diplomacy}, recruit=${budget.allocations.recruitment}`);
+
+            if (budget.allocations.diplomacy < minDiploBudget) {
+                const needed = minDiploBudget - budget.allocations.diplomacy;
+                const canTake = Math.max(0, budget.allocations.recruitment - 100);
+                const toTake = Math.min(needed, canTake);
+                budget.allocations.recruitment -= toTake;
+                budget.allocations.diplomacy += toTake;
+
+                console.log(`[AI BUDGET FIX ${faction}] After final: diplo=${budget.allocations.diplomacy}, took=${toTake}`);
+            }
+        }
 
         // 4. DIPLOMACY (Insurrections)
         const dipResult = manageDiplomacy(state, faction, goals, profile, budget);

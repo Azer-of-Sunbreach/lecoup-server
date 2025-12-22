@@ -1,9 +1,10 @@
 // AI Military Management - Main orchestrator
 // Refactored to use modular components
 
-import { GameState, FactionId, Army } from '../../../shared/types';
+import { GameState, FactionId, Army, Character } from '../../../shared/types';
 import { FactionPersonality } from './types';
 import { DEBUG_AI } from '../../../shared/data/gameConstants';
+import { executeMergeRegiments } from '../../../shared/services/domain/military/mergeRegiments';
 
 // Import from new modular structure
 import { handleCampaign } from './military/campaign';
@@ -89,5 +90,65 @@ export const manageMilitary = (
     // 2. IDLE ARMIES BEHAVIOR
     handleIdleArmies(state, faction, newArmies, assignedArmyIds);
 
+    // 3. CONSOLIDATE ARMIES (merge when 5+ eligible at same location)
+    const consolidatedResult = consolidateArmies(faction, {
+        ...state,
+        armies: newArmies
+    });
+    newArmies = consolidatedResult.armies;
+
     return newArmies;
 };
+
+/**
+ * Consolidate AI armies at each location.
+ * Calls executeMergeRegiments when there are 5 or more eligible armies at the same location.
+ * Note: executeMergeRegiments already excludes spent, insurgent, sieging, and action armies.
+ */
+function consolidateArmies(
+    faction: FactionId,
+    state: GameState
+): { armies: Army[], characters: Character[] } {
+    let currentArmies = [...state.armies];
+    let currentCharacters = [...state.characters];
+
+    // Count eligible armies per location
+    const locationCounts = new Map<string, number>();
+
+    for (const army of currentArmies) {
+        if (army.faction !== faction) continue;
+        if (army.locationType !== 'LOCATION') continue;
+        if (!army.locationId) continue;
+        // Same criteria as executeMergeRegiments
+        if (army.isSpent || army.isInsurgent || army.isSieging || army.action) continue;
+
+        const locId = army.locationId;
+        locationCounts.set(locId, (locationCounts.get(locId) || 0) + 1);
+    }
+
+    // Merge at locations with 5+ eligible armies
+    for (const [locationId, count] of locationCounts) {
+        if (count < 5) continue;
+
+        const tempState: GameState = {
+            ...state,
+            armies: currentArmies,
+            characters: currentCharacters
+        };
+
+        const result = executeMergeRegiments(tempState, locationId, faction);
+
+        if (result.success && result.newState.armies) {
+            currentArmies = result.newState.armies;
+            if (result.newState.characters) {
+                currentCharacters = result.newState.characters;
+            }
+
+            if (DEBUG_AI) {
+                console.log(`[AI CONSOLIDATE ${faction}] ${result.message}`);
+            }
+        }
+    }
+
+    return { armies: currentArmies, characters: currentCharacters };
+}
