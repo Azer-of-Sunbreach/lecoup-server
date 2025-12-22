@@ -53,7 +53,16 @@ export const executeRequisition = (
     let newResources = { ...state.resources };
 
     if (type === 'GOLD') {
+        const goldBefore = newResources[faction].gold;
+        console.log(`[SEIZE_GOLD] Faction: ${faction}, Location: ${loc.name}`);
+        console.log(`[SEIZE_GOLD] Gold BEFORE: ${goldBefore}`);
+        console.log(`[SEIZE_GOLD] REQUISITION_AMOUNT constant: ${REQUISITION_AMOUNT}`);
+
         newResources[faction].gold += REQUISITION_AMOUNT;
+
+        console.log(`[SEIZE_GOLD] Gold AFTER: ${newResources[faction].gold}`);
+        console.log(`[SEIZE_GOLD] Difference: ${newResources[faction].gold - goldBefore}`);
+
         newLocations = newLocations.map(l => l.id === locId ? {
             ...l,
             stability: Math.max(0, l.stability - REQUISITION_STABILITY_PENALTY),
