@@ -7,7 +7,7 @@
 import { GameState, Army, Character, FactionId, CharacterStatus, RoadQuality, FACTION_NAMES, LogEntry } from '../../../types';
 import { FORTIFICATION_LEVELS } from '../../../data';
 import { calculateEconomyAndFood } from '../../../utils/economy';
-import { createGenericLog, createGrainTradeConquestLog, createLocationSecuredLog } from '../../../services/logs/logFactory';
+import { createForcesApproachingLog, createGrainTradeConquestLog, createLocationSecuredLog } from '../../../services/logs/logFactory';
 
 export interface MoveArmyResult {
     success: boolean;
@@ -215,8 +215,20 @@ export const executeArmyMove = (
             c.armyId === armyId ? { ...c, status: CharacterStatus.MOVING } : c
         );
 
-        const destName = state.locations.find(l => l.id === destLocId)?.name;
-        newLogs = [...newLogs, createGenericLog(`Forces marching to ${destName}.`, state.turn)];
+        const destLoc = state.locations.find(l => l.id === destLocId);
+        const destName = destLoc?.name || 'Unknown';
+        const destFaction = destLoc?.faction || FactionId.NEUTRAL;
+        // Only add log if enemy is marching to player's territory
+        const approachingLog = createForcesApproachingLog(
+            destName,
+            destFaction,
+            playerFaction,
+            armyId,
+            state.turn
+        );
+        if (approachingLog) {
+            newLogs = [...newLogs, approachingLog];
+        }
     }
 
     // Recalculate Economy
