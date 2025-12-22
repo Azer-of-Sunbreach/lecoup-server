@@ -37,6 +37,7 @@ export const executeFortify = (
     }
 
     if (activeConstruction) {
+        console.log(`[FORTIFY] Failed: Construction in progress at ${id} (idx: ${stageIndex})`);
         return { success: false, newState: {}, message: 'Construction already in progress' };
     }
 
@@ -44,10 +45,12 @@ export const executeFortify = (
     const fortData = FORTIFICATION_LEVELS[nextLevel];
 
     if (!fortData) {
+        console.log(`[FORTIFY] Failed: Max level reached at ${id}`);
         return { success: false, newState: {}, message: 'Maximum fortification level reached' };
     }
 
     if (state.resources[faction].gold < fortData.cost) {
+        console.log(`[FORTIFY] Failed: Insufficient gold (${state.resources[faction].gold} < ${fortData.cost})`);
         return { success: false, newState: {}, message: 'Insufficient gold' };
     }
 
@@ -66,6 +69,7 @@ export const executeFortify = (
     const totalAvailable = eligibleArmies.reduce((sum, a) => sum + a.strength, 0);
 
     if (totalAvailable < fortData.manpower) {
+        console.log(`[FORTIFY] Failed: Low manpower at ${id}. Need ${fortData.manpower}, have ${totalAvailable}. Eligible armies: ${eligibleArmies.length}`);
         return { success: false, newState: {}, message: `Need ${fortData.manpower} troops, have ${totalAvailable}` };
     }
 
