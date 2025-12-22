@@ -4,7 +4,7 @@ import { AIGoal, AIBudget, FactionPersonality } from './types';
 import { COST_INCITE, PORT_SEQUENCE } from '../../../shared/constants';
 import { getDistance } from './utils';
 import { getLeaderProfile, hasCommanderRole } from './leaders_config';
-import { createGenericLog } from '../../../shared/services/logs/logFactory';
+import { createInsurrectionPreparationLog } from '../../../shared/services/logs/logFactory';
 
 // Helper to determine how valuable a leader is to keep on the field
 const getLeaderValue = (char: Character): number => {
@@ -255,7 +255,14 @@ function handleInsurrection(
         };
     }
 
-    updates.logs!.push(createGenericLog(`${spy.name} begins an operation to destabilize ${targetLoc.name}.`, state.turn));
+    // Use specialized log with faction-aware visibility and highlight
+    updates.logs!.push(createInsurrectionPreparationLog(
+        spy.name,
+        targetLoc.name,
+        mission.targetId,
+        targetLoc.faction,
+        state.turn
+    ));
     mission.status = 'ACTIVE';
 
     return currentGold;
@@ -329,8 +336,7 @@ function handleNegotiation(
                     foodStock: source.foodStock - amount
                 };
                 foodSourceIds.push(source.id);
-                // Notification handled by UI usually, but logs help debug
-                updates.logs!.push(createGenericLog(`${faction} sends ${amount} bushels of grain to starving ${targetLoc.name}!`, state.turn));
+                // AI food aid log removed - AI actions don't generate logs
             }
         }
     }
@@ -348,7 +354,7 @@ function handleNegotiation(
     // "Negotiations take time or depend on RNG/Influence"
     // For now, we just spend gold to try.
 
-    updates.logs!.push(createGenericLog(`Diplomats sent to ${targetLoc.name} to negotiate allegiance.`, state.turn));
+    // AI negotiation log removed - negotiations result log is generated elsewhere when completed
     mission.status = 'ACTIVE';
 
     return currentGold;

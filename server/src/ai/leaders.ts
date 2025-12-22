@@ -3,7 +3,6 @@ import { GameState, FactionId, CharacterStatus, LocationType, Character, LogEntr
 import { getLeaderProfile, LeaderProfile, LeaderRole } from './leaders_config';
 import { findSafePath } from './utils';
 import { AITheater } from './types';
-import { createGenericLog } from '../../../shared/services/logs/logFactory';
 
 export const manageLeaders = (state: GameState, faction: FactionId): Partial<GameState> => {
     let characters = [...state.characters];
@@ -239,7 +238,7 @@ function handleCommanderRole(
                 const idx = allCharacters.findIndex(c => c.id === leader.id);
                 if (idx !== -1) {
                     allCharacters[idx] = { ...leader, armyId: armyWithoutLeader.id, status: CharacterStatus.AVAILABLE }; // Occupied?
-                    logs.push(createGenericLog(`${leader.name} took command of an army for operation ${mission.id}.`, state.turn));
+                    // AI leader action log removed - AI actions don't generate logs
                     return true;
                 }
             } else {
@@ -402,7 +401,14 @@ function moveLeaderStart(
         }
 
         if (shouldLog) {
-            logs.push(createGenericLog(logMsg, state.turn));
+            logs.push({
+                id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'LEADER' as any,
+                message: logMsg,
+                turn: state.turn,
+                visibleToFactions: [],  // Visible to all
+                baseSeverity: 'INFO' as any
+            });
         }
         return true;
     }
