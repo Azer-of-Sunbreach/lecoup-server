@@ -84,7 +84,7 @@ export const CHARACTERS: Character[] = [
     {
         id: 'lekal', name: 'Baron Lekal', title: 'Lord of Port-de-Sable', faction: FactionId.NOBLES, status: CharacterStatus.AVAILABLE, locationId: 'port_de_sable', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The old lion of the aristocracy.',
         bonuses: {},
-        stats: { stabilityPerTurn: 10, commandBonus: 0, insurrectionValue: 10, ability: ['MANAGER'] }
+        stats: { stabilityPerTurn: 5, commandBonus: 0, insurrectionValue: 10, ability: ['MANAGER'] }
     },
     {
         id: 'thane', name: 'Duke of Thane', title: 'Lord of the Highlands', faction: FactionId.NOBLES, status: CharacterStatus.AVAILABLE, locationId: 'karamos', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The nobility of the sword.',
