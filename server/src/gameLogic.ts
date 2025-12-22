@@ -248,11 +248,13 @@ export function processPlayerAction(
         }
 
         case 'REQUISITION': {
+            console.log(`[SERVER REQUISITION] Before - ${playerFaction} gold: ${updatedState.resources[playerFaction].gold}`);
             const result = executeRequisition(updatedState, action.locationId, action.resourceType, playerFaction);
             if (!result.success) {
                 return { success: false, newState: state, error: result.message || 'Failed to requisition' };
             }
             updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
+            console.log(`[SERVER REQUISITION] After - ${playerFaction} gold: ${updatedState.resources[playerFaction].gold}`);
             break;
         }
 
