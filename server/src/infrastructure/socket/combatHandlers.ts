@@ -165,7 +165,10 @@ export function registerCombatHandlers(
             const clientState = getClientState(rawStateForBroadcast);
             const stateForBroadcast = { ...clientState, combatState: null }; // Ensure null for public
 
+            console.log(`[COMBAT_DIAG] Broadcasting state update (size: ${JSON.stringify(stateForBroadcast).length} chars)...`);
             io.to(code).emit('state_update', { gameState: stateForBroadcast });
+            console.log(`[COMBAT_DIAG] State update sent.`);
+
             io.to(code).emit('combat_resolved', { result: 'Combat ended' });
 
             // Update battle phase tracking
@@ -186,8 +189,10 @@ export function registerCombatHandlers(
                     );
                 } else {
                     // No more battles - end the phase
+                    console.log(`[COMBAT_DIAG] Ending battle phase for room ${code}`);
                     gameRoomManager.endBattlePhase(code);
-                    emitCombatPhaseEnded(io, code);
+                    io.to(code).emit('combat_phase_ended');
+                    console.log(`[COMBAT_DIAG] Emitted combat_phase_ended`);
                 }
             }
 
