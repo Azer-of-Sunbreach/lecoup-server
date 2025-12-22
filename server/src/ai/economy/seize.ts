@@ -2,7 +2,6 @@
 // Uses existing requisition logic from domain/economy/requisition.ts
 
 import { GameState, FactionId, Location, LocationType, FACTION_NAMES, LogEntry } from '../../../../shared/types';
-import { createGenericLog } from '../../../../shared/services/logs/logFactory';
 import { REQUISITION_AMOUNT, REQUISITION_STABILITY_PENALTY } from '../../../../shared/data';
 
 interface SeizeResult {
@@ -78,7 +77,7 @@ export function handleSeizeActions(
             }
 
             foodGained += REQUISITION_AMOUNT;
-            logs.push(createGenericLog(`${factionName} seizes food from ${rural.name} to feed ${city.name}.`, state.turn));
+            // AI seize log removed per specs - AI actions don't generate logs
             console.log(`[AI SEIZE ${faction}] Seized ${REQUISITION_AMOUNT} food from ${rural.name} for starving ${city.name}`);
         }
     }
@@ -115,7 +114,7 @@ export function handleSeizeActions(
                 };
 
                 goldGained += REQUISITION_AMOUNT;
-                logs.push(createGenericLog(`${factionName} seizes gold from ${city.name}'s treasury.`, state.turn));
+                // AI seize log removed per specs - AI actions don't generate logs
                 console.log(`[AI SEIZE ${faction}] Seized ${REQUISITION_AMOUNT} gold from ${city.name} (stability was ${city.stability}%)`);
 
                 // Only seize from one city per turn to limit instability

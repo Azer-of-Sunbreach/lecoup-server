@@ -1,7 +1,7 @@
 // Embargo Module - Grain trade embargo logic
 
 import { GameState, FactionId, Location, CharacterStatus, FACTION_NAMES, LocationType, LogEntry } from '../../../../shared/types';
-import { createGenericLog } from '../../../../shared/services/logs/logFactory';
+import { createEmbargoLog } from '../../../../shared/services/logs/logFactory';
 import { FactionPersonality } from '../types';
 
 export interface EmbargoResult {
@@ -198,7 +198,7 @@ function applyEmbargo(
     greatPlains.stability -= 20;
 
     const msg = `Embargo applied on Grain Trade by ${FACTION_NAMES[faction]}!`;
-    logs.push(createGenericLog(msg, 1));
+    logs.push(createEmbargoLog(msg, 1));
 
     setNotification({
         type: 'EMBARGO',
