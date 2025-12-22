@@ -72,6 +72,18 @@ process.on('unhandledRejection', (reason, promise) => {
     // Don't exit - try to keep server alive
 });
 
+// Memory usage logging - helps diagnose OOM kills
+setInterval(() => {
+    const used = process.memoryUsage();
+    const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
+    const rssMB = Math.round(used.rss / 1024 / 1024);
+    // Only log if approaching limit (Render free = 512MB)
+    if (rssMB > 200) {
+        console.log(`[Memory] RSS: ${rssMB}MB | Heap: ${heapUsedMB}/${heapTotalMB}MB`);
+    }
+}, 60000); // Every 60 seconds
+
 // Startup banner
 console.log('=================================');
 console.log('  Le Coup - Multiplayer Server   ');
