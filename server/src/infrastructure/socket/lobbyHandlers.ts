@@ -181,6 +181,10 @@ export function registerLobbyHandlers(
             }
         }
 
+        // CRITICAL: Update room.playerFactions with new socketId
+        // This map is used by isPlayerTurn and getSocketForFaction
+        room.playerFactions.set(socket.id, faction);
+
         // Send current game state to the rejoined player
         const currentState = getClientState(room.gameState);
         socket.emit('state_update', { gameState: currentState });
