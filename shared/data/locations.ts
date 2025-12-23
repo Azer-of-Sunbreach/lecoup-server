@@ -17,7 +17,7 @@ export const INITIAL_LOCATIONS: Location[] = [
     },
     {
         id: 'sunbreach', name: 'Sunbreach', type: 'CITY', linkedLocationId: 'sunbreach_lands', faction: FactionId.REPUBLICANS,
-        population: 150000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 150000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 300, stability: 51, defense: 4000, fortificationLevel: 3,
         position: { x: 120, y: 380 },
         backgroundPosition: { x: 186, y: 343 },
@@ -35,7 +35,7 @@ export const INITIAL_LOCATIONS: Location[] = [
     },
     {
         id: 'stormbay', name: 'Stormbay', type: 'CITY', linkedLocationId: 'order_lands', faction: FactionId.CONSPIRATORS,
-        population: 120000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 120000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 350, stability: 100, defense: 10000, fortificationLevel: 4,
         position: { x: 230, y: 580 },
         backgroundPosition: { x: 285, y: 660 },
@@ -138,7 +138,7 @@ export const INITIAL_LOCATIONS: Location[] = [
     },
     {
         id: 'gullwing', name: 'Gullwing', type: 'CITY', linkedLocationId: 'gullwing_duchy', faction: FactionId.NOBLES,
-        population: 45000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 45000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 150, stability: 75, defense: 4000, fortificationLevel: 3,
         position: { x: 780, y: 530 },
         backgroundPosition: { x: 800, y: 649 },
@@ -173,7 +173,7 @@ export const INITIAL_LOCATIONS: Location[] = [
     },
     {
         id: 'brinewaith', name: 'Brinewaith', type: 'CITY', linkedLocationId: 'saltcraw_viscounty', faction: FactionId.NOBLES,
-        population: 12000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 12000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 135, stability: 50, defense: 4000, fortificationLevel: 3,
         position: { x: 50, y: 510 },
         backgroundPosition: { x: 48, y: 521 },
@@ -190,7 +190,7 @@ export const INITIAL_LOCATIONS: Location[] = [
     },
     {
         id: 'gre_au_vent', name: 'Gré-au-vent', type: 'CITY', linkedLocationId: 'larion_islands', faction: FactionId.NOBLES,
-        population: 10000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 10000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 135, stability: 50, defense: 4000, fortificationLevel: 3,
         position: { x: 180, y: 50 },
         backgroundPosition: { x: 259, y: 18 },
