@@ -240,8 +240,13 @@ export function registerLobbyHandlers(
         room.currentTurnIndex = room.turnOrder.indexOf(currentFaction);
         if (room.currentTurnIndex === -1) room.currentTurnIndex = 0; // Fallback
 
-        // CRITICAL: Ensure server game state has correct currentTurnFaction
+        // CRITICAL: Ensure server game state has all required multiplayer fields
+        // advanceTurn uses state.currentTurnIndex, state.turnOrder, state.humanFactions, state.aiFaction
         room.gameState.currentTurnFaction = room.turnOrder[room.currentTurnIndex];
+        room.gameState.currentTurnIndex = room.currentTurnIndex;
+        room.gameState.turnOrder = room.turnOrder;
+        room.gameState.humanFactions = humanFactions;
+        room.gameState.aiFaction = aiFaction;
 
         console.log(`[Restore] Turn sync: currentFaction=${currentFaction}, turnIndex=${room.currentTurnIndex}, serverCurrentTurn=${room.gameState.currentTurnFaction}`);
 
