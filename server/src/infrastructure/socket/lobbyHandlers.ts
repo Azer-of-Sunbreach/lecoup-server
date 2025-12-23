@@ -234,10 +234,16 @@ export function registerLobbyHandlers(
         // Note: We use the gameState from client. Check security? (Ideally yes, but for now trust client)
         const room = gameRoomManager.createRoom(lobby, gameState);
 
-        // Sync currentTurnIndex with gameState.currentPlayerFaction
-        const currentFaction = gameState.currentPlayerFaction;
+        // Sync currentTurnIndex with gameState.currentTurnFaction (server field name)
+        // Client might send as currentPlayerFaction or currentTurnFaction depending on source
+        const currentFaction = gameState.currentTurnFaction || gameState.currentPlayerFaction;
         room.currentTurnIndex = room.turnOrder.indexOf(currentFaction);
         if (room.currentTurnIndex === -1) room.currentTurnIndex = 0; // Fallback
+
+        // CRITICAL: Ensure server game state has correct currentTurnFaction
+        room.gameState.currentTurnFaction = room.turnOrder[room.currentTurnIndex];
+
+        console.log(`[Restore] Turn sync: currentFaction=${currentFaction}, turnIndex=${room.currentTurnIndex}, serverCurrentTurn=${room.gameState.currentTurnFaction}`);
 
         // Join socket
         socket.data.gameCode = lobbyCode;
