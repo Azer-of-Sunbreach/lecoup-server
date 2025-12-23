@@ -67,7 +67,6 @@ export const processTurn = async (
     const logs: LogEntry[] = [];
 
     // --- PHASE 1: AI PLANNING & EXECUTION ---
-    state.armies = state.armies.map(a => ({ ...a, justMoved: false }));
     state = processAITurn(state);
 
     // --- PHASE 2: TURN ADVANCEMENT & RESET ---
@@ -99,6 +98,9 @@ export const processTurn = async (
     state.armies = moveResult.armies;
     state.characters = moveResult.characters;
     logs.push(...moveResult.logs);
+
+    // Reset justMoved AFTER movement resolution to prevent double-move bug
+    state.armies = state.armies.map(a => ({ ...a, justMoved: false }));
 
     // --- PHASE 4: EVENTS & ACTIONS ---
     console.log('[TURN] Phase 4: Processing insurrections...');
