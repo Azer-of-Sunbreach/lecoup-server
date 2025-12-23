@@ -158,10 +158,12 @@ export const processTurn = async (
     const famineNotification = famineResult.famineNotification;
 
     // 5.5 Gold Income
+    console.log(`[TURN PROCESSOR] Gold BEFORE income: NOBLES=${state.resources.NOBLES.gold}, REP=${state.resources.REPUBLICANS.gold}, CONS=${state.resources.CONSPIRATORS.gold}`);
     Object.values(FactionId).forEach(fid => {
         const income = state.locations.filter(l => l.faction === fid).reduce((sum, l) => sum + l.goldIncome, 0);
         state.resources[fid].gold += income;
     });
+    console.log(`[TURN PROCESSOR] Gold AFTER income: NOBLES=${state.resources.NOBLES.gold}, REP=${state.resources.REPUBLICANS.gold}, CONS=${state.resources.CONSPIRATORS.gold}`);
 
     // 5.6 Stability
     const stabilityResult = processStability(state.locations, state.characters, state.turn);
