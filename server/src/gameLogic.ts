@@ -32,6 +32,7 @@ import {
     executeRequisition,
     executeUpdateCityManagement
 } from '../../shared/services/domain';
+import { executeRetreat } from '../../shared/services/domain/retreat';
 import { resolveCombatResult } from '../../shared/services/combat';
 import { detectBattles } from '../../shared/services/combatDetection';
 import { processTurn } from '../../shared/services/turnProcessor';
@@ -233,6 +234,15 @@ export function processPlayerAction(
             const result = executeMoveLeader(updatedState, action.characterId, action.destinationId);
             if (!result.success) {
                 return { success: false, newState: state, error: result.message || 'Failed to move leader' };
+            }
+            updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
+            break;
+        }
+
+        case 'RETREAT_ARMY': {
+            const result = executeRetreat(updatedState, action.armyId);
+            if (!result.success) {
+                return { success: false, newState: state, error: result.message || 'Failed to reverse army' };
             }
             updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
             break;
