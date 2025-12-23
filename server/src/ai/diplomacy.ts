@@ -68,7 +68,12 @@ export const manageDiplomacy = (
         }
     }
 
-    updates.resources![faction].gold = currentGold + budget.reserved + budget.allocations.recruitment;
+    // Calculate how much was actually spent and deduct it from resources
+    const diplomacySpent = budget.allocations.diplomacy - currentGold;
+    if (diplomacySpent > 0) {
+        updates.resources![faction].gold = Math.max(0, state.resources[faction].gold - diplomacySpent);
+        console.log(`[AI DIPLOMACY ${faction}] Spent ${diplomacySpent} gold on diplomacy. Remaining: ${updates.resources![faction].gold}`);
+    }
 
     return updates;
 };

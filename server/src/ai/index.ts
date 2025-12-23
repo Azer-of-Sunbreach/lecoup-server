@@ -106,6 +106,7 @@ export const processSingleFactionAITurn = (gameState: GameState, faction: Factio
     }
 
     // 4. DIPLOMACY (Insurrections)
+    // manageDiplomacy now properly deducts spending from state.resources
     const dipResult = manageDiplomacy(state, faction, goals, profile, budget);
     state = { ...state, ...dipResult };
     console.log(`[AI GOLD DEBUG] ${faction} AFTER DIPLOMACY: ${state.resources[faction].gold} gold`);
