@@ -85,9 +85,17 @@ export const executeIncite = (
                     ...state.resources[faction],
                     gold: state.resources[faction].gold - finalCost
                 }
-            }
-            // Insurrection preparation log removed - player actions don't generate logs
-            // AI insurrection logs are generated separately in AI diplomacy module
+            },
+            logs: [
+                ...state.logs,
+                createInsurrectionPreparationLog(
+                    character.name,
+                    loc.name,
+                    loc.id,
+                    loc.faction,
+                    state.turn
+                )
+            ]
         },
         message: `${character.name} is preparing an insurrection in ${loc.name}`
     };
