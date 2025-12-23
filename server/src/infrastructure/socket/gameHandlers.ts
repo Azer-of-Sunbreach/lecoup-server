@@ -161,7 +161,7 @@ export function registerGameHandlers(
             console.log(`[Game] ${code}: Broadcasting state (${Math.round(stateSize / 1024)}KB)...`);
 
             io.to(code).emit('state_update', { gameState: stateForBroadcast });
-            console.log(`[Game] ${code}: Broadcast complete`);
+            console.log(`[Game] ${code}: Broadcast complete (combatState in broadcast: ${stateForBroadcast.combatState ? 'SET' : 'null'})`);
 
             socket.emit('action_result', { success: true });
             console.log(`[Game] ${code}: Action ${action.type} processed successfully`);
