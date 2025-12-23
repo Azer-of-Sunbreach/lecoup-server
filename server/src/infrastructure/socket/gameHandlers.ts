@@ -305,6 +305,7 @@ export function registerGameHandlers(
             // Then send combat_choice_requested to involved player
             const clientStateAfterTurn = getClientState(room.gameState);
             const sanitizedState = { ...clientStateAfterTurn, combatState: null };
+            console.log(`[END_TURN] Emitting state_update (combatState: ${sanitizedState.combatState ? 'SET' : 'null'})`);
             io.to(code).emit('state_update', { gameState: sanitizedState });
             io.to(code).emit('turn_changed', {
                 currentFaction: room.gameState.currentTurnFaction,
@@ -388,11 +389,10 @@ export function registerGameHandlers(
                     }
                 }
 
-                // Send updates after AI turn - EXCLUDE combatState if there's pending combat
+                // Send updates after AI turn - ALWAYS EXCLUDE combatState from broadcast
+                // Individual players get private combat_choice_requested events
                 const aiClientState = getClientState(room.gameState);
-                const aiStateForBroadcast = room.pendingCombat
-                    ? { ...aiClientState, combatState: null }
-                    : aiClientState;
+                const aiStateForBroadcast = { ...aiClientState, combatState: null };
                 io.to(code).emit('state_update', { gameState: aiStateForBroadcast });
                 io.to(code).emit('turn_changed', {
                     currentFaction: room.gameState.currentTurnFaction,
@@ -409,8 +409,9 @@ export function registerGameHandlers(
                 result = await advanceTurn(room.gameState);
                 room.gameState = result.newState;
 
-                // Send state update after advancing turn
-                io.to(code).emit('state_update', { gameState: getClientState(room.gameState) });
+                // Send state update after advancing turn - ALWAYS clear combatState
+                const stateAfterAdvance = getClientState(room.gameState);
+                io.to(code).emit('state_update', { gameState: { ...stateAfterAdvance, combatState: null } });
                 io.to(code).emit('turn_changed', {
                     currentFaction: room.gameState.currentTurnFaction,
                     turnNumber: room.gameState.turn
