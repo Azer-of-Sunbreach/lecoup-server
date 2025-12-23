@@ -23,6 +23,7 @@ export const processSingleFactionAITurn = (gameState: GameState, faction: Factio
     }
 
     console.log(`[AI] Processing turn for ${faction}`);
+    console.log(`[AI GOLD DEBUG] ${faction} START: ${state.resources[faction].gold} gold`);
 
     // 1. ANALYSIS & STRATEGY
     const theaters = analyzeTheaters(state, faction);
@@ -83,6 +84,7 @@ export const processSingleFactionAITurn = (gameState: GameState, faction: Factio
     // 3. ECONOMY & LOGISTICS
     const ecoResult = manageEconomy(state, faction, profile, budget);
     state = { ...state, ...ecoResult };
+    console.log(`[AI GOLD DEBUG] ${faction} AFTER ECONOMY: ${state.resources[faction].gold} gold`);
 
     // FIX: Guarantee minimum diplomacy budget for 2 insurrections
     const MIN_BUDGET_PER_INSURRECTION = 400;
@@ -106,6 +108,7 @@ export const processSingleFactionAITurn = (gameState: GameState, faction: Factio
     // 4. DIPLOMACY (Insurrections)
     const dipResult = manageDiplomacy(state, faction, goals, profile, budget);
     state = { ...state, ...dipResult };
+    console.log(`[AI GOLD DEBUG] ${faction} AFTER DIPLOMACY: ${state.resources[faction].gold} gold`);
 
     // 5. MILITARY MOVEMENT
     state.armies = manageMilitary(state, faction, profile);
@@ -114,6 +117,7 @@ export const processSingleFactionAITurn = (gameState: GameState, faction: Factio
     const leaderResult = manageLeaders(state, faction);
     state = { ...state, ...leaderResult };
 
+    console.log(`[AI GOLD DEBUG] ${faction} END: ${state.resources[faction].gold} gold`);
     console.log(`[AI] Completed turn for ${faction}`);
     return state;
 };
