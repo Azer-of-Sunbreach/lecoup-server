@@ -104,5 +104,6 @@ export const createInitialState = (): GameState => ({
     insurrectionNotification: null,
     famineNotification: null,
     siegeNotification: null,
+    leaderEliminatedNotification: null,
     hasScannedBattles: false
 });
