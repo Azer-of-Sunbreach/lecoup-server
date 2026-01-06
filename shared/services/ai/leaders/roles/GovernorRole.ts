@@ -204,7 +204,9 @@ function scoreAllPolicies(
         const foodCost = calculateAppeaseMindsFood(location.population);
 
         // Priority based on resentment against our faction
-        const resentment = location.resentment?.[leader.faction] || 0;
+        const resentment = (location.resentment && leader.faction !== FactionId.NEUTRAL)
+            ? (location.resentment[leader.faction as keyof typeof location.resentment] || 0)
+            : 0;
 
         if (resentment > 70) {
             score = 70;
@@ -609,8 +611,16 @@ export function analyzeTerritoryForGovernor(
     }
 
     // Check for economic damage (burned buildings/crops)
-    const hasBurnDamage = location.modifiers?.burned || false;
-    const burnSeverity = (location.modifiers as any)?.burnSeverity || 'NONE';
+    const burnedFields = location.burnedFields || 0;
+    const burnedDistricts = location.burnedDistricts || 0;
+    const hasBurnDamage = burnedFields > 0 || burnedDistricts > 0;
+
+    let burnSeverity = 'NONE';
+    if (burnedFields > 1 || burnedDistricts > 1) {
+        burnSeverity = 'MAJOR';
+    } else if (hasBurnDamage) {
+        burnSeverity = 'MINOR';
+    }
 
     // Check for famine risk (city with low food)
     const isFamineRisk = location.type === 'CITY' && (location.foodStock || 0) < 10;
