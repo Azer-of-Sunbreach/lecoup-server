@@ -58,7 +58,8 @@ export enum LogType {
   ECONOMY = 'ECONOMY',
   COMMERCE = 'COMMERCE',
   LEADER = 'LEADER',
-  NARRATIVE = 'NARRATIVE'
+  NARRATIVE = 'NARRATIVE',
+  CLANDESTINE = 'CLANDESTINE'
 }
 
 export interface LogHighlightTarget {
