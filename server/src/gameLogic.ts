@@ -14,6 +14,7 @@ import {
     LogSeverity
 } from '../../shared/types';
 import { createInitialState, getInitialResources } from '../../shared/data/initialState';
+import { INITIAL_PLAYER_RESOURCES, INITIAL_AI_RESOURCES } from '../../shared/data/gameConstants';
 import {
     executeRecruitment,
     executeArmyMove,
@@ -60,13 +61,13 @@ export function createMultiplayerGameState(
     // Set up resources - humans get base, AI gets bonus
     const multiplayerResources = {
         [FactionId.REPUBLICANS]: {
-            gold: aiFaction === FactionId.REPUBLICANS ? 2000 : 1000
+            gold: aiFaction === FactionId.REPUBLICANS ? INITIAL_AI_RESOURCES.REPUBLICANS : INITIAL_PLAYER_RESOURCES.REPUBLICANS
         },
         [FactionId.CONSPIRATORS]: {
-            gold: aiFaction === FactionId.CONSPIRATORS ? 850 : 350
+            gold: aiFaction === FactionId.CONSPIRATORS ? INITIAL_AI_RESOURCES.CONSPIRATORS : INITIAL_PLAYER_RESOURCES.CONSPIRATORS
         },
         [FactionId.NOBLES]: {
-            gold: aiFaction === FactionId.NOBLES ? 1200 : 500
+            gold: aiFaction === FactionId.NOBLES ? INITIAL_AI_RESOURCES.NOBLES : INITIAL_PLAYER_RESOURCES.NOBLES
         },
         [FactionId.NEUTRAL]: { gold: 0 },
     };
