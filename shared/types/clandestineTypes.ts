@@ -27,7 +27,12 @@ export type ClandestineActionType = {
     name: string;
     description: string;
     costPerTurn: number;
-    detectionRisk: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME' | 'NONE';
+    /** @deprecated Use detectionIncrease instead */
+    detectionRisk?: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME' | 'NONE';
+    /** Detection level increase per turn (or once for one-time actions) */
+    detectionIncrease: number;
+    /** Whether detection applies per turn or once */
+    detectionType: 'per_turn' | 'one_time';
     requiredOpsLevel: number;
     isOneTime?: boolean; // If true, cost is paid once at start
 };
@@ -37,8 +42,9 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         id: ClandestineActionId.UNDERMINE_AUTHORITIES,
         name: 'Undermine Authorities',
         description: 'Reduces stability by 2 to 10 points per turn.',
-        costPerTurn: 20,
-        detectionRisk: 'LOW',
+        costPerTurn: 10,
+        detectionIncrease: 10,
+        detectionType: 'per_turn',
         requiredOpsLevel: 1
     },
     [ClandestineActionId.DISTRIBUTE_PAMPHLETS]: {
@@ -46,7 +52,8 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         name: 'Distribute Pamphlets',
         description: 'Increases resentment against the local ruler.',
         costPerTurn: 10,
-        detectionRisk: 'LOW',
+        detectionIncrease: 5,
+        detectionType: 'per_turn',
         requiredOpsLevel: 1
     },
     [ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS]: {
@@ -54,7 +61,8 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         name: 'Incite Neutral Insurrections',
         description: 'Attempts to trigger a neutral uprising.',
         costPerTurn: 50,
-        detectionRisk: 'MODERATE',
+        detectionIncrease: 10,
+        detectionType: 'per_turn',
         requiredOpsLevel: 3
     },
     [ClandestineActionId.SPREAD_PROPAGANDA]: {
@@ -62,7 +70,8 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         name: 'Spread Propaganda',
         description: 'Reduces resentment against your faction.',
         costPerTurn: 10,
-        detectionRisk: 'LOW',
+        detectionIncrease: 5,
+        detectionType: 'per_turn',
         requiredOpsLevel: 2
     },
     [ClandestineActionId.ASSASSINATE_LEADER]: {
@@ -70,7 +79,8 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         name: 'Assassinate Leader',
         description: 'Attempt to assassinate an enemy leader in the region.',
         costPerTurn: 0,
-        detectionRisk: 'HIGH',
+        detectionIncrease: 10,
+        detectionType: 'one_time',
         requiredOpsLevel: 4,
         isOneTime: true
     },
@@ -78,11 +88,9 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         id: ClandestineActionId.ATTACK_TAX_CONVOYS,
         name: 'Attack Tax Convoys',
         description: 'Intercept tax gold before it reaches the faction treasury.',
-        costPerTurn: 0, // Funded by loot? Or actually 0 cost? Spec implies it might have a cost or risk. 
-        // Wait, checked previous memory: Attack Tax Convoys has a cost of 0 but requires budget?
-        // Let's stick to existing definition or update if needed.
-        // Actually typically these have 0 cost but high risk.
-        detectionRisk: 'HIGH',
+        costPerTurn: 0,
+        detectionIncrease: 5,
+        detectionType: 'per_turn',
         requiredOpsLevel: 2
     },
     [ClandestineActionId.STEAL_FROM_GRANARIES]: {
@@ -90,7 +98,8 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         name: 'Steal from Granaries',
         description: 'Sabotage food stocks to cause unrest.',
         costPerTurn: 0,
-        detectionRisk: 'HIGH',
+        detectionIncrease: 5,
+        detectionType: 'per_turn',
         requiredOpsLevel: 2
     },
     [ClandestineActionId.BURN_CROP_FIELDS]: {
@@ -98,25 +107,26 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         name: 'Burn Crop Fields',
         description: 'Destroy food production capacity.',
         costPerTurn: 25,
-        detectionRisk: 'HIGH',
-        requiredOpsLevel: 3,
-        isOneTime: true
+        detectionIncrease: 10,
+        detectionType: 'per_turn',
+        requiredOpsLevel: 3
     },
     [ClandestineActionId.START_URBAN_FIRE]: {
         id: ClandestineActionId.START_URBAN_FIRE,
         name: 'Start Urban Fire',
         description: 'Set fire to city districts to ruin economy.',
         costPerTurn: 25,
-        detectionRisk: 'HIGH',
-        requiredOpsLevel: 3,
-        isOneTime: true
+        detectionIncrease: 10,
+        detectionType: 'per_turn',
+        requiredOpsLevel: 3
     },
     [ClandestineActionId.PREPARE_GRAND_INSURRECTION]: {
         id: ClandestineActionId.PREPARE_GRAND_INSURRECTION,
         name: 'Prepare Grand Insurrection',
         description: 'Prepare a large-scale uprising to seize the region.',
         costPerTurn: 0, // One-time investment 100-500 handled dynamically
-        detectionRisk: 'MODERATE',
+        detectionIncrease: 10,
+        detectionType: 'one_time',
         requiredOpsLevel: 1, // User request: Available to all leaders
         isOneTime: true
     }
@@ -167,3 +177,57 @@ export const CLANDESTINE_ACTION_COSTS: Record<string, number> = {
     START_URBAN_FIRE: 25,
     PREPARE_GRAND_INSURRECTION: 0 // Variable one-time cost
 };
+
+// ============================================================================
+// LEADER ALERT EVENTS
+// ============================================================================
+
+/**
+ * Event types for clandestine alerts modal
+ */
+export enum ClandestineAlertEventType {
+    INFILTRATION_SUCCESS = 'infiltration_success',
+    INFILTRATION_DETECTED = 'infiltration_detected',
+    HUNT_NETWORKS_ACTIVATED = 'hunt_networks_activated',
+    DETECTION_WARNING = 'detection_warning',
+    // === Detection Level System Events (2026-01-10) ===
+    /** Agent's detection level exceeded threshold - now at risk */
+    THRESHOLD_EXCEEDED = 'threshold_exceeded',
+    /** PARANOID governor appointed in agent's location */
+    PARANOID_GOVERNOR_APPOINTED = 'paranoid_governor_appointed',
+    /** Both PARANOID governor AND HUNT_NETWORKS activated same turn */
+    COMBINED_PARANOID_HUNT = 'combined_paranoid_hunt',
+    /** Leader captured and executed */
+    EXECUTION = 'execution',
+    /** Leader captured but escaped (Daredevil) */
+    ESCAPE = 'escape',
+    OTHER = 'other'
+}
+
+/**
+ * A single alert event for a leader.
+ * Multiple events can accumulate per leader across a turn cycle.
+ * Stored on Character.pendingAlertEvents for multiplayer sync.
+ */
+export interface LeaderAlertEvent {
+    /** Leader this event belongs to */
+    leaderId: string;
+    /** Turn when event was created */
+    turn: number;
+    /** Type of alert event */
+    eventType: ClandestineAlertEventType;
+    /** Main title message (raw, needs i18n interpolation) */
+    messageKey: string;
+    /** Interpolation params for message */
+    messageParams?: Record<string, string>;
+    /** Subtitle message key */
+    subMessageKey?: string;
+    /** Interpolation params for subtitle */
+    subMessageParams?: Record<string, string>;
+    /** Faction that triggered/owns this event */
+    targetFaction: string;
+    /** Timestamp for ordering (Date.now()) */
+    timestamp: number;
+    /** Location where the event happened (useful for logs/UI if leader moves/dies) */
+    locationId?: string;
+}
