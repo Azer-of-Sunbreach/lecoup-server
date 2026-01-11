@@ -30,6 +30,7 @@ export { getStrategyForFaction, shouldGoDark, shouldExfiltrate } from './strateg
 // Utility exports
 export { getLeaderProfiles, getLeaderProfile, isLeaderVIP, getRolePriority } from './utils/LeaderProfiles';
 export * from './utils/IPGCalculator';
+export * from './utils/AIRiskDecisionService';
 
 // Unified Assignment System
 export { generateUnifiedAssignments } from './core/UnifiedAssignmentService';

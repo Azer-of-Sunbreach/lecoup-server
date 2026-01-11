@@ -7,10 +7,13 @@
  * @module shared/services/ai/leaders/core
  */
 
-import { Character, Location, Army, FactionId, CharacterStatus } from '../../../../types';
+import { Character, Location, Army, FactionId, CharacterStatus, Road } from '../../../../types';
 import { GovernorPolicy } from '../../../../types/governorTypes';
-import { ClandestineActionId, ActiveClandestineAction } from '../../../../types/clandestineTypes';
-import { calculateDetectionRisk } from '../../../domain/clandestine/detectionRisk';
+import { ClandestineActionId, ActiveClandestineAction, CLANDESTINE_ACTIONS } from '../../../../types/clandestineTypes';
+import { calculateDetectionThreshold, calculateCaptureRisk } from '../../../domain/clandestine/detectionLevelService';
+import { getStrategyForFaction } from '../strategies/factionStrategy';
+import { assessRisk } from '../utils/AIRiskDecisionService';
+import { calculateLeaderTravelTime } from '../../../domain/leaders/leaderPathfinding';
 
 // ============================================================================
 // TYPES
@@ -57,7 +60,8 @@ function getResentment(location: Location, faction: FactionId): number {
  * @param turn Current turn number
  * @param actorFaction The faction the agent belongs to
  * @param logs Array to append log messages to
- * @param allCharacters All characters (for PARANOID/LEGENDARY detection)
+ * @param allCharacters List of all characters (for context)
+ * @param roads List of all roads (for exfiltration pathfinding)
  * @returns Updated character and logs
  */
 export function processClandestineAgent(
@@ -67,7 +71,8 @@ export function processClandestineAgent(
     turn: number,
     actorFaction: FactionId,
     logs: string[],
-    allCharacters: Character[] = []
+    allCharacters: Character[] = [],
+    roads: Road[] = []
 ): ClandestineResult {
     const location = locations.find(l => l.id === leader.locationId);
     if (!location) {
@@ -108,6 +113,9 @@ export function processClandestineAgent(
     let budget = (leader as any).clandestineBudget ?? (leader as any).budget ?? 0;
     const currentActions: ActiveClandestineAction[] = (leader as any).activeClandestineActions || [];
     const clandestineOps = leader.stats?.clandestineOps || 3;
+
+    // Initialize planned mission action from current state (will be updated if plan changes/aborts)
+    let newPlannedMissionAction = (leader as any).plannedMissionAction;
 
     const enemyResentment = getResentment(location, location.faction);
     const ourResentment = getResentment(location, actorFaction);
@@ -153,25 +161,41 @@ export function processClandestineAgent(
     const hasLegendaryEnemy = !!legendaryEnemy;
 
     // =========================================================================
-    // FACTION RISK THRESHOLDS
+    // RISK ASSESSMENT & STRATEGY (New System - Using AIRiskDecisionService)
     // =========================================================================
-    let riskThreshold = 0.15;
-    if (actorFaction === FactionId.CONSPIRATORS) riskThreshold = 0.10;
-    if (actorFaction === FactionId.REPUBLICANS) riskThreshold = 0.20;
+    const strategy = getStrategyForFaction(actorFaction);
 
-    // PARANOID governor adds 15% base risk - need 16% threshold to do anything
-    // Raise threshold for Nobles/Conspirators so they can still act
-    if (hasParanoidGovernor && (actorFaction === FactionId.NOBLES || actorFaction === FactionId.CONSPIRATORS)) {
-        riskThreshold = 0.16;
-        logs.push(`${leader.name}: PARANOID governor detected - raising risk threshold to 16%`);
-    }
-
-    const isPreparingGI = currentActions.some(a =>
+    const isAlreadyPreparingGI = currentActions.some(a =>
         a.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION
     );
 
-    // If preparing GRAND_INSURRECTION, continue without changes (LEGENDARY doesn't stop ongoing prep)
-    if (isPreparingGI) {
+    const isPreparingGI = isAlreadyPreparingGI || (leader as any).plannedMissionAction === ClandestineActionId.PREPARE_GRAND_INSURRECTION;
+
+    // Check if currently doing INCITE_NEUTRAL_INSURRECTIONS (gets +15% extra risk tolerance)
+    const isDoingINCITE = currentActions.some(a =>
+        a.actionId === ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS
+    ) || (leader as any).plannedMissionAction === ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS;
+
+    // Perform standardized risk assessment
+    const riskAssessment = assessRisk({
+        leader,
+        location,
+        governor: characters.find(c =>
+            c.locationId === location.id &&
+            c.faction === location.faction &&
+            c.status === CharacterStatus.GOVERNING
+        ),
+        strategy,
+        isPreparingGrandInsurrection: isPreparingGI
+    });
+
+    const { currentDetectionLevel, effectiveThreshold, maxAllowedDetection, currentCaptureRisk } = riskAssessment;
+    const maxCaptureRiskPercent = strategy.maxCaptureRisk * 100;
+
+    logs.push(`${leader.name}: Detection ${currentDetectionLevel}/${effectiveThreshold} (Max: ${maxAllowedDetection}), Risk: ${currentCaptureRisk.toFixed(1)}%${hasParanoidGovernor ? ' (PARANOID)' : ''}`);
+
+    // If preparing GRAND_INSURRECTION is ALREADY ACTIVE, continue without changes (LEGENDARY doesn't stop ongoing prep)
+    if (isAlreadyPreparingGI) {
         logs.push(`${leader.name}: Continuing GRAND_INSURRECTION prep at ${location.name}`);
         return { character: leader, logs };
     }
@@ -250,7 +274,8 @@ export function processClandestineAgent(
     // Only if not blocked by LEGENDARY
     if (!hasLegendaryEnemy) {
         const testGold = Math.min(budget, 400);
-        if (testGold >= 200) {
+        // Minimum 300g required for GI to be effective and safe (aligned with Assignment logic)
+        if (testGold >= 300) {
             const stabilityShock = clandestineOps * 4;
             const effectiveStability = Math.max(0, location.stability - stabilityShock);
             const resentmentFactor = 1 + (enemyResentment / 100) - (ourResentment / 100);
@@ -281,7 +306,7 @@ export function processClandestineAgent(
         actionId: ClandestineActionId.UNDERMINE_AUTHORITIES,
         insurgentsPerGold: 0,
         totalInsurgents: 0,
-        costPerTurn: 20,
+        costPerTurn: 10,
         oneTimeCost: 0,
         reasoning: 'Destabilizes territory'
     });
@@ -322,62 +347,169 @@ export function processClandestineAgent(
     }
 
     // Pick best insurgent-generating action
-    const bestInsurgentAction = actionScores.find(a =>
+    let bestInsurgentAction = actionScores.find(a =>
         a.insurgentsPerGold > 0 &&
         !currentActions.some(ca => ca.actionId === a.actionId)
     );
+
+    // check for PLANNED MISSION INTENT
+    // If the leader came here with a specific mission (e.g., INCITE, GI), prioritize it
+    const plannedActionId = (leader as any).plannedMissionAction; // Cast as any if type not updated yet
+
+    // DEBUG LOG REMOVED
+    if (plannedActionId) {
+        // Check if already active
+        const alreadyActive = currentActions.some(a => a.actionId === plannedActionId); // Check initial state, not newActions yet
+
+        if (alreadyActive) {
+            // Mission is already running (e.g. Turn 2 of INCITE).
+            // PREVENT switching to another major action (like GI) even if we have budget.
+            // Force bestInsurgentAction to null so we only consider support actions.
+            bestInsurgentAction = undefined;
+            logs.push(`${leader.name}: Continuing PLANNED MISSION ${plannedActionId}. Ignoring other major opportunities.`);
+        } else {
+            // Mission not running yet (Turn 1 or interrupted)
+            // Find the score for this planned action
+            const plannedScore = actionScores.find(s => s.actionId === plannedActionId);
+            if (plannedScore) {
+                // If the planned action is possible (conditions met, enough budget), FORCE IT
+                if (remainingBudget >= (plannedScore.oneTimeCost + plannedScore.costPerTurn)) {
+                    logs.push(`${leader.name}: Prioritizing PLANNED MISSION: ${plannedActionId}`);
+                    bestInsurgentAction = plannedScore;
+                } else {
+                    logs.push(`${leader.name}: PLANNED MISSION ${plannedActionId} too expensive (${plannedScore.oneTimeCost}g > ${remainingBudget}g). Standing by.`);
+                    bestInsurgentAction = undefined; // Do not fallback to unauthorized major actions
+                }
+            } else {
+                logs.push(`${leader.name}: PLANNED MISSION ${plannedActionId} conditions not met (blocked or high risk). Standing by.`);
+                bestInsurgentAction = undefined; // Do not fallback to unauthorized major actions
+            }
+        }
+    } else {
+        // NO PLAN - Auto-selection logic applies
+        // SAFETY NET: If we already have a MAJOR action active (Incite or GI), do NOT start another one.
+        const hasMajorActionRef = currentActions.some(a =>
+            a.actionId === ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS ||
+            a.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION
+        );
+
+        // Exception: Leaders with SCORCHED_EARTH are arsonists who want to see the world burn.
+        // They are allowed to stack multiple major actions (e.g. Incite + GI).
+        // Note: SCORCHED_EARTH is a TRAIT, not an ABILITY.
+        const isScorchedEarth = leader.stats?.traits?.includes('SCORCHED_EARTH');
+
+        // If we have a major action, and the suggested 'best' action is ALSO major, block it UNLESS Scorched Earth.
+        // This prevents Incite -> GI switching/stacking for normal agents.
+        if (hasMajorActionRef && !isScorchedEarth && bestInsurgentAction &&
+            (bestInsurgentAction.actionId === ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS ||
+                bestInsurgentAction.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION)) {
+
+            logs.push(`${leader.name}: Already has major action active. Skipping new major action ${bestInsurgentAction.actionId}.`);
+            bestInsurgentAction = undefined;
+        }
+    }
 
     if (bestInsurgentAction) {
         const totalCost = bestInsurgentAction.oneTimeCost + bestInsurgentAction.costPerTurn;
 
         if (remainingBudget >= totalCost) {
+            // For GRAND_INSURRECTION: 50% chance to reserve 100g for support actions
+            let giGoldAmount = bestInsurgentAction.oneTimeCost;
+            if (bestInsurgentAction.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION) {
+                const reserveForSupport = Math.random() < 0.5;
+                if (reserveForSupport && remainingBudget >= bestInsurgentAction.oneTimeCost + 100) {
+                    // Reserve 100g for support, use rest for GI (minimum 200g for GI)
+                    giGoldAmount = Math.max(200, remainingBudget - 100);
+                    logs.push(`${leader.name}: Reserving 100g for support actions during GI prep`);
+                } else {
+                    giGoldAmount = remainingBudget; // All budget goes to GI
+                }
+            }
+
             newActions.push({
                 actionId: bestInsurgentAction.actionId,
                 turnStarted: bestInsurgentAction.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION
                     ? undefined  // Let processor initialize and create prep log
                     : turn,
                 oneTimeGoldAmount: bestInsurgentAction.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION
-                    ? bestInsurgentAction.oneTimeCost
+                    ? giGoldAmount
                     : undefined
             });
 
             if (bestInsurgentAction.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION) {
-                remainingBudget -= bestInsurgentAction.oneTimeCost;
+                remainingBudget -= giGoldAmount;
             }
+            // User requested NO oneTimeCost deduction for non-GI actions (pay-as-you-go)
 
             logs.push(`${leader.name}: Started ${bestInsurgentAction.actionId} (${bestInsurgentAction.reasoning})`);
+        } else if (isPreparingGI && bestInsurgentAction.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION) {
+            // FALLBACK for insufficient funds on PLANNED mission
+            logs.push(`${leader.name}: Insufficient funds for planned GI (Has ${remainingBudget}, Needs ${totalCost}). Aborting plan.`);
+            newPlannedMissionAction = undefined; // Clear the plan to unblock agent
         }
     }
 
-    // Add support actions
+    // Add support actions with priority order
     const isMinorMission = budget <= 100;
     const hasIncite = newActions.some(a => a.actionId === ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS);
+    const hasGI = newActions.some(a => a.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION);
 
     // For minor missions with INCITE, skip support actions
-    if (!(isMinorMission && hasIncite)) {
-        const hasUndermine = newActions.some(a => a.actionId === ClandestineActionId.UNDERMINE_AUTHORITIES);
-        if (!hasUndermine && remainingBudget >= 20) {
-            newActions.push({
-                actionId: ClandestineActionId.UNDERMINE_AUTHORITIES,
-                turnStarted: turn
-            });
-            logs.push(`${leader.name}: Started UNDERMINE_AUTHORITIES`);
-        }
-
-        const hasPamphlets = newActions.some(a => a.actionId === ClandestineActionId.DISTRIBUTE_PAMPHLETS);
-        if (!hasPamphlets && remainingBudget >= 10) {
-            newActions.push({
-                actionId: ClandestineActionId.DISTRIBUTE_PAMPHLETS,
-                turnStarted: turn
-            });
-            logs.push(`${leader.name}: Started DISTRIBUTE_PAMPHLETS`);
-        }
-    } else {
+    if (isMinorMission && hasIncite) {
         logs.push(`${leader.name}: Minor mission - focusing on INCITE only`);
+    } else {
+        // Priority order: UNDERMINE > PAMPHLETS > PROPAGANDA
+        const supportActions: { id: ClandestineActionId; cost: number; detection: number; blocked: () => boolean }[] = [
+            {
+                id: ClandestineActionId.UNDERMINE_AUTHORITIES,
+                cost: 10,
+                detection: 10,
+                blocked: () => location.stability <= 0
+            },
+            {
+                id: ClandestineActionId.DISTRIBUTE_PAMPHLETS,
+                cost: 10,
+                detection: 5,
+                blocked: () => getResentment(location, location.faction) >= 100
+            },
+            {
+                id: ClandestineActionId.SPREAD_PROPAGANDA,
+                cost: 10,
+                detection: 5,
+                blocked: () => getResentment(location, actorFaction) <= 0 || clandestineOps < 2
+            }
+        ];
+
+        // During GI preparation, only add actions if they keep detection at/below threshold
+        let supportDetectionBudget = hasGI
+            ? effectiveThreshold - currentDetectionLevel  // GI: strict threshold, no tolerance
+            : maxAllowedDetection - currentDetectionLevel; // Non-GI: allow tolerance
+
+        for (const support of supportActions) {
+            const alreadyHas = newActions.some(a => a.actionId === support.id);
+            if (alreadyHas) continue;
+            if (support.blocked()) {
+                logs.push(`${leader.name}: ${support.id} blocked (conditions not met)`);
+                continue;
+            }
+            if (remainingBudget < support.cost) continue;
+            if (support.detection > supportDetectionBudget) {
+                logs.push(`${leader.name}: ${support.id} skipped (detection +${support.detection} exceeds budget ${supportDetectionBudget})`);
+                continue;
+            }
+
+            newActions.push({
+                actionId: support.id,
+                turnStarted: turn
+            });
+            supportDetectionBudget -= support.detection;
+            remainingBudget -= support.cost; // Deduct cost from budget
+            logs.push(`${leader.name}: Started ${support.id}`);
+        }
     }
 
     // =========================================================================
-    // GO_DARK LOGIC: Priority-based action removal if risk exceeds threshold
+    // DETECTION-LEVEL BASED ACTION REDUCTION (replaces old GO_DARK logic)
     // =========================================================================
     const ACTION_PRIORITY: ClandestineActionId[] = [
         ClandestineActionId.DISTRIBUTE_PAMPHLETS,
@@ -389,51 +521,244 @@ export function processClandestineAgent(
         ClandestineActionId.PREPARE_GRAND_INSURRECTION
     ];
 
-    // Calculate risk with proposed actions
-    let proposedRisk = calculateDetectionRisk(
-        location,
-        newActions as any,  // Cast to match expected type
-        leader,
-        armies,
-        undefined,
-        location.governorPolicies?.[GovernorPolicy.HUNT_NETWORKS] === true
-    );
+    // Calculate projected detection increase from proposed actions
+    let projectedDetection = currentDetectionLevel;
+    for (const action of newActions) {
+        const actionDef = CLANDESTINE_ACTIONS[action.actionId as ClandestineActionId];
+        if (actionDef && actionDef.detectionType === 'per_turn') {
+            projectedDetection += actionDef.detectionIncrease;
+        }
+    }
 
-    // If risk exceeds threshold, remove lowest priority actions until safe
-    if (proposedRisk > riskThreshold) {
+    // Calculate projected capture risk
+    const projectedRiskFromDetection = Math.max(0, projectedDetection - effectiveThreshold);
+    const paranoidBonus = hasParanoidGovernor ? 15 : 0;
+    let projectedCaptureRisk = projectedRiskFromDetection + paranoidBonus;
+
+    // If projected detection or risk exceeds limits, remove lowest priority actions
+    // Note: If preparing GRAND_INSURRECTION, we ONLY enforce detection threshold (ignore risk % which might be high due to PARANOID flat bonus)
+    // INCITE missions get +15% tolerance before load shedding kicks in
+    const loadSheddingInciteBonus = isDoingINCITE ? 15 : 0;
+    const loadSheddingMaxRisk = maxCaptureRiskPercent + loadSheddingInciteBonus;
+    const riskCheckApplies = !isPreparingGI;
+    if (projectedDetection > maxAllowedDetection || (riskCheckApplies && projectedCaptureRisk > loadSheddingMaxRisk)) {
         let safeActions = [...newActions];
 
         for (const actionId of ACTION_PRIORITY) {
-            // NEVER remove GRAND_INSURRECTION
+            // NEVER remove major missions (GRAND_INSURRECTION or INCITE) - they continue until risk forces exfiltration
             if (actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION) break;
+            if (actionId === ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS) continue; // Skip, don't remove
 
             // Check if we have this action
             const hasAction = safeActions.some(a => a.actionId === actionId);
             if (!hasAction) continue;
 
-            // Recalculate risk without this action
-            const testActions = safeActions.filter(a => a.actionId !== actionId);
-            const newRisk = calculateDetectionRisk(
-                location, testActions as any, leader, armies, undefined,
-                location.governorPolicies?.[GovernorPolicy.HUNT_NETWORKS] === true
-            );
+            // Get action definition
+            const actionDef = CLANDESTINE_ACTIONS[actionId];
+            if (!actionDef) continue;
+
+            // Calculate reduction from removing this action
+            const detectionReduction = actionDef.detectionType === 'per_turn' ? actionDef.detectionIncrease : 0;
+            const newProjectedDetection = projectedDetection - detectionReduction;
+            const newRiskFromDetection = Math.max(0, newProjectedDetection - effectiveThreshold);
+            const newProjectedRisk = newRiskFromDetection + paranoidBonus;
 
             // Remove the action
-            safeActions = testActions;
-            logs.push(`${leader.name}: GO_DARK - Stopped ${actionId} to reduce risk (${(proposedRisk * 100).toFixed(0)}% -> ${(newRisk * 100).toFixed(0)}%)`);
-            proposedRisk = newRisk;
+            safeActions = safeActions.filter(a => a.actionId !== actionId);
+            logs.push(`${leader.name}: Reducing activity - Stopped ${actionId} (Detection: ${projectedDetection} -> ${newProjectedDetection}, Risk: ${projectedCaptureRisk}% -> ${newProjectedRisk}%)`);
+            projectedDetection = newProjectedDetection;
+            projectedCaptureRisk = newProjectedRisk;
 
-            // Stop if we're now under the threshold
-            if (proposedRisk <= riskThreshold) break;
+            // Stop if we're now within limits
+            if (projectedDetection <= maxAllowedDetection && (!riskCheckApplies || projectedCaptureRisk <= loadSheddingMaxRisk)) break;
         }
 
         newActions = safeActions;
     }
 
+    // Keep planned mission action active until explicitly cleared (e.g. by exfiltration logic elsewhere)
+    // or until budget failure forces a rethink (which happens naturally if budgetCheck fails above)
+    // let newPlannedMissionAction = (leader as any).plannedMissionAction; // MOVED TO TOP
+
+    // =========================================================================
+    // EXFILTRATION PROTOCOL (Physical Movement)
+    // =========================================================================
+
+    // Calculate effective max risk with INCITE bonus (+15 pts = +15% extra tolerance)
+    // - Nobles/Conspirators: 15% -> 30% when doing INCITE
+    // - Republicans: 20% -> 35% when doing INCITE
+    const inciteRiskBonus = isDoingINCITE ? 15 : 0;
+    const effectiveMaxRiskPercent = maxCaptureRiskPercent + inciteRiskBonus;
+
+    // Manual exfiltration check (replaces shouldExfiltrateLeader for fine-grained control)
+    let shouldExfiltrate = false;
+    let exfiltrationReason = '';
+
+    // NEVER exfiltrate during GRAND_INSURRECTION preparation (ACTIVE only)
+    // Planned GI should allow exfiltration if blocked
+    const justStartedGI = newActions.some(a => a.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION);
+
+    // FIX: Use isAlreadyPreparingGI (active) instead of isPreparingGI (includes planned)
+    // to allow planned-but-blocked missions to trigger redeployment
+    if (!isAlreadyPreparingGI && !justStartedGI) {
+        // Check budget
+        if (remainingBudget <= 0) {
+            shouldExfiltrate = true;
+            exfiltrationReason = 'No budget remaining';
+        }
+        // Check capture risk against effective max (includes INCITE bonus)
+        else if (currentCaptureRisk > effectiveMaxRiskPercent) {
+            shouldExfiltrate = true;
+            exfiltrationReason = `Risk ${currentCaptureRisk.toFixed(1)}% exceeds max ${effectiveMaxRiskPercent}%`;
+        }
+        // Check if any action is possible - BUT only if we have no ongoing actions
+        // If currentActions has items (like INCITE), keep going even if we can't add more
+        else if (newActions.length === 0 && currentActions.length === 0) {
+            shouldExfiltrate = true;
+            exfiltrationReason = 'No actions possible (Blocked)';
+        }
+    }
+
+    if (shouldExfiltrate) {
+        logs.push(`${leader.name}: Exfiltration triggered (${exfiltrationReason}). Initiating redeployment.`);
+
+        // Determine exfiltration destination
+        let bestTargetId: string | undefined;
+        let isNewMission = false;
+
+        // PRIORITY 1: Redeployment (Budget >= 100)
+        // User Rule:
+        // - Budget 100-200: Minor Mission (Undermine) elsewhere
+        // - Budget > 200: Major Mission (Incite) elsewhere
+        // - Must NOT be current or linked location
+        if (remainingBudget >= 100) {
+            // Find NEAREST hostile target (Enemy/Neutral)
+            // Range expanded from locals to Map-wide (sorted by distance, max 5 turns)
+
+            const forbiddenIds = [location.id];
+            if (location.linkedLocationId) forbiddenIds.push(location.linkedLocationId);
+
+            // 1. Identify candidates
+            const candidates = locations.filter(l =>
+                !forbiddenIds.includes(l.id) &&
+                l.faction !== actorFaction // Not friendly
+            );
+
+            // 2. Calculate travel times and sort
+            const validTargets: { id: string; name: string; dist: number }[] = [];
+
+            for (const candidate of candidates) {
+                const dist = calculateLeaderTravelTime(
+                    location.id,
+                    candidate.id,
+                    locations,
+                    roads
+                );
+
+                // Limit to reasonable distance (e.g., 5 turns) to avoid crossing the whole world
+                if (dist > 0 && dist <= 5) {
+                    validTargets.push({ id: candidate.id, name: candidate.name, dist });
+                }
+            }
+
+            // Sort by distance ASC
+            validTargets.sort((a, b) => a.dist - b.dist);
+
+            if (validTargets.length > 0) {
+                // Pick the closest one (or random among top 3 for variety)
+                const topTargets = validTargets.slice(0, 3);
+                const chosen = topTargets[Math.floor(Math.random() * topTargets.length)];
+
+                bestTargetId = chosen.id;
+                isNewMission = true;
+
+                // Assign new planned mission based on budget
+                if (remainingBudget > 200) {
+                    // Major Mission (> 200g)
+                    newPlannedMissionAction = ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS;
+                    logs.push(`${leader.name}: Redeploying to ${chosen.name} (Dist: ${chosen.dist}) for MAJOR OPS (Budget ${remainingBudget}).`);
+                } else {
+                    // Minor Mission (100-200g)
+                    // Does not count towards global cap
+                    newPlannedMissionAction = ClandestineActionId.UNDERMINE_AUTHORITIES;
+                    logs.push(`${leader.name}: Redeploying to ${chosen.name} (Dist: ${chosen.dist}) for MINOR OPS (Budget ${remainingBudget}).`);
+                }
+            } else {
+                logs.push(`${leader.name}: Cannot redeploy (No hostile targets found within 5 turns). Falling back to retreat.`);
+            }
+        }
+
+
+
+        // PRIORITY 2: Retreat to Friendly Territory (Lose Gold)
+        if (!bestTargetId) {
+            const friendlyLocations = locations.filter(l => l.faction === actorFaction);
+
+            if (friendlyLocations.length > 0) {
+                let nearestId: string | undefined;
+                let minTime = Infinity;
+
+                for (const friendly of friendlyLocations) {
+                    const time = calculateLeaderTravelTime(location.id, friendly.id, locations, roads);
+                    if (time < minTime) {
+                        minTime = time;
+                        nearestId = friendly.id;
+                    }
+                }
+
+                if (nearestId) {
+                    bestTargetId = nearestId;
+                    isNewMission = false;
+                    logs.push(`${leader.name}: Retreating to friendly territory (${minTime} turns). Gold will be surrendered.`);
+                }
+            }
+        }
+
+        // EXECUTE EXFILTRATION using proper movement system (undercoverMission)
+        if (bestTargetId) {
+            // Use ORIGINAL budget for transfer (don't deduct costs of abandoned actions)
+            const finalBudget = isNewMission ? budget : 0;
+            const travelTime = calculateLeaderTravelTime(location.id, bestTargetId, locations, roads);
+
+            // Use undercoverMission for proper movement (same as human exfiltration)
+            return {
+                character: {
+                    ...leader,
+                    status: CharacterStatus.MOVING,
+                    // Use undercoverMission structure for travel (consistent with leaderPathfinding)
+                    undercoverMission: {
+                        destinationId: bestTargetId,
+                        turnsRemaining: travelTime,
+                        turnStarted: turn
+                    },
+                    activeClandestineActions: [],
+                    plannedMissionAction: undefined,
+                    clandestineBudget: finalBudget
+                },
+                logs
+            };
+        } else {
+            // No escape possible (trapped)
+            logs.push(`${leader.name}: Exfiltration failed - no valid exit routes. Going dark.`);
+            return {
+                character: {
+                    ...leader,
+                    status: CharacterStatus.AVAILABLE,
+                    activeClandestineActions: [],
+                    plannedMissionAction: undefined,
+                    clandestineBudget: budget // Keep original budget
+                },
+                logs
+            };
+        }
+    }
+
+
     const updatedCharacter: Character = {
         ...leader,
         activeClandestineActions: newActions,
-        clandestineBudget: remainingBudget
+        clandestineBudget: budget, // DO NOT SAVE DEDUCTIONS - Let ClandestineProcessor handle actual costs
+        plannedMissionAction: newPlannedMissionAction
     } as Character;
 
     return { character: updatedCharacter, logs };

@@ -16,6 +16,7 @@
 
 import { Character, Location, Army, FactionId, CharacterStatus, GameState } from '../../../../types';
 import { AILeaderRole, RoleAssignment, TerritoryStatus, ClandestineOpportunity } from '../types';
+import { ClandestineActionId } from '../../../../types/clandestineTypes';
 import { GovernorPolicy } from '../../../../types/governorTypes';
 import {
     calculateGovernorIPG,
@@ -24,7 +25,10 @@ import {
     calculateMinorIPG,
     calculateCommanderValue,
     getFactionIPGMultiplier,
-    getEffectiveIPGFloor
+    getEffectiveIPGFloor,
+    getDetectionThreshold,
+    calculateNeutralMissionBudget,
+    applyDistancePenalty
 } from '../utils/IPGCalculator';
 import { calculateLeaderTravelTime } from '../../../domain/leaders/leaderPathfinding';
 
@@ -40,10 +44,13 @@ export interface PotentialAssignment {
     targetName: string;
     ipg: number;
     missionType?: 'MAJOR' | 'MINOR';
+    targetActionId?: ClandestineActionId;
     goldRequired: number;
     travelTime: number;
     details: string;
 }
+
+
 
 export interface AssignmentContext {
     state: GameState;
@@ -250,50 +257,73 @@ export function generateUnifiedAssignments(
         if (ops > 0) {
             for (const enemy of enemyLocations) {
                 // 3a. Grand Insurrection (Major, min 300g)
+                // BASELINE: Calculate potential using standard 400g investment for comparison
                 const grandIPG = calculateGrandIPG(enemy, ops, 400, faction) * factionMultiplier;
-                potentialAssignments.push({
-                    leaderId: leader.id,
-                    leaderName: leader.name,
-                    role: AILeaderRole.CLANDESTINE,
-                    targetId: enemy.id,
-                    targetName: enemy.name,
-                    ipg: grandIPG,
-                    missionType: 'MAJOR',
-                    goldRequired: 300, // Minimum for Major missions
-                    travelTime: calculateLeaderTravelTime(leader.locationId || '', enemy.id, state.locations, state.roads),
-                    details: `Grand @ ${enemy.name}: IPG=${grandIPG.toFixed(2)}`
-                });
 
-                // 3b. Incite Neutral (Major, min 300g)
-                const neutralIPG = calculateNeutralIPG(enemy, ops, faction) * factionMultiplier;
-                potentialAssignments.push({
-                    leaderId: leader.id,
-                    leaderName: leader.name,
-                    role: AILeaderRole.CLANDESTINE,
-                    targetId: enemy.id,
-                    targetName: enemy.name,
-                    ipg: neutralIPG,
-                    missionType: 'MAJOR',
-                    goldRequired: 300, // Minimum for Major missions
-                    travelTime: calculateLeaderTravelTime(leader.locationId || '', enemy.id, state.locations, state.roads),
-                    details: `Neutral @ ${enemy.name}: IPG=${neutralIPG.toFixed(2)}`
-                });
+                if (grandIPG > 0) {
+                    const travelTime = calculateLeaderTravelTime(leader.locationId || '', enemy.id, state.locations, state.roads);
 
-                // 3c. Undermine (Minor, 100g)
-                const minorResult = calculateMinorIPG(enemy, ops, faction);
+                    // Determine actual gold to assign based on available budget
+                    // If rich (>500), assign 500. If >400, assign 400. Else 300 default.
+                    let goldToAssign = 300;
+                    if (budget >= 500) goldToAssign = 500;
+                    else if (budget >= 400) goldToAssign = 400;
+
+                    potentialAssignments.push({
+                        leaderId: leader.id,
+                        leaderName: leader.name,
+                        role: AILeaderRole.CLANDESTINE,
+                        targetId: enemy.id,
+                        targetName: enemy.name,
+                        ipg: applyDistancePenalty(grandIPG, travelTime),
+                        missionType: 'MAJOR',
+                        targetActionId: ClandestineActionId.PREPARE_GRAND_INSURRECTION,
+                        goldRequired: goldToAssign, // Assign dynamic amount based on wealth
+                        travelTime: travelTime,
+                        details: `Grand @ ${enemy.name}: IPG=${grandIPG.toFixed(2)} (Dist: ${travelTime}) [Alloc: ${goldToAssign}g]`
+                    });
+                }  // 3b. Incite Neutral (Major, budget based on discretion)
+                const discretion = leader.stats?.discretion ?? 3;
+                const neutralMinBudget = calculateNeutralMissionBudget(discretion);
+                const neutralIPG = calculateNeutralIPG(enemy, ops, faction, discretion) * factionMultiplier;
+                if (neutralIPG > 0) {
+                    const travelTime = calculateLeaderTravelTime(leader.locationId || '', enemy.id, state.locations, state.roads);
+                    potentialAssignments.push({
+                        leaderId: leader.id,
+                        leaderName: leader.name,
+                        role: AILeaderRole.CLANDESTINE,
+                        targetId: enemy.id,
+                        targetName: enemy.name,
+                        ipg: applyDistancePenalty(neutralIPG, travelTime),
+                        missionType: 'MAJOR',
+                        targetActionId: ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS,
+                        goldRequired: neutralMinBudget,
+                        travelTime: travelTime,
+                        details: `Neutral @ ${enemy.name}: IPG=${neutralIPG.toFixed(2)} (Dist: ${travelTime})`
+                    });
+                }  // 3c. Undermine (Minor)
+                // SCORCHED_EARTH leaders need 200g minimum to cover destructive actions
+                const hasScorchedEarth = leader.stats?.traits?.includes('SCORCHED_EARTH') ?? false;
+                const minorMinBudget = hasScorchedEarth ? 200 : 100;
+                const leaderDiscretion = leader.stats?.discretion ?? 3;
+                const minorResult = calculateMinorIPG(enemy, ops, faction, leaderDiscretion, faction);
                 const minorIPG = minorResult.ipg * factionMultiplier;
-                potentialAssignments.push({
-                    leaderId: leader.id,
-                    leaderName: leader.name,
-                    role: AILeaderRole.CLANDESTINE,
-                    targetId: enemy.id,
-                    targetName: enemy.name,
-                    ipg: minorIPG,
-                    missionType: 'MINOR',
-                    goldRequired: 100,
-                    travelTime: calculateLeaderTravelTime(leader.locationId || '', enemy.id, state.locations, state.roads),
-                    details: `Minor @ ${enemy.name}: ${minorResult.details}`
-                });
+                if (minorResult.ipg > 0) {
+                    const travelTime = calculateLeaderTravelTime(leader.locationId || '', enemy.id, state.locations, state.roads);
+                    potentialAssignments.push({
+                        leaderId: leader.id,
+                        leaderName: leader.name,
+                        role: AILeaderRole.CLANDESTINE,
+                        targetId: enemy.id,
+                        targetName: enemy.name,
+                        ipg: applyDistancePenalty(minorIPG, travelTime),
+                        missionType: 'MINOR',
+                        targetActionId: ClandestineActionId.UNDERMINE_AUTHORITIES, // Default for minor, will pick up others too
+                        goldRequired: minorMinBudget,
+                        travelTime: travelTime,
+                        details: `Minor @ ${enemy.name}: ${minorResult.details}${hasScorchedEarth ? ' [SCORCHED]' : ''} (Dist: ${travelTime})`
+                    });
+                }
             }
         }
 
@@ -302,10 +332,25 @@ export function generateUnifiedAssignments(
             const needyArmies = armies.filter(a =>
                 a.faction === faction &&
                 a.strength > 1000 &&
+                a.locationId !== null && // Leaders can only travel to locations, not roads
                 !state.characters.some(c => (c as any).assignedArmyId === a.id)
             );
 
             for (const army of needyArmies) {
+                // Resolve army location name (handle both location and road-based armies)
+                let armyLocationName = 'Unknown';
+                if (army.locationId) {
+                    const loc = state.locations.find(l => l.id === army.locationId);
+                    armyLocationName = loc?.name || army.locationId;
+                } else if (army.roadId) {
+                    const road = state.roads.find(r => r.id === army.roadId);
+                    if (road && army.stageIndex >= 0 && army.stageIndex < road.stages.length) {
+                        armyLocationName = road.stages[army.stageIndex].name || `Road Stage ${army.stageIndex}`;
+                    } else {
+                        armyLocationName = `Road ${army.roadId}`;
+                    }
+                }
+
                 const travelTime = calculateLeaderTravelTime(
                     leader.locationId || '',
                     army.locationId || '',
@@ -319,7 +364,7 @@ export function generateUnifiedAssignments(
                     leaderName: leader.name,
                     role: AILeaderRole.COMMANDER,
                     targetId: army.id,
-                    targetName: `Army at ${army.locationId}`,
+                    targetName: `Army at ${armyLocationName}`,
                     ipg: result.value, // Use "value" as comparable metric
                     goldRequired: 0,
                     travelTime,
@@ -409,7 +454,10 @@ export function generateUnifiedAssignments(
             targetLocationId: pa.role !== AILeaderRole.COMMANDER ? pa.targetId : undefined,
             targetArmyId: pa.role === AILeaderRole.COMMANDER ? pa.targetId : undefined,
             priority: Math.min(100, Math.floor(pa.ipg * 5)),
-            reasoning: pa.details
+            reasoning: pa.details,
+            assignedBudget: pa.role === AILeaderRole.CLANDESTINE ? pa.goldRequired : undefined,
+            missionType: pa.missionType,
+            targetActionId: pa.targetActionId
         });
 
         assignedLeaderIds.add(pa.leaderId);

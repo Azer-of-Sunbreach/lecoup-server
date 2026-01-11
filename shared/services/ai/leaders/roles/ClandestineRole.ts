@@ -10,7 +10,7 @@
  * @module shared/services/ai/leaders/roles
  */
 
-import { Character, Location, FactionId, Army } from '../../../../types';
+import { Character, Location, FactionId, Army, CharacterStatus } from '../../../../types';
 import {
     ClandestineActionId,
     ActiveClandestineAction,
@@ -25,8 +25,15 @@ import {
     CLANDESTINE_BUDGET,
     GRAND_INSURRECTION_PREP_TURNS
 } from '../types';
-import { calculateDetectionRisk } from '../../../domain/clandestine/detectionRisk';
-import { shouldGoDark, shouldExfiltrate } from '../strategies/factionStrategy';
+import { calculateDetectionThreshold, calculateCaptureRisk } from '../../../domain/clandestine/detectionLevelService';
+import {
+    assessRisk,
+    shouldExfiltrateLeader,
+    selectActionsWithinRiskBudget,
+    formatRiskSummary,
+    RiskContext,
+    RiskAssessment
+} from '../utils/AIRiskDecisionService';
 
 // ============================================================================
 // TYPES
@@ -38,12 +45,15 @@ interface ClandestineContext {
     faction: FactionId;
     strategy: FactionStrategy;
     budget: number;
+    /** @deprecated Use riskAssessment instead */
     currentRisk: number;
     activeActions: ActiveClandestineAction[];
     turn: number;
     governor?: Character;
     garrison: number;
     isPreparingInsurrection: boolean;
+    /** New detection-level based risk assessment */
+    riskAssessment: RiskAssessment;
 }
 
 interface ActionScore {
@@ -83,23 +93,27 @@ export function makeClandestineDecisions(
     const governor = characters.find(c =>
         c.locationId === location.id &&
         c.faction === location.faction &&
-        c.status === 'GOVERNING'
-    );
-
-    const isHuntActive = location.governorPolicies?.HUNT_NETWORKS === true;
-
-    const currentRisk = calculateDetectionRisk(
-        location,
-        activeActions,
-        leader,
-        armies,
-        governor,
-        isHuntActive
+        c.status === CharacterStatus.GOVERNING
     );
 
     const isPreparingInsurrection = activeActions.some(
         a => a.actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION
     );
+
+    // Build risk context for new detection-level based assessment
+    const riskContext: RiskContext = {
+        leader,
+        location,
+        governor,
+        strategy,
+        isPreparingGrandInsurrection: isPreparingInsurrection
+    };
+
+    // Perform risk assessment using new detection-level model
+    const riskAssessment = assessRisk(riskContext);
+
+    // Calculate legacy risk for backward compatibility (deprecated, will be removed)
+    const currentRisk = calculateCaptureRisk(leader, location, governor) / 100;
 
     const context: ClandestineContext = {
         leader,
@@ -112,7 +126,8 @@ export function makeClandestineDecisions(
         turn,
         governor,
         garrison,
-        isPreparingInsurrection
+        isPreparingInsurrection,
+        riskAssessment
     };
 
     const reasoning: string[] = [];
@@ -120,8 +135,20 @@ export function makeClandestineDecisions(
     const actionsToStop: ClandestineActionId[] = [];
     let goldToAllocate: number | undefined;
 
-    // 1. Check if should exfiltrate
-    if (shouldExfiltrate(currentRisk, strategy, budget, isPreparingInsurrection)) {
+    // Log current risk state
+    reasoning.push(`Risk: ${formatRiskSummary(riskAssessment)}`);
+
+    // 1. Check if should exfiltrate (using new detection-level model)
+    // Calculate if any action is possible within constraints
+    const mandatoryActions = getMandatoryActions(leader, location.type);
+    const blockedActions = getBlockedActions(leader);
+    const actionScores = scoreAllActions(context, opportunity, mandatoryActions, blockedActions);
+    const possibleActions = actionScores.filter(s => s.score > 0 && !blockedActions.includes(s.actionId));
+    const canPerformAnyAction = possibleActions.length > 0 && budget > 0;
+
+    const exfiltrationDecision = shouldExfiltrateLeader(riskContext, budget, canPerformAnyAction);
+
+    if (exfiltrationDecision.shouldExfiltrate) {
         return {
             leaderId: leader.id,
             targetLocationId: location.id,
@@ -129,47 +156,23 @@ export function makeClandestineDecisions(
             actionsToStop: activeActions.map(a => a.actionId as ClandestineActionId),
             shouldExfiltrate: true,
             shouldGoDark: false,
-            reasoning: [`EXFILTRATE: Risk ${Math.round(currentRisk * 100)}% exceeds safety threshold or budget depleted`]
+            reasoning: [
+                `EXFILTRATE: ${exfiltrationDecision.reason || 'Risk too high'}`,
+                `${formatRiskSummary(riskAssessment)}`
+            ]
         };
     }
 
-    // 2. Check if should GO_DARK (reduce activity)
-    const goDark = shouldGoDark(currentRisk, strategy, isPreparingInsurrection);
+    // 2. Select optimal actions within risk constraints (no more binary GO_DARK)
+    // The new model progressively reduces actions rather than stopping all at once
+    const selectedActions = selectOptimalActionsWithDetection(
+        context,
+        actionScores,
+        mandatoryActions,
+        riskAssessment
+    );
 
-    if (goDark && !isPreparingInsurrection) {
-        // Stop non-essential actions to reduce risk
-        const essentialActions = [ClandestineActionId.PREPARE_GRAND_INSURRECTION];
-        for (const action of activeActions) {
-            if (!essentialActions.includes(action.actionId as ClandestineActionId)) {
-                actionsToStop.push(action.actionId as ClandestineActionId);
-                reasoning.push(`GO_DARK: Stop ${action.actionId} to reduce risk`);
-            }
-        }
-
-        return {
-            leaderId: leader.id,
-            targetLocationId: location.id,
-            actionsToStart: [],
-            actionsToStop,
-            shouldExfiltrate: false,
-            shouldGoDark: true,
-            reasoning
-        };
-    }
-
-    // 3. Get mandatory actions from traits
-    const mandatoryActions = getMandatoryActions(leader, location.type);
-
-    // 4. Get blocked actions from traits
-    const blockedActions = getBlockedActions(leader);
-
-    // 5. Score all available actions
-    const actionScores = scoreAllActions(context, opportunity, mandatoryActions, blockedActions);
-
-    // 6. Select optimal actions
-    const selectedActions = selectOptimalActions(context, actionScores, mandatoryActions);
-
-    // 7. Determine changes
+    // 3. Determine changes
     const currentActionIds = new Set(activeActions.map(a => a.actionId));
 
     for (const actionId of selectedActions) {
@@ -185,19 +188,20 @@ export function makeClandestineDecisions(
         }
     }
 
-    // Only stop actions if not in GRAND_INSURRECTION prep
-    if (!isPreparingInsurrection) {
-        for (const action of activeActions) {
-            if (!selectedActions.includes(action.actionId as ClandestineActionId) && !mandatoryActions.includes(action.actionId as ClandestineActionId)) {
-                // Only stop if the action is now negative score
-                const scoreInfo = actionScores.find(s => s.actionId === action.actionId);
-                if (scoreInfo && scoreInfo.score <= 0) {
-                    actionsToStop.push(action.actionId as ClandestineActionId);
-                    reasoning.push(`Stop ${action.actionId}: ${scoreInfo.reasoning}`);
-                }
-            }
-        }
+    // 4. Stop actions that are no longer selected
+    // During GI prep, only stop actions that would exceed threshold
+    for (const action of activeActions) {
+        const actionId = action.actionId as ClandestineActionId;
+        if (selectedActions.includes(actionId)) continue;
+        if (actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION) continue; // Never stop GI
+
+        // If this action is no longer in selected, it was dropped due to risk/budget
+        actionsToStop.push(actionId);
+        reasoning.push(`Stop ${actionId}: exceeds risk/budget constraints`);
     }
+
+    // Determine if we're in a reduced activity state (for UI purposes)
+    const isReducingActivity = actionsToStop.length > 0 && !exfiltrationDecision.shouldExfiltrate;
 
     return {
         leaderId: leader.id,
@@ -206,7 +210,7 @@ export function makeClandestineDecisions(
         actionsToStop,
         goldToAllocate,
         shouldExfiltrate: false,
-        shouldGoDark: goDark,
+        shouldGoDark: isReducingActivity,
         reasoning
     };
 }
@@ -605,6 +609,7 @@ function scoreAllActions(
 
 /**
  * Select optimal actions within budget and risk constraints.
+ * @deprecated Use selectOptimalActionsWithDetection instead
  */
 function selectOptimalActions(
     context: ClandestineContext,
@@ -646,6 +651,113 @@ function selectOptimalActions(
         selected.push(scoreInfo.actionId);
         remainingBudget -= totalCost;
         projectedRisk += scoreInfo.addedRisk;
+    }
+
+    return selected;
+}
+
+/**
+ * Select optimal actions within budget and DETECTION-LEVEL constraints.
+ * 
+ * This is the new detection-level based version that:
+ * - Projects detection level increases per action
+ * - Respects threshold + tolerance limits
+ * - Handles GRAND_INSURRECTION prep specially (threshold only, no tolerance)
+ */
+function selectOptimalActionsWithDetection(
+    context: ClandestineContext,
+    actionScores: ActionScore[],
+    mandatoryActions: ClandestineActionId[],
+    riskAssessment: RiskAssessment
+): ClandestineActionId[] {
+    const selected: ClandestineActionId[] = [];
+    let remainingBudget = context.budget;
+    let projectedDetection = riskAssessment.currentDetectionLevel;
+
+    const maxAllowed = riskAssessment.maxAllowedDetection;
+    const maxCaptureRisk = context.strategy.maxCaptureRisk * 100;
+
+    // First, add mandatory actions (from traits like SCORCHED_EARTH)
+    for (const actionId of mandatoryActions) {
+        const actionDef = CLANDESTINE_ACTIONS[actionId];
+        if (!actionDef) continue;
+
+        const cost = actionDef.costPerTurn;
+        if (cost <= remainingBudget) {
+            selected.push(actionId);
+            projectedDetection += actionDef.detectionIncrease;
+            remainingBudget -= cost;
+        }
+    }
+
+    // Then, try to keep active actions that are still valid
+    for (const action of context.activeActions) {
+        const actionId = action.actionId as ClandestineActionId;
+        if (selected.includes(actionId)) continue;
+
+        // Never drop GRAND_INSURRECTION
+        if (actionId === ClandestineActionId.PREPARE_GRAND_INSURRECTION) {
+            selected.push(actionId);
+            continue;
+        }
+
+        const scoreInfo = actionScores.find(s => s.actionId === actionId);
+        if (!scoreInfo || scoreInfo.score <= 0) continue;
+
+        const actionDef = CLANDESTINE_ACTIONS[actionId];
+        if (!actionDef) continue;
+
+        const cost = actionDef.costPerTurn;
+        const detectionIncrease = actionDef.detectionType === 'per_turn' ? actionDef.detectionIncrease : 0;
+
+        // Budget check
+        if (cost > remainingBudget) continue;
+
+        // Detection limit check
+        const newDetection = projectedDetection + detectionIncrease;
+        if (newDetection > maxAllowed) continue;
+
+        // Capture risk check
+        const riskFromDetection = Math.max(0, newDetection - riskAssessment.effectiveThreshold);
+        const paranoidBonus = riskAssessment.hasParanoidGovernor ? 15 : 0;
+        const projectedRisk = riskFromDetection + paranoidBonus;
+        if (projectedRisk > maxCaptureRisk) continue;
+
+        // Action is acceptable - keep it
+        selected.push(actionId);
+        projectedDetection = newDetection;
+        remainingBudget -= cost;
+    }
+
+    // Finally, try to add new actions by score (if not at limit)
+    for (const scoreInfo of actionScores) {
+        if (selected.length >= 4) break;
+        if (scoreInfo.score <= 0) continue;
+        if (selected.includes(scoreInfo.actionId)) continue;
+
+        const actionDef = CLANDESTINE_ACTIONS[scoreInfo.actionId];
+        if (!actionDef) continue;
+
+        const cost = actionDef.costPerTurn + (actionDef.isOneTime ? 0 : 0);
+        const detectionIncrease = actionDef.detectionType === 'per_turn' ? actionDef.detectionIncrease : 0;
+
+        // Budget check
+        if (cost > remainingBudget) continue;
+
+        // Detection limit check
+        const newDetection = projectedDetection + detectionIncrease;
+        if (newDetection > maxAllowed) continue;
+
+        // Capture risk check
+        const riskFromDetection = Math.max(0, newDetection - riskAssessment.effectiveThreshold);
+        const paranoidBonus = riskAssessment.hasParanoidGovernor ? 15 : 0;
+        const projectedRisk = riskFromDetection + paranoidBonus;
+        if (projectedRisk > maxCaptureRisk) continue;
+
+        // Action is acceptable - add it
+        selected.push(scoreInfo.actionId);
+        projectedDetection = newDetection;
+        remainingBudget -= cost;
     }
 
     return selected;
@@ -727,21 +839,17 @@ export function evaluateClandestineOpportunity(
         score -= 30;
     }
 
-    // Calculate current risk (with no actions yet)
+    // Calculate current risk using new detection-level model
     const governor = characters.find(c =>
         c.locationId === location.id &&
         c.faction === location.faction &&
-        c.status === 'GOVERNING'
+        c.status === CharacterStatus.GOVERNING
     );
-    const isHuntActive = location.governorPolicies?.HUNT_NETWORKS === true;
-    const currentRisk = calculateDetectionRisk(
-        location,
-        [], // No actions yet
-        leader,
-        armies,
-        governor,
-        isHuntActive
-    );
+
+    // Use new detection-level based capture risk calculation
+    // Leader starts with 0 detection, so initial risk is just PARANOID bonus (if any)
+    const hasParanoidGovernor = governor?.stats?.ability?.includes('PARANOID') ?? false;
+    const currentRisk = hasParanoidGovernor ? 0.15 : 0; // 15% if PARANOID, 0% otherwise
 
     return {
         locationId: location.id,

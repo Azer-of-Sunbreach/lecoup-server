@@ -46,6 +46,26 @@ export function getEffectiveIPGFloor(factionGold: number): number {
     return factionGold > GOLD_RICH_THRESHOLD ? IPG_FLOOR_REDUCED : IPG_FLOOR;
 }
 
+/**
+ * Get detection threshold based on leader discretion level.
+ * Inept(1)=30, Unreliable(2)=40, Capable(3)=50, Effective(4)=60, Exceptional(5)=70
+ */
+export function getDetectionThreshold(discretion: number): number {
+    const clampedDiscretion = Math.max(1, Math.min(5, discretion));
+    return 20 + (clampedDiscretion * 10);
+}
+
+/**
+ * Calculate minimum mission budget for INCITE_NEUTRAL based on discretion.
+ * Inept=200g, all others=300g minimum.
+ */
+export function calculateNeutralMissionBudget(discretion: number): number {
+    const threshold = getDetectionThreshold(discretion);
+    const generationTurns = (threshold - 10) / 10;
+    const rawCost = (generationTurns + 1) * 50;  // +1 for prep turn
+    return Math.max(200, Math.ceil(rawCost / 100) * 100);
+}
+
 /** Bonus multiplier when target stability <= 60 */
 const LOW_STABILITY_BONUS = 1.2;
 
@@ -119,16 +139,22 @@ export function calculateNeutralInsurgentsPerTurn(
 
 /**
  * Calculate IPG for Incite Neutral Insurrections.
- * Assumes 4 turns total (1 setup + 3 productive), 50g/turn = 200g total.
+ * Uses discretion-based turn calculation:
+ * Turns of generation = (threshold - 10) / 10
+ * Cost = (turns + 1) × 50g, rounded up to nearest 100g
  */
 export function calculateNeutralIPG(
     location: Location,
     ops: number,
-    actorFaction: FactionId
+    actorFaction: FactionId,
+    discretion: number = 3  // Default: Capable
 ): number {
     const perTurn = calculateNeutralInsurgentsPerTurn(location, ops, actorFaction);
-    const totalInsurgents = perTurn * 3; // 3 productive turns
-    const totalCost = 200; // 50g × 4 turns
+    const threshold = getDetectionThreshold(discretion);
+    const generationTurns = (threshold - 10) / 10;  // Inept=2, Capable=4
+    const totalInsurgents = perTurn * generationTurns;
+    const rawCost = (generationTurns + 1) * 50;  // +1 for prep turn
+    const totalCost = Math.ceil(rawCost / 100) * 100;  // Round to nearest 100
     return totalCost > 0 ? totalInsurgents / totalCost : 0;
 }
 
@@ -142,15 +168,22 @@ export function calculateNeutralIPG(
  * Calculates delta insurgents from stability reduction for both Grand and Neutral,
  * takes the maximum, and divides by mission cost.
  * 
- * Stability damage = 5 turns × Ops × 2
- * Mission cost = 100g
+ * Stability damage = activeTurns × Ops × 2
+ * activeTurns = (threshold/10) + tolerance
+ * tolerance: +1 for Nobles/Conspirators, +2 for Republicans
  */
 export function calculateMinorIPG(
     location: Location,
     ops: number,
-    actorFaction: FactionId
+    actorFaction: FactionId,
+    discretion: number = 3,  // Default: Capable
+    faction: FactionId = FactionId.NOBLES  // For tolerance calculation
 ): { ipg: number; details: string } {
-    const stabilityDamage = MINOR_MISSION_ACTIVE_TURNS * ops * 2;
+    const threshold = getDetectionThreshold(discretion);
+    const tolerance = (faction === FactionId.REPUBLICANS) ? 2 : 1;
+    const activeTurns = (threshold / 10) + tolerance;
+
+    const stabilityDamage = activeTurns * ops * 2;
     const reducedStability = Math.max(0, location.stability - stabilityDamage);
 
     // Create modified location for comparison
@@ -168,9 +201,10 @@ export function calculateMinorIPG(
     const grandAtReduced = calculateGrandInsurgents(reducedLocation, STANDARD_OPS, 400, actorFaction);
     const deltaGrand = grandAtReduced - grandAtCurrent;
 
-    // Delta for Neutral Insurrections (3 productive turns, with standard ops)
-    const neutralAtCurrent = calculateNeutralInsurgentsPerTurn(location, STANDARD_OPS, actorFaction) * 3;
-    const neutralAtReduced = calculateNeutralInsurgentsPerTurn(reducedLocation, STANDARD_OPS, actorFaction) * 3;
+    // Delta for Neutral Insurrections (standard ops, use same discretion for comparison)
+    const neutralTurns = (threshold - 10) / 10;
+    const neutralAtCurrent = calculateNeutralInsurgentsPerTurn(location, STANDARD_OPS, actorFaction) * neutralTurns;
+    const neutralAtReduced = calculateNeutralInsurgentsPerTurn(reducedLocation, STANDARD_OPS, actorFaction) * neutralTurns;
     const deltaNeutral = neutralAtReduced - neutralAtCurrent;
 
     // Use the better of the two
@@ -184,9 +218,15 @@ export function calculateMinorIPG(
         ipg *= LOW_STABILITY_BONUS;
     }
 
+    // Normalize IPG by duration (divide by activeTurns)
+    // "The duration of these missions is a cost in itself."
+    if (activeTurns > 0) {
+        ipg = ipg / activeTurns;
+    }
+
     return {
         ipg,
-        details: `Stab ${location.stability}->${reducedStability}, Δ${deltaType}=${deltaInsurgents.toFixed(0)}`
+        details: `${activeTurns}t: Stab ${location.stability}->${reducedStability}, Δ${deltaType}=${deltaInsurgents.toFixed(0)}`
     };
 }
 
@@ -236,7 +276,7 @@ export function calculateGovernorIPG(
     const ipg = cost > 0 ? prevented / cost : 0;
 
     return {
-        ipg,
+        ipg: Math.max(0, ipg),
         details: `Stab+${stabilityGain} prevents ${prevented.toFixed(0)} (${preventType}) @ ${cost}g`
     };
 }
@@ -294,4 +334,14 @@ export function getFactionIPGMultiplier(faction: FactionId): number {
         case FactionId.CONSPIRATORS: return 0.8;
         default: return 1.0;
     }
+}
+
+/**
+ * Apply distance penalty to IPG.
+ * Reduces value by 10% per turn of travel (max 90% reduction).
+ * Ensures distant missions are only chosen if significantly better.
+ */
+export function applyDistancePenalty(ipg: number, turns: number): number {
+    const penalty = Math.min(0.9, turns * 0.1);
+    return ipg * (1 - penalty);
 }

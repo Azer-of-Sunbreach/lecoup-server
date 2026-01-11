@@ -88,7 +88,8 @@ export function processLeaderAI(
             turn,
             faction,
             clandestineLogs,
-            allCharacters
+            allCharacters,
+            state.roads
         );
         stateManager.updateCharacter(result.character);
     }

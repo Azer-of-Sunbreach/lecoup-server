@@ -179,6 +179,9 @@ export interface RoleAssignment {
     targetArmyId?: string;
     priority: number; // 0-100, higher = more urgent
     reasoning: string;
+    assignedBudget?: number;
+    missionType?: 'MAJOR' | 'MINOR';
+    targetActionId?: ClandestineActionId;
 }
 
 // ============================================================================
@@ -191,8 +194,25 @@ export interface RoleAssignment {
 export interface FactionStrategy {
     factionId: FactionId;
 
-    // Risk tolerance
-    maxClandestineRisk: number; // 0.10 for Conspirators, 0.15 for Nobles, 0.20 for Republicans
+    // =========================================================================
+    // DETECTION-LEVEL BASED RISK TOLERANCE (New System - 2026-01)
+    // =========================================================================
+
+    /** Maximum capture risk percentage (as decimal). 0.15 for Conspirators/Nobles, 0.20 for Republicans */
+    maxCaptureRisk: number;
+
+    /** Maximum points allowed above detection threshold (without PARANOID governor) */
+    maxDetectionOverThreshold: number;
+
+    /** Maximum points allowed above detection threshold (with PARANOID governor present) */
+    maxDetectionWithParanoid: number;
+
+    // =========================================================================
+    // LEGACY RISK TOLERANCE (Deprecated - kept for backward compatibility)
+    // =========================================================================
+
+    /** @deprecated Use maxCaptureRisk instead. Old percentage-based risk threshold. */
+    maxClandestineRisk: number;
 
     // Priorities (0-100)
     stabilityPriority: number;

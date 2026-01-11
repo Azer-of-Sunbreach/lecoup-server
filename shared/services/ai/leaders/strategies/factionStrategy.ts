@@ -27,7 +27,12 @@ import { FactionStrategy } from '../types';
 const CONSPIRATOR_STRATEGY: FactionStrategy = {
     factionId: FactionId.CONSPIRATORS,
 
-    // Very low risk tolerance - GO_DARK at 10%
+    // Detection-level based risk tolerance (New System - 2026-01)
+    maxCaptureRisk: 0.15,              // 15% max capture risk
+    maxDetectionOverThreshold: 15,     // Can exceed threshold by 15 points (without PARANOID)
+    maxDetectionWithParanoid: 0,       // Cannot exceed threshold with PARANOID governor
+
+    // Legacy (deprecated) - kept for backward compatibility
     maxClandestineRisk: 0.10,
 
     // Priorities
@@ -55,7 +60,12 @@ const CONSPIRATOR_STRATEGY: FactionStrategy = {
 const NOBLE_STRATEGY: FactionStrategy = {
     factionId: FactionId.NOBLES,
 
-    // Moderate risk tolerance - GO_DARK at 15%
+    // Detection-level based risk tolerance (New System - 2026-01)
+    maxCaptureRisk: 0.15,              // 15% max capture risk
+    maxDetectionOverThreshold: 15,     // Can exceed threshold by 15 points (without PARANOID)
+    maxDetectionWithParanoid: 0,       // Cannot exceed threshold with PARANOID governor
+
+    // Legacy (deprecated) - kept for backward compatibility
     maxClandestineRisk: 0.15,
 
     // Priorities
@@ -83,7 +93,12 @@ const NOBLE_STRATEGY: FactionStrategy = {
 const REPUBLICAN_STRATEGY: FactionStrategy = {
     factionId: FactionId.REPUBLICANS,
 
-    // Higher risk tolerance - GO_DARK at 20%
+    // Detection-level based risk tolerance (New System - 2026-01)
+    maxCaptureRisk: 0.20,              // 20% max capture risk
+    maxDetectionOverThreshold: 20,     // Can exceed threshold by 20 points (without PARANOID)
+    maxDetectionWithParanoid: 5,       // Can exceed threshold by 5 points (with PARANOID)
+
+    // Legacy (deprecated) - kept for backward compatibility
     maxClandestineRisk: 0.20,
 
     // Priorities
