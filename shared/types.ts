@@ -350,6 +350,31 @@ export interface Character {
   assignedArmyId?: string;
   /** True if leader has been eliminated - derived from status === DEAD */
   isDead?: boolean;
+  /** True if leader was detected when arriving in enemy territory (for alert display) */
+  isDetectedOnArrival?: boolean;
+  /** Pending alert events for this leader (synchronized, displayed at turn start) */
+  pendingAlertEvents?: import('./types/clandestineTypes').LeaderAlertEvent[];
+
+  // === Detection Level System (2026-01-10) ===
+  /** Stealth level 1-5 (Inept to Exceptional) - determines detection threshold */
+  stealthLevel?: number;
+  /** Current detection level (0 = undetected, increases with actions) */
+  detectionLevel?: number;
+  /** Flags for pending acknowledgment by player (for timing of PARANOID/HUNT effects) */
+  pendingDetectionEffects?: {
+    /** True if PARANOID governor effect is pending notification */
+    paranoidGovernorNotified?: boolean;
+    /** True if HUNT_NETWORKS effect is pending notification */
+    huntNetworksNotified?: boolean;
+    /** True if threshold exceeded notification was sent */
+    thresholdExceededNotified?: boolean;
+  };
+
+  /** 
+   * Specific clandestine action intended for this mission.
+   * Preserves intent during travel so agent executes the correct plan on arrival.
+   */
+  plannedMissionAction?: import('./types/clandestineTypes').ClandestineActionId;
 }
 
 export interface NegotiationMission {
