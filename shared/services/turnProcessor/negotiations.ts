@@ -3,6 +3,7 @@
 import { GameState, FactionId, Location, Army, LocationType, FACTION_NAMES, LogEntry } from '../../types';
 import { NegotiationProcessingResult } from './types';
 import { createNegotiationsSuccessLog, createNegotiationsFailedLog } from '../logs/logFactory';
+import { handleLeaderStatusOnCapture } from '../turnLogic/leaderStatusUpdates';
 
 /**
  * Process pending negotiations with neutral territories.
@@ -26,6 +27,7 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
     const logs: LogEntry[] = [];
     let locations = state.locations.map(l => ({ ...l }));
     let armies = [...state.armies];
+    let characters = [...state.characters];
     const nextNegotiations: typeof state.pendingNegotiations = [];
 
     for (const neg of state.pendingNegotiations) {
@@ -65,6 +67,9 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
                         locations[targetIndex].foodStock += neg.foodOffer;
                     }
 
+                    // Update leaders present in the negotiated territory
+                    characters = handleLeaderStatusOnCapture(target.id, winnerFaction, characters);
+
                     // Success log - visible to all, WARNING for enemies, INFO for winner
                     const successLog = createNegotiationsSuccessLog(
                         target.name,
@@ -93,6 +98,7 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
         locations,
         armies,
         pendingNegotiations: nextNegotiations,
+        characters,
         logs
     };
 }

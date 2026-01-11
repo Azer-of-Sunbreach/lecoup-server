@@ -3,8 +3,9 @@
  *
  * Effect: Reduce resentment against player faction by 2 × Statesmanship per turn
  * Cost: Food (population-based tiers) - handled by processor
- * Auto-disable: If rural net production - food cost < 0
- * Not available: Rural areas
+ * Auto-disable:
+ * - Rural: If net production - food cost <= 0
+ * - City: If food stock <= 0
  */
 
 import { Location, Character, GovernorPolicy, FactionId, LocationType } from '../../../types';
@@ -37,8 +38,8 @@ export function getAppeaseMindsEffectiveCost(
  * Check if Appease the Minds should be disabled
  * 
  * Conditions:
- * - Location is rural (not available)
- * - Rural net production - food cost would be negative
+ * - Rural: Net food production - food cost would be <= 0
+ * - City: Food stock is <= 0
  * - Resentment against faction is already 0
  */
 export function shouldDisableAppeaseMinds(
@@ -46,15 +47,18 @@ export function shouldDisableAppeaseMinds(
     ruralNetProduction: number,
     foodCost: number,
     resentmentAgainstFaction: number
-): { shouldDisable: boolean; reason?: 'rural_area' | 'negative_production' | 'no_resentment' } {
-    // Not available in rural areas
+): { shouldDisable: boolean; reason?: 'negative_production' | 'no_stock' | 'no_resentment' } {
+    // For rural areas: disable if net production after food cost would be <= 0
     if (location.type === LocationType.RURAL) {
-        return { shouldDisable: true, reason: 'rural_area' };
-    }
-
-    // Check if enabling would cause negative production
-    if (ruralNetProduction - foodCost < 0) {
-        return { shouldDisable: true, reason: 'negative_production' };
+        if (ruralNetProduction - foodCost <= 0) {
+            return { shouldDisable: true, reason: 'negative_production' };
+        }
+    } else {
+        // For cities: disable if food stock is <= 0
+        const foodStock = location.foodStock || 0;
+        if (foodStock <= 0) {
+            return { shouldDisable: true, reason: 'no_stock' };
+        }
     }
 
     // Disable if resentment is already 0

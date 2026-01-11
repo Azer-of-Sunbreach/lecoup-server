@@ -1,6 +1,7 @@
 
 import { GameState, Army, Character, CharacterStatus, RoadQuality, FactionId, LogEntry } from '../../types';
 import { calculateEconomyAndFood } from '../../utils/economy';
+import { shouldResetDetectionLevel } from '../domain/clandestine/detectionLevelService';
 
 // Helper to check hostility
 const areHostile = (f1: FactionId, f2: FactionId): boolean => {
@@ -237,13 +238,22 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
                     arrivalStatus = CharacterStatus.AVAILABLE;
                 }
 
+                // Reset detection level on status/location change
+                const resetDetection = shouldResetDetectionLevel(
+                    char.status,
+                    arrivalStatus,
+                    char.locationId,
+                    destLocationId
+                );
+
                 return {
                     ...char,
                     turnsUntilArrival: 0,
                     status: arrivalStatus,
                     locationId: destLocationId,
                     destinationId: null,
-                    governorMission: undefined
+                    governorMission: undefined,
+                    ...(resetDetection ? { detectionLevel: 0, pendingDetectionEffects: undefined } : {})
                 };
             }
             // Still traveling
@@ -284,12 +294,21 @@ export const resolveMovements = (state: GameState): { armies: Army[], characters
                 console.log(`[Movement] ${char.name} arrived at ${destLocation?.name}. Status set to ${arrivalStatus}.`);
             }
 
+            // Reset detection level on status/location change
+            const resetDetection = shouldResetDetectionLevel(
+                char.status,
+                arrivalStatus,
+                char.locationId,
+                destLocationId
+            );
+
             return {
                 ...char,
                 turnsUntilArrival: 0,
                 status: arrivalStatus,
                 locationId: destLocationId,
-                destinationId: null
+                destinationId: null,
+                ...(resetDetection ? { detectionLevel: 0, pendingDetectionEffects: undefined } : {})
             };
         }
         return { ...char, turnsUntilArrival: newTurns };

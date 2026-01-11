@@ -276,6 +276,7 @@ export const processTurn = async (
     state.locations = negResult.locations;
     state.armies = negResult.armies;
     state.pendingNegotiations = negResult.pendingNegotiations;
+    state.characters = negResult.characters;
     logs.push(...negResult.logs);
 
     // --- PHASE 6: AI BATTLE RESOLUTION ---

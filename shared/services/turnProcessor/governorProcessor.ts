@@ -203,8 +203,10 @@ export function processGovernorPolicies(
             if (disableCheck.shouldDisable) {
                 policiesToRemove.push(policy);
                 let reason = 'Not enough food in this area.';
-                if (disableCheck.reason === 'rural_area') {
-                    reason = 'Not available in rural areas.';
+                if (disableCheck.reason === 'negative_production') {
+                    reason = 'Net food production is too low.';
+                } else if (disableCheck.reason === 'no_stock') {
+                    reason = 'Food stock is empty.';
                 } else if (disableCheck.reason === 'no_resentment') {
                     reason = 'Resentment is already at minimum.';
                 }

@@ -104,16 +104,21 @@ export function executeAppointGovernor(
         if (c.id === leaderId) {
             if (travelTime === 0) {
                 // Leader is in the region - immediately become GOVERNING
+                // Reset detection if was clandestine
+                const wasClandestine = c.status === CharacterStatus.UNDERCOVER || c.status === CharacterStatus.ON_MISSION;
                 return {
                     ...c,
                     locationId: targetLocationId,
                     status: CharacterStatus.GOVERNING,
                     governorMission: undefined,
                     // Clear clandestine actions if was UNDERCOVER
-                    activeClandestineActions: undefined
+                    activeClandestineActions: undefined,
+                    ...(wasClandestine ? { detectionLevel: 0, pendingDetectionEffects: undefined } : {})
                 };
             } else {
                 // Leader is distant - start traveling
+                // Reset detection if was clandestine
+                const wasClandestine = c.status === CharacterStatus.UNDERCOVER || c.status === CharacterStatus.ON_MISSION;
                 return {
                     ...c,
                     status: CharacterStatus.MOVING,
@@ -124,7 +129,8 @@ export function executeAppointGovernor(
                         turnsRemaining: travelTime
                     },
                     // Clear clandestine actions if was UNDERCOVER
-                    activeClandestineActions: undefined
+                    activeClandestineActions: undefined,
+                    ...(wasClandestine ? { detectionLevel: 0, pendingDetectionEffects: undefined } : {})
                 };
             }
         }
@@ -405,7 +411,9 @@ export function validateGovernorStatus(
                 ...governor,
                 status: CharacterStatus.DEAD,
                 locationId: location.id, // Dies here
-                activeGovernorPolicies: []
+                activeGovernorPolicies: [],
+                detectionLevel: 0,
+                pendingDetectionEffects: undefined
             },
             isValid: false,
             log: {
@@ -453,7 +461,9 @@ export function validateGovernorStatus(
                 ...governor,
                 status: CharacterStatus.AVAILABLE,
                 locationId: targetLocation.id,
-                activeGovernorPolicies: []
+                activeGovernorPolicies: [],
+                detectionLevel: 0,
+                pendingDetectionEffects: undefined
             },
             isValid: false,
             log: {

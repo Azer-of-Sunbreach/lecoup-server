@@ -38,6 +38,7 @@ export interface NegotiationProcessingResult {
     locations: Location[];
     armies: Army[];
     pendingNegotiations: GameState['pendingNegotiations'];
+    characters: Character[];
     logs: LogEntry[];
 }
 

@@ -23,7 +23,7 @@ export function processUndermineAuthorities(
     leader: Character,
     location: Location,
     turn: number
-): { location: Location; log?: LogEntry } {
+): { location: Location; log?: LogEntry; reductionAmount: number } {
     // Get leader's clandestineOps level (1-5, defaults to 3 if not set)
     const clandestineOpsLevel = leader.stats.clandestineOps ?? 3;
 
@@ -52,7 +52,8 @@ export function processUndermineAuthorities(
 
     return {
         location: updatedLocation,
-        log: warningLog
+        log: warningLog,
+        reductionAmount: stabilityReduction
     };
 }
 

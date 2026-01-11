@@ -1,74 +1,113 @@
 /**
  * Infiltration Risk Service
  * 
- * Calculates the risk of a leader being detected or eliminated when entering enemy territory.
+ * Calculates the risk of a leader being DETECTED when entering enemy territory.
+ * Important: Detection does NOT result in elimination - leader still arrives but is spotted.
  * 
- * Formula:
- * (Soldiers * ((Stability + 1)/20) / Population) * ((Population + Soldiers) / (20000 * ((Resentment/100) + 1)))
+ * New Formula (v2):
+ * BaseRisk = (10 + Garrison/250) × (1 + Stability/100) × (1 - Resentment/100) × (1 - Discretion/10) / 100
+ * 
+ * Rules:
+ * - If Garrison = 0: Risk = 0% (no detection possible)
+ * - Max base risk: 50%
+ * - Max risk with modifiers: 70%
+ * 
+ * Modifiers:
+ * - City location: ×1.33
+ * - Hunt Networks active: ×(1 + GovernorStatesmanship/20)
  */
 
-import { Location, FactionId, Character } from '../../../types';
-import { Army } from '../../../types'; // Assuming Army type exists, if not need to verify path
+import { Location, FactionId, Character, LocationType } from '../../../types';
+import { Army } from '../../../types';
 import { getResentment } from '../../domain/politics/resentment';
 
 // Risk bounds
-const MIN_RISK = 0.0;
-const MAX_RISK = 0.6; // 60%
+const MAX_BASE_RISK = 0.50;     // 50% before modifiers
+const MAX_MODIFIED_RISK = 0.70; // 70% after all modifiers
 
 /**
- * Calculate the base detection risk for a leader entering a specific location
+ * Calculate the base detection risk for a leader entering a specific location.
+ * 
+ * Formula: (10 + Garrison/250) × (1 + Stability/100) × (1 - Resentment/100) × (1 - Discretion/10) / 100
  * 
  * @param location The target location
- * @param locationUrl The faction controlling the location (usually location.faction)
- * @param factionsSoldiersCount Total number of soldiers OF THE CONTROLLING FACTION in the location
+ * @param factionSoldiers Number of soldiers of the controlling faction
+ * @param resentment Resentment against the controlling faction (0-100)
+ * @param discretion Leader's discretion stat (1-5)
+ * @returns Detection probability (0.0 to MAX_BASE_RISK)
  */
 export function calculateBaseDetectionRisk(
     location: Location,
-    factionsSoldiersCount: number
+    factionSoldiers: number,
+    resentment: number,
+    discretion: number
 ): number {
-    const population = location.population;
+    // No detection if no garrison
+    if (factionSoldiers === 0) return 0;
+
     const stability = location.stability;
-    const controllerFaction = location.faction;
 
-    // Resentment against the CONTROLLING faction
-    // Higher resentment makes infiltration EASIER (lower risk)
-    const resentment = getResentment(location, controllerFaction);
+    // Calculate each factor
+    const garrisonFactor = 10 + (factionSoldiers / 250);
+    const stabilityFactor = 1 + (stability / 100);
+    const resentmentFactor = 1 - (resentment / 100);
+    const discretionFactor = 1 - (discretion / 10);
 
-    // Prevent division by zero
-    if (population <= 0) return 0;
+    // Combine factors and convert to percentage
+    let risk = (garrisonFactor * stabilityFactor * resentmentFactor * discretionFactor) / 100;
 
-    // Part 1: (Soldiers * ((Stability + 1)/20) / Population) - Reverted to 20 as per Excel
-    const part1 = (factionsSoldiersCount * ((stability + 1) / 20)) / population;
-
-    // Part 2: ((Population + Soldiers) / (200000 * ((Resentment/100) + 1))) - Updated to 200,000 as per Excel
-    // Resentment factor: (Resentment/100) + 1 varies from 1.0 (0 resentment) to 2.0 (100 resentment)
-    const resentmentFactor = (resentment / 100) + 1;
-    const part2 = (population + factionsSoldiersCount) / (200000 * resentmentFactor);
-
-    return part1 * part2;
+    // Clamp to base max
+    return Math.max(0, Math.min(risk, MAX_BASE_RISK));
 }
 
 /**
- * Apply leader discretion modifier to the risk
+ * Apply location modifiers to the base detection risk.
  * 
- * Formula: (Risk + (Discretion/30)) / Discretion
+ * Modifiers:
+ * - City: ×1.33
+ * - Hunt Networks: ×(1 + statesmanship/20)
+ * 
+ * @param risk Base detection risk
+ * @param isCity Whether the location is a city
+ * @param isHuntNetworkActive Whether Hunt Networks policy is active
+ * @param governorStatesmanship Governor's statesmanship stat (1-5)
+ * @returns Modified detection probability (0.0 to MAX_MODIFIED_RISK)
+ */
+export function applyLocationModifiers(
+    risk: number,
+    isCity: boolean,
+    isHuntNetworkActive: boolean = false,
+    governorStatesmanship: number = 0
+): number {
+    let modifiedRisk = risk;
+
+    // City modifier: ×1.33
+    if (isCity) {
+        modifiedRisk *= 1.33;
+    }
+
+    // Hunt Networks modifier: ×(1 + statesmanship/20)
+    if (isHuntNetworkActive && governorStatesmanship > 0) {
+        modifiedRisk *= (1 + (governorStatesmanship / 20));
+    }
+
+    // Clamp to modified max
+    return Math.max(0, Math.min(modifiedRisk, MAX_MODIFIED_RISK));
+}
+
+/**
+ * @deprecated Use calculateBaseDetectionRisk + applyLocationModifiers instead.
+ * Legacy function for backwards compatibility.
  */
 export function applyLeaderStatsModifier(risk: number, discretion: number): number {
-    // Formula: Risk * (1 - (Discretion / 10))
-    // Example: Level 3 => Risk * 0.7 (30% reduction)
-    // Example: Level 5 => Risk * 0.5 (50% reduction)
-
-    // Ensure discretion doesn't exceed 10 to prevent negative risk
+    // Discretion is now integrated into the main formula
     const effectiveDiscretion = Math.min(10, Math.max(0, discretion));
-
     return risk * (1 - (effectiveDiscretion / 10));
 }
 
 /**
- * Apply governor surveillance modifier
- * 
- * Formula: AdjustedRisk * (1 + (GovernorStatesmanship * 0.2))
- * Only applies if "Hunt enemy underground networks" is active (Future feature)
+ * @deprecated Use applyLocationModifiers instead.
+ * Legacy function for backwards compatibility.
  */
 export function applyGovernorSurveillanceModifier(
     risk: number,
@@ -78,59 +117,117 @@ export function applyGovernorSurveillanceModifier(
     if (!isHuntNetworkActive) {
         return risk;
     }
-
-    return risk * (1 + (governorStatesmanship * 0.2));
+    return risk * (1 + (governorStatesmanship / 20));
 }
 
 /**
- * Clamp risk to valid range [0, 0.6]
+ * Clamp risk to valid range [0, MAX_MODIFIED_RISK]
  */
 export function clampRisk(risk: number): number {
-    return Math.max(MIN_RISK, Math.min(MAX_RISK, risk));
+    return Math.max(0, Math.min(MAX_MODIFIED_RISK, risk));
 }
 
 /**
- * Full calculation pipeline
+ * Full calculation pipeline for infiltration detection risk.
+ * 
+ * This is the main entry point for calculating detection risk when a leader
+ * attempts to infiltrate enemy territory.
+ * 
+ * @param location Target location to infiltrate
+ * @param armies All armies in the game
+ * @param infiltratingLeader The leader attempting infiltration
+ * @param governor Governor of the target location (if any)
+ * @param isHuntNetworkActive Whether Hunt Networks policy is active
+ * @returns Final detection probability (0.0 to 0.70)
  */
 export function calculateTotalInfiltrationRisk(
     location: Location,
     armies: Army[],
     infiltratingLeader: Character,
-    governor: Character | undefined, // Placeholder for future governor logic
-    isHuntNetworkActive: boolean = false // Placeholder
+    governor: Character | undefined,
+    isHuntNetworkActive: boolean = false
 ): number {
-    // 1. Count soldiers of the controlling faction
+    // 1. Count soldiers of the controlling faction in the location
     const controllingFaction = location.faction;
-
-    // Filter armies: In this location AND belong to controlling faction
     const factionSoldiers = armies
         .filter(a => a.locationId === location.id && a.faction === controllingFaction)
         .reduce((sum, a) => sum + a.strength, 0);
 
-    // 2. Base calculation
-    const baseRisk = calculateBaseDetectionRisk(location, factionSoldiers);
+    // No detection if no garrison
+    if (factionSoldiers === 0) return 0;
 
-    // 3. Leader stats modifier
-    // Use 'clandestine' or 'discretion' depending on what's available suited for the spec
-    // Spec says: "Niveau de discrétion". In Character traits, we have 'discretion' (level 1-5 usually).
-    // Using 'discretion' from character stats.
-    // If discretion is missing/0, default to 1 to avoid punishment/bugs
-    // Assuming Character type has 'stats' object
-    // Note: Character type definition might vary, will check types.ts if needed.
-    // Based on previous files, stats are like { discretion: number, ... }
+    // 2. Get resentment against the controlling faction
+    const resentment = getResentment(location, controllingFaction);
 
-    // Check if stats exists, otherwise fallback
-    const discretion = (infiltratingLeader as any).stats?.discretion || 1;
+    // 3. Get leader's discretion stat
+    const discretion = infiltratingLeader.stats?.discretion || 1;
 
-    const riskWithStats = applyLeaderStatsModifier(baseRisk, discretion);
+    // 4. Calculate base risk
+    const baseRisk = calculateBaseDetectionRisk(
+        location,
+        factionSoldiers,
+        resentment,
+        discretion
+    );
 
-    // 4. Governor modifier (Placeholder for future)
-    let finalRisk = riskWithStats;
-    if (governor && isHuntNetworkActive) {
-        const statesmanship = (governor as any).stats?.statesmanship || 0;
-        finalRisk = applyGovernorSurveillanceModifier(finalRisk, statesmanship, isHuntNetworkActive);
-    }
+    // 5. Determine if location is a city
+    const isCity = location.type === LocationType.CITY;
 
-    // 5. Clamp
-    return clampRisk(finalRisk);
+    // 6. Get governor statesmanship if Hunt Networks is active
+    const governorStatesmanship = governor?.stats?.statesmanship || 0;
+
+    // 7. Apply location modifiers
+    const finalRisk = applyLocationModifiers(
+        baseRisk,
+        isCity,
+        isHuntNetworkActive,
+        governorStatesmanship
+    );
+
+    return finalRisk;
+}
+
+/**
+ * Debug helper to get risk breakdown for logging
+ */
+export function getInfiltrationRiskBreakdown(
+    location: Location,
+    armies: Army[],
+    infiltratingLeader: Character,
+    governor: Character | undefined,
+    isHuntNetworkActive: boolean = false
+): {
+    garrison: number;
+    stability: number;
+    resentment: number;
+    discretion: number;
+    isCity: boolean;
+    isHuntNetworkActive: boolean;
+    governorStatesmanship: number;
+    baseRisk: number;
+    finalRisk: number;
+} {
+    const controllingFaction = location.faction;
+    const garrison = armies
+        .filter(a => a.locationId === location.id && a.faction === controllingFaction)
+        .reduce((sum, a) => sum + a.strength, 0);
+    const resentment = getResentment(location, controllingFaction);
+    const discretion = infiltratingLeader.stats?.discretion || 1;
+    const isCity = location.type === LocationType.CITY;
+    const governorStatesmanship = governor?.stats?.statesmanship || 0;
+
+    const baseRisk = calculateBaseDetectionRisk(location, garrison, resentment, discretion);
+    const finalRisk = applyLocationModifiers(baseRisk, isCity, isHuntNetworkActive, governorStatesmanship);
+
+    return {
+        garrison,
+        stability: location.stability,
+        resentment,
+        discretion,
+        isCity,
+        isHuntNetworkActive,
+        governorStatesmanship,
+        baseRisk,
+        finalRisk
+    };
 }

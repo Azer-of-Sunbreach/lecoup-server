@@ -9,18 +9,19 @@
  * - Undercover mission processing with infiltration risk
  */
 
-import { GameState, Location, Road, FactionId, LocationType, Army, LogEntry, CharacterStatus, Character, GovernorPolicy } from '../../../types';
+import { GameState, Location, Road, FactionId, LocationType, Army, LogEntry, CharacterStatus, Character, GovernorPolicy, LogType } from '../../../types';
 import { PORT_SEQUENCE, getNavalTravelTime } from '../../../data/gameConstants';
 import { calculateTotalInfiltrationRisk } from './infiltrationRisk';
 import {
     createGenericLog,
     createInfiltrationSuccessLog,
     createInfiltrationDetectedLog,
-    createInfiltrationEliminatedLog,
     createInfiltrationRiskDebugLog,
-    createLeaderDepartureSpottedLog
-} from '../../logs/logFactory'; // Corrected path: shared/services/domain/leaders -> shared/services/logs
+    createLeaderDepartureSpottedLog,
+    createInfiltrationEliminatedLog
+} from '../../logs/logFactory';
 import { FACTION_NAMES } from '../../../types';
+import { createInfiltrationEvent, addLeaderAlertEvent } from '../clandestine/clandestineAlertService';
 
 // ============================================================================
 // TYPES
@@ -38,7 +39,20 @@ interface PathResult {
 export interface UndercoverProcessingResult<T> {
     characters: T[];
     logs: LogEntry[];
-    notifications: any[]; // For modal notifications (death)
+    notifications: any[]; // For modal notifications
+    infiltrationEvents: InfiltrationEvent[]; // NEW: Track arrivals for ClandestineAlertsModal
+}
+
+/**
+ * Event for a leader successfully infiltrating a location
+ */
+export interface InfiltrationEvent {
+    leaderId: string;
+    leaderName: string;
+    leaderFaction: FactionId;
+    locationId: string;
+    locationName: string;
+    wasDetected: boolean;
 }
 
 // ============================================================================
@@ -48,9 +62,9 @@ export interface UndercoverProcessingResult<T> {
 /**
  * Calculate travel time for a leader from one location to another.
  * Uses hybrid routing: compares naval, land, and combination routes.
- * 
+ *
  * @param fromLocationId - Starting location ID
- * @param toLocationId - Destination location ID  
+ * @param toLocationId - Destination location ID
  * @param locations - All game locations
  * @param roads - All game roads
  * @returns Total travel time in turns
@@ -190,7 +204,7 @@ export function calculateLeaderTravelTime(
  * Apply leader travel speed bonus.
  * Leaders travel faster than armies: trips of 2+ turns are reduced by 1 turn.
  * This does NOT apply when leaders are attached to armies.
- * 
+ *
  * @param travelTime - Base travel time in turns
  * @returns Adjusted travel time (reduced by 1 if >= 2)
  */
@@ -276,7 +290,7 @@ export function getAvailableLeadersForMission(
 /**
  * Process undercover mission travel each turn.
  * Should be called during turn processing.
- * 
+ *
  * - Decrements turnsRemaining for traveling leaders
  * - Moves leader to destination when turnsRemaining reaches 0
  * - Sets status to AVAILABLE when arrived
@@ -290,6 +304,7 @@ export function processUndercoverMissionTravel<T extends Character>(
 ): UndercoverProcessingResult<T> {
     const logs: LogEntry[] = [];
     const notifications: any[] = [];
+    const infiltrationEvents: InfiltrationEvent[] = [];
 
     // Map for fast location lookup
     const locationMap = new Map(locations.map(l => [l.id, l]));
@@ -404,62 +419,23 @@ export function processUndercoverMissionTravel<T extends Character>(
             const roll = Math.random();
 
             if (roll < risk) {
-                // DETECTED
+                // DETECTED (but NOT eliminated - new system)
                 isSuccess = false;
-
-                // Second roll for Elimination (50/50)
-                const eliminationRoll = Math.random();
-
-                if (eliminationRoll < 0.5) {
-                    // ELIMINATED (50% chance if detected)
-                    isEliminated = true;
-                }
             }
+            // NOTE: Elimination logic removed - detection only
         }
 
         // --- CONSEQUENCES ---
 
         // Helper for pronouns
-        const isFemale = c.name === 'Alia' || c.name === 'Lady Ethell'; // Simplified check based on names mentioned in spec
-        const pronounObj = isFemale ? 'her' : 'him';
+        const isFemale = c.name === 'Alia' || c.name === 'Lady Ethell';
         const pronounPossessive = isFemale ? 'her' : 'his';
-        const pronounSubj = isFemale ? 'she' : 'he'; // used in eliminated log
 
-        const factionName = c.faction; // Simplified, ideally map to full name
+        const factionName = c.faction;
 
-        if (isEliminated) {
-            // 1. Log for owner (Good news!)
-            logs.push(createInfiltrationEliminatedLog(
-                c.name,
-                factionName,
-                destination.name,
-                destination.id,
-                turn,
-                destination.faction,
-                pronounSubj
-            ));
-
-            // 2. Notification Modal for sender ("We will mourn him")
-            notifications.push({
-                type: 'LEADER_ELIMINATED',
-                leaderId: c.id,
-                leaderName: c.name,
-                locationName: destination.name,
-                message: `Our valorous ${c.name} has been identified and killed by the enemy while entering ${destination.name}.`,
-                buttonText: `We will mourn ${pronounObj}.`
-            });
-
-            // 3. Kill Leader
-            return {
-                ...c,
-                status: CharacterStatus.DEAD,
-                locationId: 'graveyard',
-                undercoverMission: undefined,
-                armyId: null // detach if any (shouldn't be, but safe)
-            };
-
-        } else if (!isSuccess) { // Detected but not eliminated
-            // 1. Log for owner (Spotted)
+        if (!isSuccess) {
+            // DETECTED - Leader arrives but enemy knows about them
+            // 1. Log for defender (Spotted enemy agent)
             logs.push(createInfiltrationDetectedLog(
                 c.name,
                 factionName,
@@ -471,7 +447,7 @@ export function processUndercoverMissionTravel<T extends Character>(
                 pronounPossessive
             ));
 
-            // 2. Log for sender (Spotted)
+            // 2. Log for sender (Your agent was spotted)
             logs.push(createInfiltrationDetectedLog(
                 c.name,
                 factionName,
@@ -483,18 +459,29 @@ export function processUndercoverMissionTravel<T extends Character>(
                 pronounPossessive
             ));
 
-            // Leader still arrives and becomes UNDERCOVER (was detected but not eliminated)
+            // Create infiltration event for UI
+            const infiltrationEvent = createInfiltrationEvent(
+                c,
+                destination,
+                true, // wasDetected
+                turn
+            );
+
+            // Leader arrives as UNDERCOVER but is detected
             return {
                 ...c,
                 locationId: mission.destinationId,
-                status: CharacterStatus.UNDERCOVER, // Arrived in enemy territory
-                undercoverMission: undefined
+                status: CharacterStatus.UNDERCOVER,
+                undercoverMission: undefined,
+                isDetectedOnArrival: true, // NEW: Track detection for alerts
+                pendingAlertEvents: c.pendingAlertEvents
+                    ? [...c.pendingAlertEvents, { ...infiltrationEvent, timestamp: Date.now() }]
+                    : [{ ...infiltrationEvent, timestamp: Date.now() }]
             };
 
         } else {
-            // SUCCESS
-            // 1. Log for sender (Infiltrated - Good news)
-            // Destination faction doesn't know
+            // SUCCESS - Undetected infiltration
+            // Log for sender only (Destination faction doesn't know)
             if (c.faction !== destination.faction) {
                 logs.push(createInfiltrationSuccessLog(
                     c.name,
@@ -505,19 +492,50 @@ export function processUndercoverMissionTravel<T extends Character>(
                 ));
             }
 
-            // Leader arrives and becomes UNDERCOVER for clandestine operations
+            // Create infiltration event for UI
+            const infiltrationEvent = createInfiltrationEvent(
+                c,
+                destination,
+                false, // wasDetected
+                turn
+            );
+
+            // Leader arrives as UNDERCOVER, undetected
             return {
                 ...c,
                 locationId: mission.destinationId,
-                status: CharacterStatus.UNDERCOVER, // Arrived in enemy territory
-                undercoverMission: undefined
+                status: CharacterStatus.UNDERCOVER,
+                undercoverMission: undefined,
+                isDetectedOnArrival: false, // NEW: Track detection for alerts
+                pendingAlertEvents: c.pendingAlertEvents
+                    ? [...c.pendingAlertEvents, { ...infiltrationEvent, timestamp: Date.now() }]
+                    : [{ ...infiltrationEvent, timestamp: Date.now() }]
             };
+        }
+    });
+
+    // Build infiltration events for ClandestineAlertsModal from characters that just arrived
+    processedCharacters.forEach(c => {
+        // Only track characters that just arrived (have isDetectedOnArrival defined)
+        if (typeof (c as any).isDetectedOnArrival === 'boolean') {
+            const location = locationMap.get(c.locationId);
+            if (location && c.status === CharacterStatus.UNDERCOVER) {
+                infiltrationEvents.push({
+                    leaderId: c.id,
+                    leaderName: c.name,
+                    leaderFaction: c.faction,
+                    locationId: location.id,
+                    locationName: location.name,
+                    wasDetected: (c as any).isDetectedOnArrival
+                });
+            }
         }
     });
 
     return {
         characters: processedCharacters,
         logs,
-        notifications
+        notifications,
+        infiltrationEvents
     };
 }

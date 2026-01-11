@@ -10,6 +10,7 @@ import {
 } from '../logs/logFactory';
 import { isNeutralInsurrectionBlocked, createBlockedInsurrectionLog } from '../domain/governor/makeExamples';
 import { validateGovernorStatus } from '../domain/governor/governorService';
+import { handleLeaderStatusOnCapture } from './leaderStatusUpdates';
 
 let logIdCounter = 0;
 const generateLogId = (): string => {
@@ -362,7 +363,8 @@ export const processAutoCapture = (
             let newStability = loc.stability;
             if (isInsurgentCapture && winner !== FactionId.NEUTRAL) {
                 if (newStability < 49) {
-                    newStability = Math.min(49, newStability + 10);
+                    // DEPRECATED: Stability boost disabled (was +10). Kept for potential rebalancing.
+                    newStability = Math.min(49, newStability + 0);
                 }
             }
 
@@ -389,6 +391,9 @@ export const processAutoCapture = (
                     if (validationResult.log) logs.push(validationResult.log);
                 }
             }
+
+            // NEW: Update status of other leaders (Available <-> Undercover)
+            nextCharacters = handleLeaderStatusOnCapture(updatedLoc.id, updatedLoc.faction, nextCharacters);
 
             return updatedLoc;
         }

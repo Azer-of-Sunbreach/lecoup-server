@@ -57,7 +57,8 @@ export const resolveCombatResult = (
                 newCharacters,
                 newLocations,
                 newRoads,
-                newStats
+                newStats,
+                prevState.turn
             );
             newArmies = result.armies;
             newLocations = result.locations;

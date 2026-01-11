@@ -27,7 +27,8 @@ export const resolveFight = (
     characters: Character[],
     locations: Location[],
     roads: Road[],
-    stats: GameStats
+    stats: GameStats,
+    turn: number = 0
 ): FightResult => {
     let newArmies = [...armies];
     let newCharacters = [...characters];
@@ -255,7 +256,7 @@ export const resolveFight = (
                         location: loc,
                         controllerFaction: combat.defenderFaction,
                         insurgentStrength,
-                        turn: 0, // Turn not available here easily?
+                        turn,
                         governorName
                     });
 

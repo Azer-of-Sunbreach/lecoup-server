@@ -1,5 +1,5 @@
 import { Character, Location, Army, LogEntry, FactionId, LogType, LogSeverity, CharacterStatus } from '../../../types';
-import { ActiveClandestineAction, ClandestineActionId } from '../../../types/clandestineTypes';
+import { ActiveClandestineAction, ClandestineActionId, CLANDESTINE_ACTIONS } from '../../../types/clandestineTypes';
 import { calculateCombatStrength, applySequentialLosses } from '../../combat/powerCalculation';
 
 const generateId = () => 'insurgency_' + Math.random().toString(36).substr(2, 9);
@@ -47,13 +47,19 @@ export function processPrepareGrandInsurrection(
 
         // Deduct One-Time Cost immediately
         const cost = action.oneTimeGoldAmount || 100;
-        const currentBudget = leader.budget || 0;
+        const currentBudget = leader.clandestineBudget ?? leader.budget ?? 0; // Check both properties
         const newBudget = Math.max(0, currentBudget - cost);
 
         // Lock leader status immediately and update budget
+        // Apply instant detection increase for one-time action
+        const actionDef = CLANDESTINE_ACTIONS[ClandestineActionId.PREPARE_GRAND_INSURRECTION];
+        const detectionIncrease = actionDef?.detectionIncrease ?? 10;
+
         const finalLeader = {
             ...leader,
-            budget: newBudget,
+            clandestineBudget: newBudget, // Use clandestineBudget for consistency
+            budget: newBudget, // Also set budget for backward compatibility
+            detectionLevel: (leader.detectionLevel ?? 0) + detectionIncrease,
             status: CharacterStatus.ON_MISSION,
             activeClandestineActions: leader.activeClandestineActions?.map(a =>
                 a.actionId === action.actionId ? newAction : a
@@ -179,7 +185,8 @@ export function processPrepareGrandInsurrection(
         ...leader,
         status: CharacterStatus.AVAILABLE,
         armyId: insurgentArmy.id,
-        activeClandestineActions: [] // Clear actions
+        activeClandestineActions: [], // Clear actions
+        pendingAlertEvents: [] // Clear alerts so they don't appear in modal this turn
     };
 
     // 5. Notification

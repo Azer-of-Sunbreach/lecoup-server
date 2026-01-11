@@ -13,11 +13,27 @@
  */
 
 import { Character, Location, LogEntry, CharacterStatus, LogSeverity, LogType, FactionId, Army } from '../../../types';
-import { CLANDESTINE_ACTION_COSTS, ActiveClandestineAction, ClandestineActionId } from '../../../types/clandestineTypes';
+import { CLANDESTINE_ACTION_COSTS, ActiveClandestineAction, ClandestineActionId, CLANDESTINE_ACTIONS } from '../../../types/clandestineTypes';
 import { processUndermineAuthorities, shouldDisableUndermineAuthorities } from './undermineAuthorities';
 import { processDistributePamphlets, shouldDisableDistributePamphlets } from './distributePamphlets';
 import { processSpreadPropaganda, shouldDisableSpreadPropaganda } from './spreadPropaganda';
-import { calculateDetectionRisk } from './detectionRisk';
+import { calculateDetectionRisk } from './detectionRisk'; // Legacy, kept for reference
+import {
+    calculateCaptureRisk,
+    shouldEffectsApply,
+    applyTurnDetectionIncrease,
+    isThresholdExceeded,
+    calculateDetectionThreshold
+} from './detectionLevelService';
+import {
+    addLeaderAlertEvent,
+    createThresholdExceededEvent,
+    createHuntNetworksEvent,
+    createParanoidGovernorEvent,
+    createCombinedParanoidHuntEvent,
+    createExecutionEvent,
+    createEscapeEvent
+} from './clandestineAlertService';
 import { processAttackTaxConvoys, shouldDisableAttackTaxConvoys } from './attackTaxConvoys';
 import { processStealFromGranaries, shouldDisableStealFromGranaries } from './stealFromGranaries';
 import { processBurnOperation, shouldDisableBurnOperation } from './burnOperations';
@@ -237,6 +253,11 @@ export function processClandestineActions(
     // Create mutable copies for locations
     let updatedLocations = [...locations];
 
+    // DEBUG: Log all undercover leaders at the start
+    const allUndercover = updatedCharacters.filter(c => c.status === CharacterStatus.UNDERCOVER || c.status === CharacterStatus.ON_MISSION);
+    console.log(`[PROCESSOR] Starting with ${allUndercover.length} undercover/on_mission leaders:`);
+    allUndercover.forEach(l => console.log(`  - ${l.name} (${l.faction}) @ ${l.locationId}, status=${l.status}`));
+
     // Process each character that has active clandestine actions
     for (let charIndex = 0; charIndex < updatedCharacters.length; charIndex++) {
         let leader = updatedCharacters[charIndex];
@@ -279,9 +300,81 @@ export function processClandestineActions(
 
         // Re-check active actions after potential SCORCHED_EARTH additions
         const activeActions = leader.activeClandestineActions || [];
+
+        // --------------------------------------------------------------------
+        // 0b. PARANOID/HUNT ALERTS (must run BEFORE activeActions filter)
+        // These alerts should fire regardless of whether the leader has active actions
+        // --------------------------------------------------------------------
+        // Identify governor for this location (needed for PARANOID check)
+        const governorForAlerts = updatedCharacters.find(c =>
+            c.locationId === location.id &&
+            c.faction === location.faction &&
+            c.status === CharacterStatus.GOVERNING
+        );
+
+        const isHuntActiveEarly = location.governorPolicies?.HUNT_NETWORKS === true;
+        const hasParanoidGovernorEarly = governorForAlerts?.stats.ability.includes('PARANOID') ?? false;
+        const governorNameEarly = governorForAlerts?.name || 'Unknown Governor';
+
+        const huntNotifiedEarly = leader.pendingDetectionEffects?.huntNetworksNotified ?? false;
+        const paranoidNotifiedEarly = leader.pendingDetectionEffects?.paranoidGovernorNotified ?? false;
+
+        let newHuntNotifiedEarly = huntNotifiedEarly;
+        let newParanoidNotifiedEarly = paranoidNotifiedEarly;
+
+        // DEBUG LOG
+        console.log(`[CLANDESTINE] ${leader.name} @ ${location.name}: isHunt=${isHuntActiveEarly}, hasParanoid=${hasParanoidGovernorEarly}, huntNotified=${huntNotifiedEarly}, paranoidNotified=${paranoidNotifiedEarly}`);
+
+        // Case 1: Both New (Combined Alert)
+        if (isHuntActiveEarly && !huntNotifiedEarly && hasParanoidGovernorEarly && !paranoidNotifiedEarly) {
+            console.log(`[CLANDESTINE] Creating COMBINED alert for ${leader.name}`);
+            const alertEvent = createCombinedParanoidHuntEvent(leader, location, governorNameEarly, turn);
+            leader = addLeaderAlertEvent(leader, alertEvent);
+            newHuntNotifiedEarly = true;
+            newParanoidNotifiedEarly = true;
+        }
+        // Case 2: Hunt New
+        else if (isHuntActiveEarly && !huntNotifiedEarly) {
+            console.log(`[CLANDESTINE] Creating HUNT_NETWORKS alert for ${leader.name}`);
+            const alertEvent = createHuntNetworksEvent(leader, location, turn);
+            leader = addLeaderAlertEvent(leader, alertEvent);
+            newHuntNotifiedEarly = true;
+        }
+        // Case 3: Paranoid New
+        else if (hasParanoidGovernorEarly && !paranoidNotifiedEarly) {
+            console.log(`[CLANDESTINE] Creating PARANOID alert for ${leader.name}`);
+            const alertEvent = createParanoidGovernorEvent(leader, location, governorNameEarly, turn);
+            leader = addLeaderAlertEvent(leader, alertEvent);
+            newParanoidNotifiedEarly = true;
+        }
+
+        // Reset logic (if condition stops)
+        if (!isHuntActiveEarly && huntNotifiedEarly) {
+            newHuntNotifiedEarly = false;
+        }
+        if (!hasParanoidGovernorEarly && paranoidNotifiedEarly) {
+            newParanoidNotifiedEarly = false;
+        }
+
+        // Apply state updates if changed
+        if (newHuntNotifiedEarly !== huntNotifiedEarly || newParanoidNotifiedEarly !== paranoidNotifiedEarly) {
+            leader = {
+                ...leader,
+                pendingDetectionEffects: {
+                    ...leader.pendingDetectionEffects,
+                    huntNetworksNotified: newHuntNotifiedEarly,
+                    paranoidGovernorNotified: newParanoidNotifiedEarly
+                }
+            };
+        }
+
+        // Update character in array after alert processing
+        updatedCharacters[charIndex] = leader;
+
+        // Skip remaining processing if no active actions
         if (activeActions.length === 0) continue;
         // --------------------------------------------------------------------
-        // 1. DETECTION CHECK
+        // 1. CAPTURE ROLL (Detection Level System - 2026-01-10)
         // --------------------------------------------------------------------
 
         // Identify governor (must be GOVERNING status)
@@ -291,22 +384,30 @@ export function processClandestineActions(
             c.status === CharacterStatus.GOVERNING
         );
 
-        // Check if Hunt Networks policy is active
-        const isHuntNetworksActive = location.governorPolicies?.HUNT_NETWORKS === true;
+        // Check if agent's faction is AI-controlled (for timing purposes)
+        // For now, assume this passed from outside or check a flag
+        // In solo mode, all non-player factions are AI
+        // We'll assume human control for now and let the timing flags handle it
+        const isAIControlled = false; // TODO: Pass from turn processor context
 
-        const detectionRisk = calculateDetectionRisk(
-            location,
-            activeActions,
+        // Check which effects should apply based on notification timing
+        const effectsApply = shouldEffectsApply(leader, isAIControlled);
+
+        // Calculate capture risk using new detection level system
+        // Only include PARANOID/HUNT_NETWORKS if effects have been acknowledged
+        const captureRisk = calculateCaptureRisk(
             leader,
-            currentArmies, // Use potentially updated armies
-            governor,
-            isHuntNetworksActive
+            effectsApply.huntNetworksApplies ? location : { ...location, governorPolicies: { ...location.governorPolicies, HUNT_NETWORKS: false } },
+            effectsApply.paranoidApplies ? governor : undefined
         );
+
+        // Convert to 0-1 range for roll comparison
+        const riskProbability = captureRisk / 100;
 
         // Roll dice (0.0 to 1.0)
         const roll = Math.random();
 
-        if (roll < detectionRisk) {
+        if (roll < riskProbability) {
             // CAUGHT! (Code omitted for brevity - logic remains same as original but emitted to `logs` directly as these are events)
             const leaderBudget = leader.clandestineBudget || leader.budget || 0;
             const controllerFaction = location.faction;
@@ -330,18 +431,16 @@ export function processClandestineActions(
                         locationId: escapeLoc.id,
                         status: CharacterStatus.AVAILABLE,
                         activeClandestineActions: [],
-                        armyId: null
+                        armyId: null,
+                        detectionLevel: 0,
+                        pendingDetectionEffects: undefined
                     };
 
-                    logs.push({
-                        id: `escape-owner-${turn}-${leader.id}`,
-                        type: LogType.LEADER,
-                        message: `${leader.name}'s cell in ${location.name} was dismantled! ${leader.name} escaped to ${escapeLoc.name}.`,
-                        turn,
-                        visibleToFactions: [leader.faction],
-                        baseSeverity: LogSeverity.WARNING
-                    });
+                    // Trigger Escape Alert Event (visible to player)
+                    const escapeEvent = createEscapeEvent(leader, location, escapeLoc, turn);
+                    leader = addLeaderAlertEvent(leader, escapeEvent);
 
+                    // Opponent log logic remains (controller sees money seized)
                     logs.push({
                         id: `escape-controller-${turn}-${leader.id}`,
                         type: LogType.LEADER,
@@ -362,18 +461,16 @@ export function processClandestineActions(
                 status: CharacterStatus.DEAD,
                 locationId: 'graveyard',
                 activeClandestineActions: [],
-                armyId: null
+                armyId: null,
+                detectionLevel: 0,
+                pendingDetectionEffects: undefined
             };
 
-            logs.push({
-                id: `exec-owner-${turn}-${leader.id}`,
-                type: LogType.LEADER,
-                message: `Our brave ${leader.name} was caught in ${location.name} and executed!`,
-                turn,
-                visibleToFactions: [leader.faction],
-                baseSeverity: LogSeverity.CRITICAL, // Critical for owner
-                criticalForFactions: [leader.faction]
-            });
+            // Trigger Execution Alert Event (visible to player)
+            const executionEvent = createExecutionEvent(leader, location, turn);
+            leader = addLeaderAlertEvent(leader, executionEvent);
+
+            // Opponent log logic remains (controller sees execution and money seized)
 
             logs.push({
                 id: `exec-controller-${turn}-${leader.id}`,
@@ -425,6 +522,7 @@ export function processClandestineActions(
                     }
                     const result = processUndermineAuthorities(leader, location, turn);
                     location = result.location;
+
                     if (result.log) {
                         // Category: Priority (Non-Critical)
                         routeLog(result.log, action.actionId, false, location, leader);
@@ -474,6 +572,14 @@ export function processClandestineActions(
                         action.turnStarted = turn;
                         const oneTimeCost = action.oneTimeGoldAmount ?? 0;
                         leaderBudget = Math.max(0, leaderBudget - oneTimeCost);
+                        // Apply instant detection increase for one-time action
+                        const actionDef = CLANDESTINE_ACTIONS[action.actionId];
+                        if (actionDef && actionDef.detectionType === 'one_time') {
+                            leader = {
+                                ...leader,
+                                detectionLevel: (leader.detectionLevel ?? 0) + actionDef.detectionIncrease
+                            };
+                        }
                         break;
                     }
 
@@ -782,6 +888,8 @@ export function processClandestineActions(
                         turn
                     );
 
+
+
                     location = result.updatedLocation;
                     leader = result.updatedLeader;
 
@@ -825,11 +933,59 @@ export function processClandestineActions(
             a => !actionsToRemove.includes(a.actionId)
         );
 
-        updatedCharacters[charIndex] = {
-            ...leader,
-            budget: leaderBudget,
-            activeClandestineActions: remainingActions.length > 0 ? remainingActions : undefined
-        };
+        // Apply detection level increase from active per-turn actions
+        // Apply detection level increase from active per-turn actions
+        let updatedLeader: Character;
+
+        // Only if leader is still UNDERCOVER or ON_MISSION
+        if (leader.status === CharacterStatus.UNDERCOVER || leader.status === CharacterStatus.ON_MISSION) {
+            let updatedLeaderState = applyTurnDetectionIncrease({
+                ...leader,
+                budget: leaderBudget,
+                clandestineBudget: leaderBudget,
+                activeClandestineActions: remainingActions.length > 0 ? remainingActions : undefined
+            });
+
+            // Check if threshold was just exceeded (wasn't before, now is)
+            const wasExceeded = isThresholdExceeded(leader, location);
+            const nowExceeded = isThresholdExceeded(updatedLeaderState, location);
+            const alreadyNotified = updatedLeaderState.pendingDetectionEffects?.thresholdExceededNotified ?? false;
+
+            if (nowExceeded && !alreadyNotified) {
+                // Trigger threshold exceeded alert
+                const alertEvent = createThresholdExceededEvent(updatedLeaderState, location, turn);
+                updatedLeaderState = addLeaderAlertEvent(updatedLeaderState, alertEvent);
+                // Mark as notified
+                updatedLeaderState = {
+                    ...updatedLeaderState,
+                    pendingDetectionEffects: {
+                        ...updatedLeaderState.pendingDetectionEffects,
+                        thresholdExceededNotified: true
+                    }
+                };
+            } else if (!nowExceeded && alreadyNotified) {
+                // Reset notification if no longer exceeded (e.g. stealth increased)
+                updatedLeaderState = {
+                    ...updatedLeaderState,
+                    pendingDetectionEffects: {
+                        ...updatedLeaderState.pendingDetectionEffects,
+                        thresholdExceededNotified: false
+                    }
+                };
+            }
+            updatedLeader = updatedLeaderState;
+        } else {
+            // Leader status changed (e.g. became AVAILABLE after Grand Insurrection)
+            // Just update budget/actions
+            updatedLeader = {
+                ...leader,
+                budget: leaderBudget,
+                clandestineBudget: leaderBudget,
+                activeClandestineActions: remainingActions.length > 0 ? remainingActions : undefined
+            };
+        }
+
+        updatedCharacters[charIndex] = updatedLeader;
     }
 
     // Consolidate logs
