@@ -75,8 +75,8 @@ export const manageEconomy = (
     const globalFoodNet = myCities.reduce((sum, c) => sum + c.foodIncome, 0);
     const isDesperateForFood = globalFoodNet < -10;
 
-    optimizeCityTaxes(myCities, isDesperateForGold);
-    optimizeRuralCollection(myRurals, isDesperateForFood);
+    optimizeCityTaxes(myCities, isDesperateForGold, faction);
+    optimizeRuralCollection(myRurals, isDesperateForFood, faction);
 
     // 2. EMERGENCY SEIZE ACTIONS (before logistics to secure resources)
     const seizeResult = handleSeizeActions(faction, state, updates.locations!);

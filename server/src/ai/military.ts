@@ -11,6 +11,7 @@ import { handleCampaign } from './military/campaign';
 import { handleDefense } from './military/defense';
 import { handleRoadDefense } from './military/roadDefense';
 import { handleIdleArmies } from './military/idleHandler';
+import { handleEnRouteReversals } from './military/reversalHandler';
 
 /**
  * Main military management function for AI factions.
@@ -36,6 +37,10 @@ export const manageMilitary = (
         console.log(`[AI MILITARY ${faction}] === STARTING manageMilitary ===`);
         console.log(`[AI MILITARY ${faction}] Total missions: ${missions.length}`);
     }
+
+    // 0. CHECK FOR URGENT REVERSALS (Home base capture)
+    // This modifies newArmies in place if reversals occur
+    handleEnRouteReversals(state, faction, newArmies);
 
     const campaignMissions = missions.filter(m => m.type === 'CAMPAIGN');
     if (DEBUG_AI) {
