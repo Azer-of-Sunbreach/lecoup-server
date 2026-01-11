@@ -10,6 +10,7 @@
 
 import { Character, FactionId, CharacterStatus, LeaderAbility } from '../types';
 import { LeaderStatLevel, CharacterTrait } from '../types/leaderTypes';
+import { ClandestineActionId } from '../types/clandestineTypes';
 
 /**
  * Extended Character type with new stats.
@@ -85,6 +86,7 @@ export const CHARACTERS_NEW: CharacterNew[] = [
     },
     {
         id: 'alia',
+        plannedMissionAction: ClandestineActionId.PREPARE_GRAND_INSURRECTION,
         name: 'Alia',
         title: 'The Messenger',
         faction: FactionId.REPUBLICANS,
@@ -102,7 +104,7 @@ export const CHARACTERS_NEW: CharacterNew[] = [
             clandestineOps: LeaderStatLevel.EXCEPTIONAL,
             discretion: LeaderStatLevel.EXCEPTIONAL,
             statesmanship: LeaderStatLevel.INEPT,
-            ability: ['FIREBRAND', 'GHOST'],
+            ability: ['FIREBRAND', 'GHOST', 'DAREDEVIL'],
             traits: [CharacterTrait.FAINT_HEARTED],
             insurrectionValue: 30 // DEPRECATED
         }
@@ -133,6 +135,7 @@ export const CHARACTERS_NEW: CharacterNew[] = [
     },
     {
         id: 'caelan',
+        plannedMissionAction: ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS,
         name: 'Caelan',
         title: 'The Lawyer',
         faction: FactionId.REPUBLICANS,
@@ -274,7 +277,7 @@ export const CHARACTERS_NEW: CharacterNew[] = [
             clandestineOps: LeaderStatLevel.EXCEPTIONAL,
             discretion: LeaderStatLevel.EXCEPTIONAL,
             statesmanship: LeaderStatLevel.EXCEPTIONAL,
-            ability: ['MANAGER', 'GHOST'],
+            ability: ['MANAGER', 'GHOST', 'DAREDEVIL'],
             traits: [], // No trait
             insurrectionValue: 30 // DEPRECATED
         }
@@ -282,7 +285,7 @@ export const CHARACTERS_NEW: CharacterNew[] = [
     {
         id: 'barrett',
         name: 'Sir Barrett',
-        title: 'Grandmaster',
+        title: 'Grandmaster of the Knights',
         faction: FactionId.CONSPIRATORS,
         status: CharacterStatus.AVAILABLE,
         locationId: 'stormbay',
@@ -306,14 +309,14 @@ export const CHARACTERS_NEW: CharacterNew[] = [
     {
         id: 'tymon',
         name: 'Sir Tymon',
-        title: 'Commander',
+        title: 'Knight Commander',
         faction: FactionId.CONSPIRATORS,
         status: CharacterStatus.AVAILABLE,
         locationId: 'hornvale',
         destinationId: null,
         turnsUntilArrival: 0,
         armyId: null,
-        description: 'Honorable Knight.',
+        description: 'Duty over oaths.',
         bonuses: {},
         budget: 0,
         stats: {
@@ -353,6 +356,7 @@ export const CHARACTERS_NEW: CharacterNew[] = [
     },
     {
         id: 'ethell',
+        plannedMissionAction: ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS,
         name: 'Lady Ethell',
         title: "King Fredrik's favorite",
         faction: FactionId.CONSPIRATORS,
@@ -501,6 +505,7 @@ export const CHARACTERS_NEW: CharacterNew[] = [
     },
     {
         id: 'lys',
+        plannedMissionAction: ClandestineActionId.PREPARE_GRAND_INSURRECTION,
         name: 'Castellan Lys',
         title: 'Vassal of the Baron Lekal',
         faction: FactionId.NOBLES,
@@ -639,7 +644,7 @@ export const CHARACTERS: OldCharacter[] = [
         stats: { stabilityPerTurn: 10, commandBonus: 0.30, insurrectionValue: 30, ability: ['MANAGER'] }
     },
     {
-        id: 'barrett', name: 'Sir Barrett', title: 'Grandmaster', faction: FactionId.CONSPIRATORS, status: CharacterStatus.AVAILABLE, locationId: 'stormbay', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Legendary Knight.',
+        id: 'barrett', name: 'Sir Barrett', title: 'Grandmaster of the Knights', faction: FactionId.CONSPIRATORS, status: CharacterStatus.AVAILABLE, locationId: 'stormbay', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Legendary Knight.',
         bonuses: {},
         stats: { stabilityPerTurn: 10, commandBonus: 0.30, insurrectionValue: 10, ability: ['LEGENDARY'] }
     },
@@ -649,7 +654,7 @@ export const CHARACTERS: OldCharacter[] = [
         stats: { stabilityPerTurn: 5, commandBonus: 0, insurrectionValue: 20, ability: ['MANAGER'] }
     },
     {
-        id: 'tymon', name: 'Sir Tymon', title: 'Commander', faction: FactionId.CONSPIRATORS, status: CharacterStatus.AVAILABLE, locationId: 'hornvale', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Honorable Knight.',
+        id: 'tymon', name: 'Sir Tymon', title: 'Knight Commander', faction: FactionId.CONSPIRATORS, status: CharacterStatus.AVAILABLE, locationId: 'hornvale', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Duty over oaths.',
         bonuses: {},
         stats: { stabilityPerTurn: 5, commandBonus: 0.15, insurrectionValue: 10, ability: ['NONE'] }
     },

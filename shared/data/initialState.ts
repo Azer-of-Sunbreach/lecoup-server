@@ -6,7 +6,7 @@
 import { GameState, FactionId, Army, LogType, LogSeverity } from '../types';
 import { INITIAL_LOCATIONS, INITIAL_GARRISONS } from './locations';
 import { ROADS } from './roads';
-import { CHARACTERS } from './characters';
+import { CHARACTERS_NEW as CHARACTERS } from './characters';
 import { INITIAL_PLAYER_RESOURCES, INITIAL_AI_RESOURCES } from './gameConstants';
 
 /**
