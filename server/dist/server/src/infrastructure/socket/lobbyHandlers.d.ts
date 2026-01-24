@@ -1,7 +1,7 @@
 /**
- * Lobby Socket Handlers
- * Handles all lobby-related socket events: create, join, leave, faction selection, ready, start
- */
+* Lobby Socket Handlers
+* Handles all lobby-related socket events: create, join, leave, faction selection, ready, start
+*/
 import { Server, Socket } from 'socket.io';
 import { LobbyManager } from '../../lobbyManager';
 import { GameRoomManager } from '../../gameRoom';

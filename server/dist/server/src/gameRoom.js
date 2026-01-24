@@ -33,7 +33,10 @@ class GameRoomManager {
             currentTurnIndex: 0,
             playerFactions,
             aiFaction,
-            pendingCombat: null
+            pendingCombat: null,
+            battlePhaseActive: false,
+            battlePhaseTotal: 0,
+            battlePhaseResolved: 0
         };
         this.rooms.set(lobby.code, room);
         console.log(`[GameRoom] Created: ${lobby.code} with turn order: ${turnOrder.join(' -> ')}`);
@@ -41,6 +44,18 @@ class GameRoomManager {
     }
     getRoom(code) {
         return this.rooms.get(code);
+    }
+    /**
+     * Find gameCode for a socket ID by searching all rooms' playerFactions
+     * This handles socket reconnection where socket.data.gameCode might be lost
+     */
+    getGameCodeForSocket(socketId) {
+        for (const [code, room] of this.rooms) {
+            if (room.playerFactions.has(socketId)) {
+                return code;
+            }
+        }
+        return null;
     }
     getCurrentFaction(code) {
         const room = this.rooms.get(code);
@@ -140,6 +155,44 @@ class GameRoomManager {
         if (room) {
             room.pendingCombat = null;
         }
+    }
+    // Battle Phase Management
+    startBattlePhase(code, totalBattles) {
+        const room = this.rooms.get(code);
+        if (room) {
+            room.battlePhaseActive = true;
+            room.battlePhaseTotal = totalBattles;
+            room.battlePhaseResolved = 0;
+            console.log(`[GameRoom] ${code}: Battle phase started with ${totalBattles} battles`);
+        }
+    }
+    incrementBattleResolved(code) {
+        const room = this.rooms.get(code);
+        if (room && room.battlePhaseActive) {
+            room.battlePhaseResolved++;
+            console.log(`[GameRoom] ${code}: Battle resolved (${room.battlePhaseResolved}/${room.battlePhaseTotal})`);
+            return room.battlePhaseResolved;
+        }
+        return 0;
+    }
+    endBattlePhase(code) {
+        const room = this.rooms.get(code);
+        if (room) {
+            room.battlePhaseActive = false;
+            room.battlePhaseTotal = 0;
+            room.battlePhaseResolved = 0;
+            console.log(`[GameRoom] ${code}: Battle phase ended`);
+        }
+    }
+    getBattlePhaseInfo(code) {
+        const room = this.rooms.get(code);
+        if (!room)
+            return { active: false, total: 0, resolved: 0 };
+        return {
+            active: room.battlePhaseActive,
+            total: room.battlePhaseTotal,
+            resolved: room.battlePhaseResolved
+        };
     }
     deleteRoom(code) {
         this.rooms.delete(code);

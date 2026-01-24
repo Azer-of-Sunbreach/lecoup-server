@@ -46,6 +46,25 @@ class LobbyManager {
         console.log(`[Lobby] Created: ${code} by ${hostSocketId} (${maxPlayers} players)`);
         return lobby;
     }
+    restoreLobby(code, players, maxPlayers) {
+        const lobby = {
+            code,
+            hostSocketId: players.find(p => p.isConnected)?.odId || players[0].odId,
+            maxPlayers,
+            players,
+            status: 'IN_PROGRESS',
+            createdAt: Date.now()
+        };
+        this.lobbies.set(code, lobby);
+        // Map connected players
+        for (const player of players) {
+            if (player.isConnected) {
+                this.playerToLobby.set(player.odId, code);
+            }
+        }
+        console.log(`[Lobby] Restored: ${code} with ${players.length} players`);
+        return lobby;
+    }
     joinLobby(code, socketId, nickname) {
         const lobby = this.lobbies.get(code.toUpperCase());
         if (!lobby) {

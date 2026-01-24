@@ -31,7 +31,7 @@ export declare function advanceTurn(state: MultiplayerGameState): Promise<{
     nextFaction: FactionId;
     isAITurn: boolean;
 }>;
-export { processAITurn } from './ai';
+export { processAITurn, processSingleFactionAITurn } from './ai';
 /**
  * Extract state for client (removes server-only fields)
  */

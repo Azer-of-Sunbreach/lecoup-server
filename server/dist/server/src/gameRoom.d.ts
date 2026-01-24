@@ -7,6 +7,9 @@ export interface GameRoom {
     playerFactions: Map<string, FactionId>;
     aiFaction: FactionId | null;
     pendingCombat: PendingCombat | null;
+    battlePhaseActive: boolean;
+    battlePhaseTotal: number;
+    battlePhaseResolved: number;
 }
 export interface PendingCombat {
     combatState: any;
@@ -20,6 +23,11 @@ export declare class GameRoomManager {
     private rooms;
     createRoom(lobby: GameLobby, initialGameState: any): GameRoom;
     getRoom(code: string): GameRoom | undefined;
+    /**
+     * Find gameCode for a socket ID by searching all rooms' playerFactions
+     * This handles socket reconnection where socket.data.gameCode might be lost
+     */
+    getGameCodeForSocket(socketId: string): string | null;
     getCurrentFaction(code: string): FactionId | undefined;
     isPlayerTurn(code: string, socketId: string): boolean;
     getSocketForFaction(code: string, faction: FactionId): string | null;
@@ -34,5 +42,13 @@ export declare class GameRoomManager {
     setDefenderChoice(code: string, choice: 'FIGHT' | 'RETREAT_CITY'): boolean;
     isCombatReady(code: string): boolean;
     clearCombat(code: string): void;
+    startBattlePhase(code: string, totalBattles: number): void;
+    incrementBattleResolved(code: string): number;
+    endBattlePhase(code: string): void;
+    getBattlePhaseInfo(code: string): {
+        active: boolean;
+        total: number;
+        resolved: number;
+    };
     deleteRoom(code: string): void;
 }

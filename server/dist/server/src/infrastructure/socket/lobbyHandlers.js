@@ -1,8 +1,8 @@
 "use strict";
 /**
- * Lobby Socket Handlers
- * Handles all lobby-related socket events: create, join, leave, faction selection, ready, start
- */
+* Lobby Socket Handlers
+* Handles all lobby-related socket events: create, join, leave, faction selection, ready, start
+*/
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerLobbyHandlers = registerLobbyHandlers;
 const types_1 = require("../../types");
@@ -88,9 +88,12 @@ function registerLobbyHandlers(io, socket, lobbyManager, gameRoomManager) {
         // Notify all players that game is starting
         io.to(lobby.code).emit('game_starting', { lobby: startResult.lobby });
         // Determine human and AI factions
+        // IMPORTANT: Sort by standard faction order (REPUBLICANS < CONSPIRATORS < NOBLES)
+        const standardOrder = [types_1.FactionId.REPUBLICANS, types_1.FactionId.CONSPIRATORS, types_1.FactionId.NOBLES];
         const humanFactions = startResult.lobby.players
             .map(p => p.faction)
-            .filter((f) => f !== null);
+            .filter((f) => f !== null)
+            .sort((a, b) => standardOrder.indexOf(a) - standardOrder.indexOf(b));
         let aiFaction = null;
         if (startResult.lobby.maxPlayers === 2) {
             const allFactions = [types_1.FactionId.REPUBLICANS, types_1.FactionId.CONSPIRATORS, types_1.FactionId.NOBLES];
@@ -107,5 +110,105 @@ function registerLobbyHandlers(io, socket, lobbyManager, gameRoomManager) {
             turnOrder: room.turnOrder
         });
         console.log(`[Game] Started: ${lobby.code} with factions: humans=${humanFactions}, AI=${aiFaction}`);
+    });
+    // Rejoin game after disconnect/reconnect
+    socket.on('rejoin_game', ({ lobbyCode, faction }) => {
+        console.log(`[Rejoin] Player ${socket.id} attempting to rejoin ${lobbyCode} as ${faction}`);
+        // Find the game room
+        const room = gameRoomManager.getRoom(lobbyCode);
+        if (!room) {
+            console.log(`[Rejoin] No room found for ${lobbyCode}`);
+            socket.emit('rejoin_error', { message: 'Game not found or has ended' });
+            return;
+        }
+        // Verify the faction was part of the game
+        const validFactions = Array.from(room.playerFactions.values());
+        if (!validFactions.includes(faction)) {
+            console.log(`[Rejoin] Faction ${faction} not in room's factions:`, validFactions);
+            socket.emit('rejoin_error', { message: 'Invalid faction for this game' });
+            return;
+        }
+        // Update socket data
+        socket.data.gameCode = lobbyCode;
+        socket.data.faction = faction;
+        // Rejoin the socket room
+        socket.join(lobbyCode);
+        // Update the lobby to mark player as connected again
+        const lobby = lobbyManager.getLobby(lobbyCode);
+        if (lobby) {
+            const player = lobby.players.find(p => p.faction === faction);
+            if (player) {
+                player.odId = socket.id;
+                player.isConnected = true;
+            }
+        }
+        // CRITICAL: Update room.playerFactions with new socketId
+        // This map is used by isPlayerTurn and getSocketForFaction
+        room.playerFactions.set(socket.id, faction);
+        // Send current game state to the rejoined player
+        const currentState = (0, gameLogic_1.getClientState)(room.gameState);
+        socket.emit('state_update', { gameState: currentState });
+        // Notify successful rejoin
+        socket.emit('game_rejoined', { lobbyCode, faction });
+        console.log(`[Rejoin] Player ${socket.id} successfully rejoined ${lobbyCode} as ${faction}`);
+    });
+    // Restore game from client state (after server restart)
+    socket.on('restore_game', ({ lobbyCode, faction, gameState, aiFaction }) => {
+        console.log(`[Restore] Player ${socket.id} attempting to restore ${lobbyCode} as ${faction}`);
+        // Double check if room exists (race condition)
+        if (gameRoomManager.getRoom(lobbyCode)) {
+            console.log(`[Restore] Room ${lobbyCode} already exists, treating as rejoin`);
+            // Trigger rejoin logic manually or tell client to rejoin
+            // Ideally we'd just call the rejoin logic, but for simplicity let's emit error and client will rejoin
+            // Actually, client won't retry rejoin if restore fails with "exists".
+            // Let's just tell client it's restored (which effectively joins them)
+            // But we need to ensure they are joined to socket room
+            socket.emit('rejoin_error', { message: 'Game already exists, please rejoin' });
+            return;
+        }
+        // Reconstruct Lobby
+        // We need to infer other players. 
+        // If 3 player game (aiFaction is null), we have 3 humans.
+        // If 2 player game (aiFaction not null), we have 2 humans.
+        const allFactions = [types_1.FactionId.REPUBLICANS, types_1.FactionId.CONSPIRATORS, types_1.FactionId.NOBLES];
+        const humanFactions = aiFaction
+            ? allFactions.filter(f => f !== aiFaction)
+            : allFactions;
+        const players = humanFactions.map(f => ({
+            odId: f === faction ? socket.id : `disconnected-${f}`, // Placeholder for others
+            faction: f,
+            isHost: f === faction, // Restorer becomes host effectively
+            isReady: true,
+            isConnected: f === faction,
+            nickname: f === faction ? 'Restored Player' : 'Disconnected'
+        }));
+        const maxPlayers = aiFaction ? 2 : 3;
+        // Restore Lobby
+        const lobby = lobbyManager.restoreLobby(lobbyCode, players, maxPlayers);
+        // Restore Game Room
+        // Note: We use the gameState from client. Check security? (Ideally yes, but for now trust client)
+        const room = gameRoomManager.createRoom(lobby, gameState);
+        // Sync currentTurnIndex with gameState.currentTurnFaction (server field name)
+        // Client might send as currentPlayerFaction or currentTurnFaction depending on source
+        const currentFaction = gameState.currentTurnFaction || gameState.currentPlayerFaction;
+        room.currentTurnIndex = room.turnOrder.indexOf(currentFaction);
+        if (room.currentTurnIndex === -1)
+            room.currentTurnIndex = 0; // Fallback
+        // CRITICAL: Ensure server game state has all required multiplayer fields
+        // advanceTurn uses state.currentTurnIndex, state.turnOrder, state.humanFactions, state.aiFaction
+        room.gameState.currentTurnFaction = room.turnOrder[room.currentTurnIndex];
+        room.gameState.currentTurnIndex = room.currentTurnIndex;
+        room.gameState.turnOrder = room.turnOrder;
+        room.gameState.humanFactions = humanFactions;
+        room.gameState.aiFaction = aiFaction;
+        console.log(`[Restore] Turn sync: currentFaction=${currentFaction}, turnIndex=${room.currentTurnIndex}, serverCurrentTurn=${room.gameState.currentTurnFaction}`);
+        // Join socket
+        socket.data.gameCode = lobbyCode;
+        socket.data.faction = faction;
+        socket.join(lobbyCode);
+        // Notify client
+        socket.emit('game_restored');
+        socket.emit('state_update', { gameState: (0, gameLogic_1.getClientState)(room.gameState) });
+        console.log(`[Restore] Successfully restored game ${lobbyCode} from player state`);
     });
 }

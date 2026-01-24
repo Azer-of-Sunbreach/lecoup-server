@@ -1,9 +1,10 @@
-import { GameLobby, FactionId } from './types';
+import { GameLobby, PlayerInfo, FactionId } from './types';
 export declare class LobbyManager {
     private lobbies;
     private playerToLobby;
     constructor();
     createLobby(hostSocketId: string, maxPlayers: 2 | 3, nickname?: string): GameLobby;
+    restoreLobby(code: string, players: PlayerInfo[], maxPlayers: 2 | 3): GameLobby;
     joinLobby(code: string, socketId: string, nickname?: string): {
         success: boolean;
         lobby?: GameLobby;

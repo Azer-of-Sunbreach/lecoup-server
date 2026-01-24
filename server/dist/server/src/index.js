@@ -24,9 +24,18 @@ const httpServer = (0, http_1.createServer)((req, res) => {
         res.end('Not found');
     }
 });
-// Socket.IO server
+// Socket.IO server with robust connection settings
 const io = new socket_io_1.Server(httpServer, {
-    cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] }
+    cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
+    // Increase timeouts for better stability on cloud hosting / proxies
+    pingTimeout: 60000, // 60 seconds before considering connection dead
+    pingInterval: 25000, // Ping every 25 seconds to keep connection alive
+    // Allow both websocket and polling (polling as fallback)
+    transports: ['websocket', 'polling'],
+    // Allow upgrade from polling to websocket
+    allowUpgrades: true,
+    // Increase buffer size for large state updates
+    maxHttpBufferSize: 1e6 // 1MB
 });
 // Initialize managers (data layer)
 const lobbyManager = new lobbyManager_1.LobbyManager();
@@ -35,6 +44,37 @@ const gameRoomManager = new gameRoom_1.GameRoomManager();
 const lobbyService = new application_1.LobbyService(lobbyManager, gameRoomManager);
 const gameService = new application_1.GameService(gameRoomManager);
 const combatService = new application_1.CombatService(gameRoomManager);
+// Global error handlers to prevent server crashes
+process.on('uncaughtException', (error) => {
+    console.error('=== UNCAUGHT EXCEPTION ===');
+    console.error('This would have crashed the server:');
+    console.error(error);
+    console.error('Stack:', error.stack);
+    console.error('==========================');
+    // Don't exit - try to keep server alive
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('=== UNHANDLED REJECTION ===');
+    console.error('Unhandled Rejection at:', promise);
+    console.error('Reason:', reason);
+    console.error('===========================');
+    // Don't exit - try to keep server alive
+});
+// Memory usage logging - helps diagnose OOM kills
+setInterval(() => {
+    const used = process.memoryUsage();
+    const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
+    const rssMB = Math.round(used.rss / 1024 / 1024);
+    // Only log if approaching limit (Render free = 512MB)
+    if (rssMB > 200) {
+        console.log(`[Memory] RSS: ${rssMB}MB | Heap: ${heapUsedMB}/${heapTotalMB}MB`);
+    }
+}, 60000); // Every 60 seconds
+// Heartbeat to keep server alive and help diagnose unexpected shutdowns
+setInterval(() => {
+    console.log(`[Heartbeat] Server alive - ${new Date().toISOString()}`);
+}, 5 * 60 * 1000); // Every 5 minutes
 // Startup banner
 console.log('=================================');
 console.log('  Le Coup - Multiplayer Server   ');
