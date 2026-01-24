@@ -1,7 +1,8 @@
 // Logistics Module - Food convoy management
 
 import { GameState, FactionId, Location, LocationType, Convoy, NavalConvoy } from '../../../../shared/types';
-import { PORT_SEQUENCE, getNavalTravelTime } from '../../../../shared/constants';
+import { getNavalTravelTime } from '../../../../shared/constants';
+import { isPort } from '../../../../shared/data/ports';
 import { findSafePath } from '../utils';
 
 export interface LogisticsResult {
@@ -81,7 +82,7 @@ function findBestRoute(
     let bestCost = Infinity;
 
     const targetRuralId = targetCity.linkedLocationId;
-    const isTargetPort = PORT_SEQUENCE.includes(targetCity.id);
+    const isTargetPort = isPort(targetCity.id);
 
     for (const source of sources) {
         const safetyBuffer = source.foodIncome > 0 ? 60 : 150;
@@ -89,7 +90,7 @@ function findBestRoute(
         if (available <= 50) continue;
 
         const amount = Math.min(neededAmount, available);
-        const isSourcePort = PORT_SEQUENCE.includes(source.id);
+        const isSourcePort = isPort(source.id);
         const sourceRuralId = source.linkedLocationId;
 
         // Option 1: Direct naval (both are ports)
@@ -129,7 +130,7 @@ function findBestRoute(
         if (isSourcePort && !isTargetPort && targetRuralId) {
             // Find all friendly ports that could serve as transit
             const transitPorts = myCities.filter(p =>
-                PORT_SEQUENCE.includes(p.id) &&
+                isPort(p.id) &&
                 p.id !== source.id &&
                 p.id !== targetCity.id
             );
