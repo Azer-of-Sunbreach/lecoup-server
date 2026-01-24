@@ -266,8 +266,7 @@ function handleInsurrection(
 
     // Use specialized log with faction-aware visibility and highlight
     updates.logs!.push(createInsurrectionPreparationLog(
-        spy.name,
-        targetLoc.name,
+        spy.id,
         mission.targetId,
         targetLoc.faction,
         state.turn
