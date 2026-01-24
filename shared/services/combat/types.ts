@@ -28,12 +28,18 @@ export interface LossResult {
  */
 export type RetreatPosition = Partial<Army>;
 
+export interface StructuredLogData {
+    key: string;
+    params: Record<string, any>;
+}
+
 /**
  * Result of processing leader survival after combat
  */
 export interface LeaderSurvivalResult {
     updatedCharacters: Character[];
     logMessages: string[];
+    logEntries?: StructuredLogData[];
 }
 
 /**

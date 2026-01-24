@@ -61,7 +61,7 @@ export function processConvoys(
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
                 const arrivalLog = createConvoyArrivalLog(
-                    updatedLocations[destCityIndex].name,
+                    updatedLocations[destCityIndex].id,
                     convoy.foodAmount,
                     currentTurn
                 );
@@ -107,7 +107,7 @@ export function processNavalConvoys(
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
                 const navalArrivalLog = createNavalConvoyArrivalLog(
-                    updatedLocations[destCityIndex].name,
+                    updatedLocations[destCityIndex].id,
                     convoy.foodAmount,
                     currentTurn
                 );

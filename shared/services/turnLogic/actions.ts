@@ -53,7 +53,7 @@ export const processInsurrections = (
 
                     // FAILSAFE (Spec 5.3.3): If territory is already controlled by the faction, cancel mission
                     if (loc.faction === char.faction) {
-                        const cancelLog = createInsurrectionCancelledLog(loc.name, loc.faction, currentTurn);
+                        const cancelLog = createInsurrectionCancelledLog(loc.id, loc.faction, currentTurn);
                         logs.push(cancelLog);
 
                         // Refund Gold
@@ -109,8 +109,7 @@ export const processInsurrections = (
 
                     // 5. Attach Leader & Log - Using structured LogEntry
                     const uprisingLog = createUprisingLog(
-                        char.name,
-                        loc.name,
+                        char.id,
                         loc.id,
                         loc.faction,
                         numInsurgents,
@@ -186,7 +185,6 @@ export const processInsurrections = (
 
                         // Spontaneous uprising log - without risk percentage per user request
                         const spontaneousLog = createSpontaneousUprisingLog(
-                            loc.name,
                             loc.id,
                             loc.faction,
                             currentTurn
@@ -349,7 +347,6 @@ export const processAutoCapture = (
 
             // Create capture log with dynamic severity
             const captureLog = createCaptureUncontestedLog(
-                loc.name,
                 loc.id,
                 previousFaction,
                 winner,

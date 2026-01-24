@@ -733,7 +733,10 @@ export function processClandestineAgent(
                     },
                     activeClandestineActions: [],
                     plannedMissionAction: undefined,
-                    clandestineBudget: finalBudget
+                    clandestineBudget: finalBudget,
+                    // FIX: Reset detection level on exfiltration
+                    detectionLevel: 0,
+                    pendingDetectionEffects: undefined
                 },
                 logs
             };

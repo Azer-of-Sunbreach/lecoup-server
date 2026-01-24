@@ -9,12 +9,15 @@ import {
     getFallbackRetreatPosition
 } from './helpers';
 
+import { StructuredLogData } from './types';
+
 export interface SiegeResult {
     armies: Army[];
     locations: Location[];
     roads: Road[];
     resources: { [key in FactionId]: { gold: number } };
     logMessage: string;
+    logEntries?: StructuredLogData[];
 }
 
 /**
@@ -137,6 +140,39 @@ export const handleSiege = (
                     newArmies.push(updatedSieger);
                 }
             }
+
+            // Reduce defense if sieging a location
+            if (combat.locationId) {
+                newLocations = newLocations.map(l => l.id === combat.locationId ? {
+                    ...l,
+                    fortificationLevel: Math.max(0, l.fortificationLevel - 1),
+                    defense: FORTIFICATION_LEVELS[Math.max(0, l.fortificationLevel - 1)].bonus,
+                    hasBeenSiegedThisTurn: true
+                } : l);
+            }
+            if (combat.roadId && combat.stageIndex !== undefined) {
+                newRoads = newRoads.map(r => r.id === combat.roadId ? {
+                    ...r,
+                    stages: r.stages.map(s => s.index === combat.stageIndex ? {
+                        ...s,
+                        fortificationLevel: 0 // Road forts destroyed immediately? Or reduced? Assuming reduced/destroyed.
+                    } : s)
+                } : r);
+            }
+
+            logMsg = "Siege engines constructed. Defenses weakened.";
+
+            return {
+                armies: newArmies,
+                locations: newLocations,
+                roads: newRoads,
+                resources: newResources,
+                logMessage: logMsg,
+                logEntries: [{
+                    key: 'siegeConstructed',
+                    params: {}
+                }]
+            };
         }
     } else if (combat.roadId && combat.stageIndex !== undefined) {
         // Road siege - same split logic as location sieges
@@ -144,7 +180,7 @@ export const handleSiege = (
         const stage = road?.stages.find(s => s.index === combat.stageIndex);
         const curLevel = stage ? stage.fortificationLevel : 0;
         const reqMen = curLevel >= 3 ? 1000 : 500;
-
+        const attIds = combat.attackers.map(a => a.id);
         const sortedAttackers = newArmies.filter(a => attIds.includes(a.id)).sort((a, b) => b.strength - a.strength);
 
         if (sortedAttackers.length > 0 && road) {
@@ -249,20 +285,28 @@ export const handleSiege = (
     }
 
     // Update fortification levels
-    if (combat.locationId) {
-        newLocations = newLocations.map(l => {
-            if (l.id === combat.locationId) {
-                const newFortLevel = Math.max(0, l.fortificationLevel - 1);
-                return {
-                    ...l,
-                    hasBeenSiegedThisTurn: true,
-                    fortificationLevel: newFortLevel,
-                    defense: FORTIFICATION_LEVELS[newFortLevel].bonus
-                };
-            }
-            return l;
-        });
-    } else if (combat.roadId && combat.stageIndex !== undefined) {
+    // (Wait, logic above duplicates this for location, but handles roads incorrectly?
+    // The original logic had update in block. Lines 255-277 in file 1141 seem to be duplicate or outside?)
+    // In original file 1141 lines 255-277 update location/road if not already updated?
+    // Actually the location update block was inside `if (combat.locationId)` block before return in original.
+    // But road update was inside `else if` block?
+    // Let's copy logic faithfully.
+
+    // Actually, lines 255-277 in viewing 1141 are OUTSIDE the `if/else if` blocks?
+    // No, logic structure in 1141:
+    // if (combat.locationId) { ... if () { return } }
+    // else if (combat.roadId) { ... }
+
+    // Lines 255-277 are outside conditional return.
+    // BUT the return IS inside `if (combat.locationId)` (lines 281).
+    // And `else if (roadId)` block DOES NOT explicitly return.
+    // So if road siege, it falls through to 255-277.
+
+    // Let's check my constructed code.
+    // I put `return` inside `if (combat.locationId)`.
+    // So I need to handle `logEntries` and returns correctly for road siege as well.
+
+    if (combat.roadId && combat.stageIndex !== undefined) {
         newRoads = newRoads.map(r => r.id === combat.roadId ? {
             ...r,
             stages: r.stages.map(s => s.index === combat.stageIndex ? {
@@ -271,15 +315,26 @@ export const handleSiege = (
                 fortificationLevel: Math.max(0, s.fortificationLevel - 1)
             } : s)
         } : r);
-    }
 
-    logMsg = "Siege engines constructed. Defenses weakened.";
+        logMsg = "Siege engines constructed. Defenses weakened.";
+        return {
+            armies: newArmies,
+            locations: newLocations,
+            roads: newRoads,
+            resources: newResources,
+            logMessage: logMsg,
+            logEntries: [{
+                key: 'siegeConstructed',
+                params: {}
+            }]
+        };
+    }
 
     return {
         armies: newArmies,
         locations: newLocations,
         roads: newRoads,
         resources: newResources,
-        logMessage: logMsg
+        logMessage: "Siege failed (insufficient troops or invalid state)."
     };
 };

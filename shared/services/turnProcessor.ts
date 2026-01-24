@@ -328,17 +328,16 @@ export const processTurn = async (
     for (const faction of activeFactions) {
         const ownedLocations = state.locations.filter(l => l.faction === faction);
         if (ownedLocations.length === state.locations.length) {
-            let message = "Your armies are victorious... ";
+            let messageKey = "victory.messages.default";
             switch (faction) {
-                case FactionId.REPUBLICANS: message += "but at what cost?"; break;
-                case FactionId.CONSPIRATORS: message += "and Larion can finally enter a new era."; break;
-                case FactionId.NOBLES: message += "and order is restored, for good."; break;
-                default: message += "The land is yours.";
+                case FactionId.REPUBLICANS: messageKey = "victory.messages.REPUBLICANS"; break;
+                case FactionId.CONSPIRATORS: messageKey = "victory.messages.CONSPIRATORS"; break;
+                case FactionId.NOBLES: messageKey = "victory.messages.NOBLES"; break;
             }
 
             state.victory = {
                 winner: faction,
-                message: message
+                message: messageKey
             };
             break;
         }

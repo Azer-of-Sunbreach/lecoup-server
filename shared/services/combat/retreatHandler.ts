@@ -9,14 +9,18 @@ import {
     getFallbackRetreatPosition
 } from './helpers';
 
+import { StructuredLogData } from './types';
+
 export interface RetreatResult {
     armies: Army[];
     locations: Location[];
     characters: Character[];
     logMessage: string;
+    logEntries?: StructuredLogData[];
 }
 
 import { validateGovernorStatus } from '../domain/governor/governorService';
+import { handleLeaderStatusOnCapture } from '../turnLogic/leaderStatusUpdates';
 import { Character, CharacterStatus } from '../../types';
 
 /**
@@ -141,11 +145,18 @@ export const handleAttackerRetreat = (
         }
     });
 
+    // Legacy string message
+    const logMessage = "Attackers retreated.";
+
     return {
         armies: newArmies,
         locations: newLocations,
         characters: newCharacters,
-        logMessage: "Attackers retreated."
+        logMessage,
+        logEntries: [{
+            key: 'attackersRetreated',
+            params: {}
+        }]
     };
 };
 
@@ -162,6 +173,7 @@ export const handleDefenderRetreatToCity = (
     let newLocations = [...locations];
     let newCharacters = [...characters];
     let logMsg = "";
+    const logEntries: StructuredLogData[] = [];
 
     if (combat.locationId) {
         const loc = locations.find(l => l.id === combat.locationId);
@@ -216,11 +228,18 @@ export const handleDefenderRetreatToCity = (
                         }
                     }
 
+                    // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                    newCharacters = handleLeaderStatusOnCapture(updatedLoc.id, updatedLoc.faction, newCharacters);
+
                     return updatedLoc;
                 }
                 return l;
             });
             logMsg = "Defenders retreated to safety. Location ceded.";
+            logEntries.push({
+                key: 'defendersRetreated',
+                params: { location: combat.locationId || loc.name }
+            });
         }
     }
 
@@ -228,6 +247,7 @@ export const handleDefenderRetreatToCity = (
         armies: newArmies,
         locations: newLocations,
         characters: newCharacters,
-        logMessage: logMsg
+        logMessage: logMsg,
+        logEntries
     };
 };

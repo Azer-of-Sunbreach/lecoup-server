@@ -36,6 +36,7 @@ export const processLeaderSurvival = (
     const { combat, attackerWon, locations } = context;
     let updatedCharacters = [...characters];
     const logMessages: string[] = [];
+    const logEntries: import('./types').StructuredLogData[] = [];
 
     armyIds.forEach(armyId => {
         const leaders = updatedCharacters.filter(c => c.armyId === armyId);
@@ -61,6 +62,10 @@ export const processLeaderSurvival = (
                             : c
                     );
                     logMessages.push(`${leader.name} escaped to ${target.name}.`);
+                    logEntries.push({
+                        key: 'leaderEscaped',
+                        params: { leader: leader.name, location: target.name }
+                    });
                 } else {
                     // No escape locations - leader dies
                     updatedCharacters = updatedCharacters.map(c =>
@@ -69,6 +74,10 @@ export const processLeaderSurvival = (
                             : c
                     );
                     logMessages.push(`${leader.name} fell (no escape).`);
+                    logEntries.push({
+                        key: 'leaderDied',
+                        params: { leader: leader.name }
+                    });
                 }
             } else {
                 // Leader dies
@@ -78,11 +87,15 @@ export const processLeaderSurvival = (
                         : c
                 );
                 logMessages.push(`${leader.name} fell in battle.`);
+                logEntries.push({
+                    key: 'leaderDiedInBattle',
+                    params: { leader: leader.name }
+                });
             }
         });
     });
 
-    return { updatedCharacters, logMessages };
+    return { updatedCharacters, logMessages, logEntries };
 };
 
 /**

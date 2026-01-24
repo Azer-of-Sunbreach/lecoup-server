@@ -16,6 +16,7 @@ import { AIBattleResolutionResult } from './types';
 import { createLeaderDiedLog } from '../logs/logFactory';
 import { isMakeExamplesActive, processMakeExamples } from '../domain/governor/makeExamples';
 import { validateGovernorStatus } from '../domain/governor/governorService';
+import { handleLeaderStatusOnCapture } from '../turnLogic/leaderStatusUpdates';
 
 /**
  * Resolve all AI vs AI battles for the current turn.
@@ -113,6 +114,9 @@ export function resolveAIBattles(
                             if (validation.log) logs.push(validation.log);
                         }
                     }
+
+                    // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                    characters = handleLeaderStatusOnCapture(updatedLoc.id, updatedLoc.faction, characters);
                 }
             }
 
@@ -128,13 +132,14 @@ export function resolveAIBattles(
                 if (!insurrectionNotification) {
                     const armyIds = battle.attackers.map(a => a.id);
                     const leader = characters.find(c => c.armyId && armyIds.includes(c.armyId));
-                    const locName = locations.find(l => l.id === battle.locationId)?.name || "Unknown";
+                    // Pass location ID for translation
+                    const targetId = battle.locationId || "unknown";
                     const notifType = battle.attackerFaction === FactionId.NEUTRAL ? 'SUCCESS_NEUTRAL' : 'SUCCESS_AI';
 
                     insurrectionNotification = {
                         type: notifType,
                         faction: battle.attackerFaction,
-                        targetName: locName,
+                        targetName: targetId,
                         leaderName: leader?.name || "A leader",
                         loserFaction: battle.defenderFaction
                     };
@@ -191,12 +196,14 @@ export function resolveAIBattles(
             if (battle.isInsurgentBattle && !insurrectionNotification && battle.attackerFaction !== FactionId.NEUTRAL) {
                 const armyIds = battle.attackers.map(a => a.id);
                 const leader = characters.find(c => c.armyId && armyIds.includes(c.armyId));
+                // Pass location ID for translation
+                const targetId = battle.locationId || "unknown";
                 const locName = locations.find(l => l.id === battle.locationId)?.name || "Unknown";
 
                 insurrectionNotification = {
                     type: 'FAILURE',
                     faction: battle.attackerFaction,
-                    targetName: locName,
+                    targetName: targetId,
                     leaderName: leader?.name || "A leader",
                     loserFaction: battle.defenderFaction
                 };
@@ -234,7 +241,7 @@ export function resolveAIBattles(
                                 : c
                         );
                         // Leader death log - INFO severity
-                        const deathLog = createLeaderDiedLog(leader.name, state.turn);
+                        const deathLog = createLeaderDiedLog(leader.name, leader.id, state.turn);
                         logs.push(deathLog);
                     } else {
                         const escapeLocs = locations.filter(loc => loc.faction === leader.faction);

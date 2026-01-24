@@ -36,18 +36,41 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
             const target = targetIndex !== -1 ? locations[targetIndex] : null;
 
             if (target && target.faction === FactionId.NEUTRAL) {
-                const score = target.stability + (neg.goldOffer / 5) + neg.foodOffer;
-                const success = score > 60;
+                const winnerFaction = neg.factionId || state.playerFaction;
+
+                // Get resentment towards the negotiating faction (default 0)
+                const resentment = target.resentment?.[winnerFaction as keyof typeof target.resentment] || 0;
+
+                // Probabilistic success formula:
+                // Base: min(stability, 50) + goldOffer/5 + foodOffer - resentment/5
+                // Result is clamped to 0-100 as a percentage chance
+                const clampedStability = Math.min(target.stability, 50);
+                const rawScore = clampedStability + (neg.goldOffer / 5) + neg.foodOffer - (resentment / 5);
+                const successChance = Math.max(0, Math.min(100, Math.round(rawScore)));
+
+                // Roll for success
+                const roll = Math.random() * 100;
+                const success = roll < successChance;
 
                 if (success) {
-                    const winnerFaction = neg.factionId || state.playerFaction;
-
                     // Update location
                     locations[targetIndex] = {
                         ...locations[targetIndex],
                         faction: winnerFaction,
-                        stability: Math.min(100, score)
+                        stability: Math.max(0, Math.min(100, Math.round(rawScore)))
                     };
+
+                    // Reduce resentment against winner faction by half on success
+                    if (target.resentment) {
+                        const currentResentment = target.resentment[winnerFaction as keyof typeof target.resentment] || 0;
+                        locations[targetIndex] = {
+                            ...locations[targetIndex],
+                            resentment: {
+                                ...target.resentment,
+                                [winnerFaction]: Math.floor(currentResentment / 2)
+                            }
+                        };
+                    }
 
                     // Convert neutral troops
                     armies = armies.map(a => {
@@ -82,6 +105,7 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
                     // Failed log - visible only to initiator per user request
                     const failedLog = createNegotiationsFailedLog(
                         target.name,
+                        target.id,
                         neg.factionId || state.playerFaction,
                         state.turn
                     );

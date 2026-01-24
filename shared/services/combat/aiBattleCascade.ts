@@ -5,6 +5,9 @@ import { FORTIFICATION_LEVELS } from '../../constants';
 import { detectBattles } from '../combatDetection';
 import { applySequentialLosses, calculateCombatStrength } from './powerCalculation';
 import { validateGovernorStatus } from '../domain/governor/governorService';
+import { handleLeaderStatusOnCapture } from '../turnLogic/leaderStatusUpdates';
+
+import { StructuredLogData } from './types';
 
 export interface CascadeResult {
     armies: Army[];
@@ -13,6 +16,7 @@ export interface CascadeResult {
     characters: Character[];
     stats: GameStats;
     logMessages: string[];
+    logEntries?: StructuredLogData[];
 }
 
 /**
@@ -42,6 +46,7 @@ export const resolveAIBattleCascade = (
     let newRoads = [...roads];
     let newStats = { ...stats };
     const logMessages: string[] = [];
+    const logEntries: StructuredLogData[] = [];
 
     let currentBattles = detectBattles(newLocations, newArmies, newRoads);
     let loops = 0;
@@ -120,6 +125,9 @@ export const resolveAIBattleCascade = (
                             }
                         }
 
+                        // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                        newCharacters = handleLeaderStatusOnCapture(updatedLoc.id, updatedLoc.faction, newCharacters);
+
                         return updatedLoc;
                     }
                     return l;
@@ -138,8 +146,16 @@ export const resolveAIBattleCascade = (
             if (battle.isInsurgentBattle) {
                 newArmies = newArmies.map(a => battle.attackers.some(atk => atk.id === a.id) ? { ...a, isInsurgent: false } : a);
             }
+            logEntries.push({
+                key: 'aiBattleWon',
+                params: { faction: battle.attackerFaction, location: battle.locationId || locName }
+            });
         } else {
             logMessages.push(`AI Battle: ${FACTION_NAMES[battle.attackerFaction]} repelled.`);
+            logEntries.push({
+                key: 'aiBattleRepelled',
+                params: { faction: battle.attackerFaction }
+            });
         }
 
         const loserIds = loserArmies.map(a => a.id);

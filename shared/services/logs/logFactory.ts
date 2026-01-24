@@ -46,7 +46,9 @@ export const createTurnMarkerLog = (turn: number): LogEntry => ({
     message: `--- Turn ${turn} ---`,
     turn,
     visibleToFactions: [],  // Empty = visible to all
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'turnMarker',
+    i18nParams: { turn }
 });
 
 /**
@@ -58,7 +60,22 @@ export const createGameStartLog = (message: string, turn: number): LogEntry => (
     message,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'gameStart'
+});
+
+/**
+ * Create a faction chosen log (visible to player)
+ */
+export const createFactionChosenLog = (faction: FactionId, turn: number): LogEntry => ({
+    id: generateLogId(),
+    type: LogType.GAME_START,
+    message: `You have chosen the ${faction}.`,
+    turn,
+    visibleToFactions: [faction],
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'factionChosen',
+    i18nParams: { faction }
 });
 
 // ============================================================================
@@ -70,7 +87,7 @@ export const createGameStartLog = (message: string, turn: number): LogEntry => (
  * Returns null if not visible to any player faction (e.g., same faction moving)
  */
 export const createForcesApproachingLog = (
-    destinationName: string,
+    destinationId: string,
     destinationFaction: FactionId,
     movingFaction: FactionId,
     armyId: string,
@@ -84,11 +101,13 @@ export const createForcesApproachingLog = (
     return {
         id: generateLogId(),
         type: LogType.MOVEMENT,
-        message: `Forces marching to ${destinationName}.`,
+        message: `Forces marching to ${destinationId}.`,
         turn,
         visibleToFactions: [destinationFaction],
         baseSeverity: LogSeverity.WARNING,
-        highlightTarget: { type: 'ARMY', id: armyId }
+        highlightTarget: { type: 'ARMY', id: armyId },
+        i18nKey: 'forcesMarching',
+        i18nParams: { destination: destinationId }
     };
 };
 
@@ -97,28 +116,22 @@ export const createForcesApproachingLog = (
  * CRITICAL if player lost the location, INFO otherwise
  */
 export const createLocationSecuredLog = (
-    locationName: string,
     locationId: string,
     previousFaction: FactionId,
     newFaction: FactionId,
     turn: number
 ): LogEntry => {
-    const FACTION_NAMES: Record<FactionId, string> = {
-        [FactionId.REPUBLICANS]: 'Republicans',
-        [FactionId.CONSPIRATORS]: 'Conspirators',
-        [FactionId.NOBLES]: "Nobles' rights faction",
-        [FactionId.NEUTRAL]: 'Neutral'
-    };
-
     return {
         id: generateLogId(),
         type: LogType.CAPTURE,
-        message: `${locationName} secured by ${FACTION_NAMES[newFaction]}.`,
+        message: `${locationId} secured by ${newFaction}.`,
         turn,
         visibleToFactions: [],  // All see it
         baseSeverity: LogSeverity.INFO,
         criticalForFactions: previousFaction !== FactionId.NEUTRAL ? [previousFaction] : undefined,
-        highlightTarget: { type: 'LOCATION', id: locationId }
+        highlightTarget: { type: 'LOCATION', id: locationId },
+        i18nKey: 'locationSecured',
+        i18nParams: { location: locationId, faction: newFaction }
     };
 };
 
@@ -126,28 +139,22 @@ export const createLocationSecuredLog = (
  * Create a "Location captured (uncontested)" log
  */
 export const createCaptureUncontestedLog = (
-    locationName: string,
     locationId: string,
     previousFaction: FactionId,
     newFaction: FactionId,
     turn: number
 ): LogEntry => {
-    const FACTION_NAMES: Record<FactionId, string> = {
-        [FactionId.REPUBLICANS]: 'Republicans',
-        [FactionId.CONSPIRATORS]: 'Conspirators',
-        [FactionId.NOBLES]: "Nobles' rights faction",
-        [FactionId.NEUTRAL]: 'Neutral'
-    };
-
     return {
         id: generateLogId(),
         type: LogType.CAPTURE,
-        message: `${locationName} captured by ${FACTION_NAMES[newFaction]} (Uncontested).`,
+        message: `${locationId} captured by ${newFaction} (Uncontested).`,
         turn,
         visibleToFactions: [],
         baseSeverity: LogSeverity.INFO,
         criticalForFactions: previousFaction !== FactionId.NEUTRAL ? [previousFaction] : undefined,
-        highlightTarget: { type: 'LOCATION', id: locationId }
+        highlightTarget: { type: 'LOCATION', id: locationId },
+        i18nKey: 'locationCapturedUncontested',
+        i18nParams: { location: locationId, faction: newFaction }
     };
 };
 
@@ -159,32 +166,70 @@ export const createCaptureUncontestedLog = (
  * Create a convoy arrival log
  */
 export const createConvoyArrivalLog = (
-    cityName: string,
-    foodAmount: number,
+    cityId: string,
+    amount: number,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.CONVOY,
-    message: `Convoy arrived at ${cityName} with ${foodAmount} food.`,
+    message: `Convoy arrived at ${cityId} with ${amount} food.`,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    highlightTarget: { type: 'LOCATION', id: cityId },
+    i18nKey: 'convoyArrived',
+    i18nParams: { city: cityId, amount }
 });
 
 /**
  * Create a naval convoy arrival log
  */
 export const createNavalConvoyArrivalLog = (
-    cityName: string,
-    foodAmount: number,
+    cityId: string,
+    amount: number,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.CONVOY,
-    message: `Naval convoy arrived at ${cityName} with ${foodAmount} food.`,
+    message: `Naval convoy arrived at ${cityId} with ${amount} food.`,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    highlightTarget: { type: 'LOCATION', id: cityId },
+    i18nKey: 'navalConvoyArrived',
+    i18nParams: { city: cityId, amount }
+});
+
+/**
+ * Create a convoy dispatched log
+ */
+export const createConvoyDispatchedLog = (
+    turn: number
+): LogEntry => ({
+    id: generateLogId(),
+    type: LogType.CONVOY,
+    message: `Convoy dispatched (FALLBACK).`,
+    turn,
+    visibleToFactions: [],
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'convoyDispatched',
+    i18nParams: {}
+});
+
+/**
+ * Create a naval convoy dispatched log
+ */
+export const createNavalConvoyDispatchedLog = (
+    turn: number
+): LogEntry => ({
+    id: generateLogId(),
+    type: LogType.CONVOY,
+    message: `Naval convoy dispatched (FALLBACK).`,
+    turn,
+    visibleToFactions: [],
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'navalConvoyDispatched',
+    i18nParams: {}
 });
 
 // ============================================================================
@@ -195,28 +240,28 @@ export const createNavalConvoyArrivalLog = (
  * Create an insurrection preparation log
  */
 export const createInsurrectionPreparationLog = (
-    leaderName: string,
-    locationName: string,
+    leaderId: string,
     locationId: string,
     locationFaction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.INSURRECTION,
-    message: `${leaderName} is preparing an insurrection in ${locationName}.`,
+    message: `${leaderId} is preparing an insurrection in ${locationId}.`,
     turn,
     visibleToFactions: [],
     baseSeverity: LogSeverity.INFO,
     criticalForFactions: locationFaction !== FactionId.NEUTRAL ? [locationFaction] : undefined,
-    highlightTarget: { type: 'LOCATION', id: locationId }
+    highlightTarget: { type: 'LOCATION', id: locationId },
+    i18nKey: 'insurrectionPreparing',
+    i18nParams: { leader: leaderId, location: locationId }
 });
 
 /**
  * Create an uprising log
  */
 export const createUprisingLog = (
-    leaderName: string,
-    locationName: string,
+    leaderId: string,
     locationId: string,
     locationFaction: FactionId,
     rebelCount: number,
@@ -224,47 +269,52 @@ export const createUprisingLog = (
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.INSURRECTION,
-    message: `Uprising in ${locationName}! ${leaderName} leads ${rebelCount} rebels.`,
+    message: `Uprising in ${locationId}! ${leaderId} leads ${rebelCount} rebels.`,
     turn,
     visibleToFactions: [],
     baseSeverity: LogSeverity.INFO,
     criticalForFactions: locationFaction !== FactionId.NEUTRAL ? [locationFaction] : undefined,
-    highlightTarget: { type: 'LOCATION', id: locationId }
+    highlightTarget: { type: 'LOCATION', id: locationId },
+    i18nKey: 'uprising',
+    i18nParams: { leader: leaderId, location: locationId, count: rebelCount }
 });
 
 /**
  * Create a spontaneous uprising log
  */
 export const createSpontaneousUprisingLog = (
-    locationName: string,
     locationId: string,
     locationFaction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.INSURRECTION,
-    message: `Spontaneous uprising in ${locationName}! The people have taken up arms.`,
+    message: `Spontaneous uprising in ${locationId}! The people have taken up arms.`,
     turn,
     visibleToFactions: [],
     baseSeverity: LogSeverity.INFO,
     criticalForFactions: locationFaction !== FactionId.NEUTRAL ? [locationFaction] : undefined,
-    highlightTarget: { type: 'LOCATION', id: locationId }
+    highlightTarget: { type: 'LOCATION', id: locationId },
+    i18nKey: 'spontaneousUprising',
+    i18nParams: { location: locationId }
 });
 
 /**
  * Create an insurrection cancelled log (visible only to territory owner)
  */
 export const createInsurrectionCancelledLog = (
-    locationName: string,
+    locationId: string,
     ownerFaction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.INSURRECTION,
-    message: `Insurrection cancelled at ${locationName}. Gold refunded.`,
+    message: `Insurrection cancelled at ${locationId}. Gold refunded.`,
     turn,
     visibleToFactions: [ownerFaction],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'insurrectionCancelled',
+    i18nParams: { location: locationId }
 });
 
 // ============================================================================
@@ -275,30 +325,24 @@ export const createInsurrectionCancelledLog = (
  * Create a negotiations successful log
  */
 export const createNegotiationsSuccessLog = (
-    locationName: string,
     locationId: string,
     winnerFaction: FactionId,
     turn: number
 ): LogEntry => {
-    const FACTION_NAMES: Record<FactionId, string> = {
-        [FactionId.REPUBLICANS]: 'Republicans',
-        [FactionId.CONSPIRATORS]: 'Conspirators',
-        [FactionId.NOBLES]: "Nobles' rights faction",
-        [FactionId.NEUTRAL]: 'Neutral'
-    };
-
     // WARNING for enemies, INFO for winner
     const warningFactions = ALL_PLAYER_FACTIONS.filter(f => f !== winnerFaction);
 
     return {
         id: generateLogId(),
         type: LogType.NEGOTIATION,
-        message: `Negotiations successful! ${locationName} has joined ${FACTION_NAMES[winnerFaction]}.`,
+        message: `Negotiations successful! ${locationId} has joined ${winnerFaction}.`,
         turn,
         visibleToFactions: [],
         baseSeverity: LogSeverity.INFO,
         warningForFactions: warningFactions,
-        highlightTarget: { type: 'LOCATION', id: locationId }
+        highlightTarget: { type: 'LOCATION', id: locationId },
+        i18nKey: 'negotiationSuccess',
+        i18nParams: { location: locationId, faction: winnerFaction }
     };
 };
 
@@ -306,17 +350,45 @@ export const createNegotiationsSuccessLog = (
  * Create a negotiations failed log (visible only to initiator)
  */
 export const createNegotiationsFailedLog = (
-    locationName: string,
+    locationId: string,
     initiatorFaction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.NEGOTIATION,
-    message: `Negotiations failed with ${locationName}.`,
+    message: `Negotiations failed with ${locationId}.`,
     turn,
     visibleToFactions: [initiatorFaction],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'negotiationFailed',
+    i18nParams: { location: locationId }
 });
+
+/**
+ * Create a negotiation attempt log (visible to OTHER players as WARNING)
+ * Used in multiplayer to notify other human players when someone initiates a negotiation
+ */
+export const createNegotiationAttemptLog = (
+    locationId: string,
+    initiatorFaction: FactionId,
+    turn: number
+): LogEntry => {
+    // Visible to all OTHER player factions as WARNING
+    const otherFactions = ALL_PLAYER_FACTIONS.filter(f => f !== initiatorFaction);
+
+    return {
+        id: generateLogId(),
+        type: LogType.NEGOTIATION,
+        message: `${initiatorFaction} has sent a negotiator to ${locationId}.`,
+        turn,
+        visibleToFactions: otherFactions,
+        baseSeverity: LogSeverity.WARNING,
+        warningForFactions: otherFactions,
+        highlightTarget: { type: 'LOCATION', id: locationId },
+        i18nKey: 'negotiationAttempt',
+        i18nParams: { faction: initiatorFaction, location: locationId }
+    };
+};
 
 // ============================================================================
 // FAMINE LOGS
@@ -327,17 +399,19 @@ export const createNegotiationsFailedLog = (
  * CRITICAL for city owner, WARNING for others
  */
 export const createFamineLog = (
-    cityName: string,
+    cityId: string,
     cityFaction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.FAMINE,
-    message: `Famine in ${cityName}! Stability plummets while the death toll mounts!`,
+    message: `Famine in ${cityId}! Stability plummets while the death toll mounts!`,
     turn,
     visibleToFactions: [],
     baseSeverity: LogSeverity.WARNING,
-    criticalForFactions: cityFaction !== FactionId.NEUTRAL ? [cityFaction] : undefined
+    criticalForFactions: cityFaction !== FactionId.NEUTRAL ? [cityFaction] : undefined,
+    i18nKey: 'famine',
+    i18nParams: { city: cityId }
 });
 
 /**
@@ -345,18 +419,19 @@ export const createFamineLog = (
  * Visible only to city owner when food drops below 50
  */
 export const createLowFoodWarningLog = (
-    cityName: string,
     cityId: string,
     cityFaction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.FAMINE,
-    message: `Stability drops in ${cityName} as worries mount due to low food stocks.`,
+    message: `Stability drops in ${cityId} as worries mount due to low food stocks.`,
     turn,
     visibleToFactions: cityFaction !== FactionId.NEUTRAL ? [cityFaction] : [],
     baseSeverity: LogSeverity.WARNING,
-    highlightTarget: { type: 'LOCATION', id: cityId }
+    highlightTarget: { type: 'LOCATION', id: cityId },
+    i18nKey: 'lowFoodWarning',
+    i18nParams: { city: cityId }
 });
 
 // ============================================================================
@@ -372,7 +447,8 @@ export const createGrainTradeRestoredLog = (turn: number): LogEntry => ({
     message: 'The Grain Trade has been restored due to change in control.',
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.WARNING
+    baseSeverity: LogSeverity.WARNING,
+    i18nKey: 'grainTradeRestored'
 });
 
 /**
@@ -384,7 +460,8 @@ export const createGrainTradeConquestLog = (turn: number): LogEntry => ({
     message: 'Grain Trade restored by conquest.',
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.WARNING
+    baseSeverity: LogSeverity.WARNING,
+    i18nKey: 'grainTradeConquest'
 });
 
 // ============================================================================
@@ -395,34 +472,37 @@ export const createGrainTradeConquestLog = (turn: number): LogEntry => ({
  * Create a leader died log
  */
 export const createLeaderDiedLog = (
-    leaderName: string,
+    leaderId: string,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.LEADER,
-    message: `${leaderName} died in battle.`,
+    message: `${leaderId} died in battle.`,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'leaderDiedInBattle',
+    i18nParams: { leader: leaderId }
 });
 
 /**
  * Create infiltration success log (green, good news)
  */
 export const createInfiltrationSuccessLog = (
-    leaderName: string,
-    locationName: string,
+    leaderId: string,
     locationId: string,
     turn: number,
     visibleToFaction: FactionId
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.LEADER,
-    message: `Agent ${leaderName} has infiltrated ${locationName} and is awaiting your orders.`,
+    message: `Agent ${leaderId} has infiltrated ${locationId} and is awaiting your orders.`,
     turn,
     visibleToFactions: [visibleToFaction],
     baseSeverity: LogSeverity.GOOD, // Green
-    highlightTarget: { type: 'LOCATION', id: locationId } // Clickable
+    highlightTarget: { type: 'LOCATION', id: locationId }, // Clickable
+    i18nKey: 'infiltrationSuccess',
+    i18nParams: { leader: leaderId, location: locationId }
 });
 
 /**
@@ -430,27 +510,26 @@ export const createInfiltrationSuccessLog = (
  * Used when leader is spotted but NOT eliminated
  */
 export const createInfiltrationDetectedLog = (
-    leaderName: string,
-    leaderFactionName: string,
-    locationName: string,
+    leaderId: string,
+    leaderFaction: FactionId,
     locationId: string,
     turn: number,
     visibleToFaction: FactionId,
     isOwnerMsg: boolean,
-    pronoun: string = 'his'
+    pronoun: string = 'his' // Key for game:pronouns.his
 ): LogEntry => {
-    const message = isOwnerMsg
-        ? `Leader ${leaderName} from the ${leaderFactionName} has been spotted infiltrating ${locationName}.`
-        : `${leaderName} has infiltrated ${locationName} but has been spotted. The enemy is now aware of ${pronoun} presence.`;
-
     return {
         id: generateLogId(),
         type: LogType.LEADER,
-        message,
+        message: `Infiltration detected.`,
         turn,
         visibleToFactions: [visibleToFaction],
         baseSeverity: LogSeverity.WARNING,
-        highlightTarget: { type: 'LOCATION', id: locationId }
+        highlightTarget: { type: 'LOCATION', id: locationId },
+        i18nKey: isOwnerMsg ? 'infiltrationDetectedOwner' : 'infiltrationDetectedSender',
+        i18nParams: isOwnerMsg
+            ? { leader: leaderId, faction: leaderFaction, location: locationId }
+            : { leader: leaderId, location: locationId, pronoun }
     };
 };
 
@@ -458,55 +537,42 @@ export const createInfiltrationDetectedLog = (
  * Create infiltration eliminated log (good news for defender)
  */
 export const createInfiltrationEliminatedLog = (
-    leaderName: string,
-    leaderFactionName: string,
-    locationName: string,
+    leaderId: string,
+    leaderFaction: FactionId,
     locationId: string,
     turn: number,
     visibleToFaction: FactionId,
-    pronoun: string = 'he'
+    pronoun: string = 'he' // Key for game:pronouns.he
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.LEADER,
-    message: `Good news! Leader ${leaderName} from the ${leaderFactionName} has been eliminated while ${pronoun} tried infiltrating ${locationName}.`,
+    message: `Leader eliminated.`,
     turn,
     visibleToFactions: [visibleToFaction],
-    baseSeverity: LogSeverity.WARNING, // Still warning style for importance? Or GOOD? Spec says WARNING level event
-    highlightTarget: { type: 'LOCATION', id: locationId }
+    baseSeverity: LogSeverity.WARNING,
+    highlightTarget: { type: 'LOCATION', id: locationId },
+    i18nKey: 'infiltrationEliminated',
+    i18nParams: { leader: leaderId, faction: leaderFaction, location: locationId, pronoun }
 });
 
-/**
- * Create infiltration risk debug log
- */
-export const createInfiltrationRiskDebugLog = (
-    leaderName: string,
-    locationName: string,
-    risk: number, // 0-1
-    turn: number,
-    visibleToFaction: FactionId
-): LogEntry => ({
-    id: generateLogId(),
-    type: LogType.LEADER,
-    message: `[RISK CHECK] ${leaderName} entering ${locationName}. Infiltration Risk: ${(risk * 100).toFixed(1)}%.`,
-    turn,
-    visibleToFactions: [visibleToFaction],
-    baseSeverity: LogSeverity.INFO
-});
+
 
 /**
  * Create a leader took command log
  */
 export const createLeaderCommandLog = (
-    leaderName: string,
+    leaderId: string,
     missionId: string,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.LEADER,
-    message: `${leaderName} took command of an army for operation ${missionId}.`,
+    message: `${leaderId} took command.`,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'leaderTookCommand',
+    i18nParams: { leader: leaderId, missionId }
 });
 
 // ============================================================================
@@ -517,48 +583,54 @@ export const createLeaderCommandLog = (
  * Create an AI seize food log
  */
 export const createAISeizeFoodLog = (
-    factionName: string,
-    ruralName: string,
-    cityName: string,
+    faction: FactionId,
+    ruralId: string,
+    cityId: string,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.ECONOMY,
-    message: `${factionName} seizes food from ${ruralName} to feed ${cityName}.`,
+    message: `${faction} seizes food.`,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'aiSeizeFood',
+    i18nParams: { faction, rural: ruralId, city: cityId }
 });
 
 /**
  * Create an AI seize gold log
  */
 export const createAISeizeGoldLog = (
-    factionName: string,
-    cityName: string,
+    faction: FactionId,
+    cityId: string,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.ECONOMY,
-    message: `${factionName} seizes gold from ${cityName}'s treasury.`,
+    message: `${faction} seizes gold.`,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'aiSeizeGold',
+    i18nParams: { faction, city: cityId }
 });
 
 /**
  * Create an embargo log
  */
 export const createEmbargoLog = (
-    message: string,
+    faction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.ECONOMY,
-    message,
+    message: `Embargo logic.`,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey: 'embargo',
+    i18nParams: { faction }
 });
 
 // ============================================================================
@@ -570,14 +642,18 @@ export const createEmbargoLog = (
  */
 export const createCombatLog = (
     message: string,
-    turn: number
+    turn: number,
+    i18nKey?: string,
+    i18nParams?: Record<string, any>
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.COMBAT,
     message,
     turn,
     visibleToFactions: [],
-    baseSeverity: LogSeverity.INFO
+    baseSeverity: LogSeverity.INFO,
+    i18nKey,
+    i18nParams
 });
 
 // ============================================================================
@@ -608,19 +684,20 @@ export const createNarrativeLog = (
  * Visible only to territory owner, clickable to open governor menu
  */
 export const createClandestineSabotageWarningLog = (
-    locationName: string,
     locationId: string,
     locationFaction: FactionId,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.LEADER,
-    message: `Something is stirring the people's mind against us in ${locationName}…`,
+    message: `Sabotage warning in ${locationId}…`,
     turn,
     visibleToFactions: [locationFaction],
     baseSeverity: LogSeverity.WARNING,
     warningForFactions: [locationFaction],
-    highlightTarget: { type: 'LOCATION', id: locationId }
+    highlightTarget: { type: 'LOCATION', id: locationId },
+    i18nKey: 'clandestineSabotageWarning',
+    i18nParams: { location: locationId }
 });
 
 /**
@@ -629,19 +706,40 @@ export const createClandestineSabotageWarningLog = (
  * Format: "[LeaderName] from the [FactionName] has been spotted leaving [RegionName] for [DestinationName]."
  */
 export const createLeaderDepartureSpottedLog = (
-    leaderName: string,
-    leaderFactionName: string,
-    sourceLocationName: string,
+    leaderId: string,
+    leaderFaction: FactionId,
     sourceLocationId: string,
-    destinationName: string,
+    destinationId: string,
     turn: number,
     visibleToFaction: FactionId
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.LEADER,
-    message: `${leaderName} from the ${leaderFactionName} has been spotted leaving ${sourceLocationName} for ${destinationName}.`,
+    message: `${leaderId} spotted leaving ${sourceLocationId}.`,
     turn,
     visibleToFactions: [visibleToFaction],
     baseSeverity: LogSeverity.GOOD,
-    highlightTarget: { type: 'LOCATION', id: sourceLocationId }
+    highlightTarget: { type: 'LOCATION', id: sourceLocationId },
+    i18nKey: 'leaderDepartureSpotted',
+    i18nParams: { leader: leaderId, faction: leaderFaction, source: sourceLocationId, destination: destinationId }
+});
+
+/**
+ * Create a neutral insurrection warning log
+ */
+export const createNeutralInsurrectionWarningLog = (
+    locationId: string,
+    locationFaction: FactionId,
+    turn: number
+): LogEntry => ({
+    id: generateLogId(),
+    type: LogType.INSURRECTION,
+    message: `Neutral insurrection warning in ${locationId}!`,
+    turn,
+    visibleToFactions: [locationFaction],
+    baseSeverity: LogSeverity.CRITICAL,
+    criticalForFactions: [locationFaction],
+    highlightTarget: { type: 'LOCATION', id: locationId },
+    i18nKey: 'neutralInsurrectionWarning',
+    i18nParams: { location: locationId }
 });

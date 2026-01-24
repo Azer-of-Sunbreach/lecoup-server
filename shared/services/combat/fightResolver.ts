@@ -8,6 +8,9 @@ import { processOrphanedLeaders } from './orphanedLeaders';
 import { getArmiesAtCombatLocation, getLocationName } from './helpers';
 import { isMakeExamplesActive, processMakeExamples } from '../domain/governor/makeExamples';
 import { validateGovernorStatus } from '../domain/governor/governorService';
+import { handleLeaderStatusOnCapture } from '../turnLogic/leaderStatusUpdates';
+
+import { StructuredLogData } from './types';
 
 export interface FightResult {
     armies: Army[];
@@ -16,6 +19,7 @@ export interface FightResult {
     characters: Character[];
     stats: GameStats;
     logMessage: string;
+    logEntries?: StructuredLogData[];
 }
 
 /**
@@ -36,6 +40,7 @@ export const resolveFight = (
     let newRoads = [...roads];
     let newStats = { ...stats };
     let logMsg = "";
+    const logEntries: StructuredLogData[] = [];
 
     const actualAttackers = getArmiesAtCombatLocation(combat.attackerFaction, newArmies, combat);
     const actualDefenders = getArmiesAtCombatLocation(combat.defenderFaction, newArmies, combat);
@@ -49,6 +54,7 @@ export const resolveFight = (
 
     const attWin = attStr > defStr;
     const locationName = getLocationName(combat, locations, roads);
+    const logLocationParam = combat.locationId || locationName;
 
     const involvedIds = [...actualAttackers, ...actualDefenders].map(a => a.id);
     newArmies = newArmies.filter(a => !involvedIds.includes(a.id));
@@ -63,6 +69,7 @@ export const resolveFight = (
         );
         newCharacters = survivalResult.updatedCharacters;
         survivalResult.logMessages.forEach(msg => logMsg += ` ${msg}`);
+        if (survivalResult.logEntries) logEntries.push(...survivalResult.logEntries);
 
         // Death Toll: All defenders lost
         newStats.deathToll += actualDefenders.reduce((sum, a) => sum + a.strength, 0);
@@ -116,6 +123,10 @@ export const resolveFight = (
         }
 
         logMsg += `Victory at ${locationName}! Defenders wiped out.`;
+        logEntries.push({
+            key: 'combatVictory',
+            params: { location: logLocationParam }
+        });
 
         if (combat.locationId) {
             newLocations = newLocations.map(l => {
@@ -155,6 +166,9 @@ export const resolveFight = (
                             if (validation.log) logMsg += ` ${validation.log.message}`;
                         }
                     }
+
+                    // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                    newCharacters = handleLeaderStatusOnCapture(updatedLoc.id, updatedLoc.faction, newCharacters);
 
                     return updatedLoc;
                 }
@@ -230,6 +244,10 @@ export const resolveFight = (
         }
 
         logMsg += `Defeat at ${locationName}. Attackers wiped out.`;
+        logEntries.push({
+            key: 'combatDefeat',
+            params: { location: logLocationParam }
+        });
 
         // === MAKE EXAMPLES PROCESSING ===
         // When an insurrection is repressed and MAKE_EXAMPLES is active
@@ -265,6 +283,10 @@ export const resolveFight = (
                     newStats.deathToll += result.casualties;
 
                     logMsg += ` Governor made brutal examples. ${result.casualties} civilians executed.`;
+                    logEntries.push({
+                        key: 'governorRepression',
+                        params: { location: logLocationParam, count: result.casualties }
+                    });
                 }
             }
         }
@@ -291,6 +313,7 @@ export const resolveFight = (
         roads: newRoads,
         characters: newCharacters,
         stats: newStats,
-        logMessage: logMsg
+        logMessage: logMsg,
+        logEntries
     };
 };
