@@ -15,7 +15,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPlayerBattles = exports.resolveAIBattles = exports.processNegotiations = exports.processStability = exports.applyLowTaxStabilityRecovery = exports.applyLeaderStabilityModifiers = exports.processFamine = exports.processNavalConvoys = exports.processConvoys = void 0;
+exports.processGovernorPolicies = exports.getPlayerBattles = exports.resolveAIBattles = exports.processNegotiations = exports.processStability = exports.applyHighTaxStabilityPenalty = exports.applyLowTaxStabilityRecovery = exports.applyLeaderStabilityModifiers = exports.processFamine = exports.processNavalConvoys = exports.processConvoys = void 0;
 __exportStar(require("./types"), exports);
 // Logistics
 var logistics_1 = require("./logistics");
@@ -28,6 +28,7 @@ Object.defineProperty(exports, "processFamine", { enumerable: true, get: functio
 var stability_1 = require("./stability");
 Object.defineProperty(exports, "applyLeaderStabilityModifiers", { enumerable: true, get: function () { return stability_1.applyLeaderStabilityModifiers; } });
 Object.defineProperty(exports, "applyLowTaxStabilityRecovery", { enumerable: true, get: function () { return stability_1.applyLowTaxStabilityRecovery; } });
+Object.defineProperty(exports, "applyHighTaxStabilityPenalty", { enumerable: true, get: function () { return stability_1.applyHighTaxStabilityPenalty; } });
 Object.defineProperty(exports, "processStability", { enumerable: true, get: function () { return stability_1.processStability; } });
 // Negotiations
 var negotiations_1 = require("./negotiations");
@@ -36,3 +37,6 @@ Object.defineProperty(exports, "processNegotiations", { enumerable: true, get: f
 var aiBattleResolution_1 = require("./aiBattleResolution");
 Object.defineProperty(exports, "resolveAIBattles", { enumerable: true, get: function () { return aiBattleResolution_1.resolveAIBattles; } });
 Object.defineProperty(exports, "getPlayerBattles", { enumerable: true, get: function () { return aiBattleResolution_1.getPlayerBattles; } });
+// Governor Policies
+var governorProcessor_1 = require("./governorProcessor");
+Object.defineProperty(exports, "processGovernorPolicies", { enumerable: true, get: function () { return governorProcessor_1.processGovernorPolicies; } });

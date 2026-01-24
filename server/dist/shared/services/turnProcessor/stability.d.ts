@@ -22,11 +22,27 @@ export declare function applyLeaderStabilityModifiers(locations: Location[], cha
  */
 export declare function applyLowTaxStabilityRecovery(locations: Location[]): StabilityProcessingResult;
 /**
- * Process all stability changes for a turn.
- * Combines leader modifiers and low tax recovery.
+ * Apply stability penalties for locations with very high taxes/food collection.
+ * Only applies if NO leader of the controlling faction is present.
+ *
+ * Spec:
+ * - Cities with VERY_HIGH personal taxes + no leader: -5/turn
+ * - Cities with VERY_HIGH commercial taxes + no leader: -2/turn
+ * - Rural with VERY_HIGH food collection + no leader: -4/turn
  *
  * @param locations - All locations
  * @param characters - All characters
- * @returns Updated locations
+ * @param turn - Current turn number
+ * @returns Updated locations and warning logs
  */
-export declare function processStability(locations: Location[], characters: Character[]): StabilityProcessingResult;
+export declare function applyHighTaxStabilityPenalty(locations: Location[], characters: Character[], turn: number): StabilityProcessingResult;
+/**
+ * Process all stability changes for a turn.
+ * Combines leader modifiers, low tax recovery, and high tax penalties.
+ *
+ * @param locations - All locations
+ * @param characters - All characters
+ * @param turn - Current turn number
+ * @returns Updated locations and logs
+ */
+export declare function processStability(locations: Location[], characters: Character[], turn?: number): StabilityProcessingResult;

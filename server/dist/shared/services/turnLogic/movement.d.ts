@@ -1,6 +1,6 @@
-import { GameState, Army, Character } from '../../types';
+import { GameState, Army, Character, LogEntry } from '../../types';
 export declare const resolveMovements: (state: GameState) => {
     armies: Army[];
     characters: Character[];
-    logs: string[];
+    logs: LogEntry[];
 };

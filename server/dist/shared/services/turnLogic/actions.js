@@ -3,7 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.processAutoCapture = exports.processConstruction = exports.processInsurrections = void 0;
 const types_1 = require("../../types");
 const constants_1 = require("../../constants");
-const processInsurrections = (locations, characters, armies, playerFaction) => {
+const logFactory_1 = require("../logs/logFactory");
+const makeExamples_1 = require("../domain/governor/makeExamples");
+const governorService_1 = require("../domain/governor/governorService");
+const leaderStatusUpdates_1 = require("./leaderStatusUpdates");
+let logIdCounter = 0;
+const generateLogId = () => {
+    logIdCounter++;
+    return `log_actions_${Date.now()}_${logIdCounter}`;
+};
+const processInsurrections = (locations, characters, armies, playerFaction, currentTurn = 1) => {
     let nextLocations = [...locations];
     let nextCharacters = [...characters];
     let nextArmies = [...armies];
@@ -21,7 +30,8 @@ const processInsurrections = (locations, characters, armies, playerFaction) => {
                     const loc = nextLocations[locIndex];
                     // FAILSAFE (Spec 5.3.3): If territory is already controlled by the faction, cancel mission
                     if (loc.faction === char.faction) {
-                        logs.push(`Insurrection preparation in ${loc.name} cancelled. The region is already under control. Gold refunded.`);
+                        const cancelLog = (0, logFactory_1.createInsurrectionCancelledLog)(loc.name, loc.faction, currentTurn);
+                        logs.push(cancelLog);
                         // Refund Gold
                         refunds[char.faction] = (refunds[char.faction] || 0) + goldInvested;
                         // Leader appears immediately
@@ -66,9 +76,9 @@ const processInsurrections = (locations, characters, armies, playerFaction) => {
                         foodSourceId: targetId,
                         lastSafePosition: { type: 'LOCATION', id: targetId }
                     });
-                    // 5. Attach Leader & Log
-                    logs.push(`Uprising in ${loc.name}! ${char.name} leads ${numInsurgents} rebels.`);
-                    // Notification removed from here as it should be triggered on victory/defeat of the insurrection (Spec 5.3.5)
+                    // 5. Attach Leader & Log - Using structured LogEntry
+                    const uprisingLog = (0, logFactory_1.createUprisingLog)(char.name, loc.name, loc.id, loc.faction, numInsurgents, currentTurn);
+                    logs.push(uprisingLog);
                     return {
                         ...char,
                         status: types_1.CharacterStatus.AVAILABLE,
@@ -88,16 +98,14 @@ const processInsurrections = (locations, characters, armies, playerFaction) => {
         return char;
     });
     // --- NEW: NEUTRAL INSURRECTIONS (restored per specs) ---
-    // Scan all locations for low stability to trigger spontaneous uprisings
     nextLocations = nextLocations.map(loc => {
-        // Condition: Stability < 50% (Spec)
         if (loc.stability < 50 && loc.faction !== types_1.FactionId.NEUTRAL && loc.population > 1000) {
-            // Check if there's already an active insurrection (Insurgent army present)
             const existingInsurgents = nextArmies.some(a => a.locationId === loc.id &&
                 a.isInsurgent &&
                 a.faction === types_1.FactionId.NEUTRAL);
-            if (!existingInsurgents) {
-                // Probabilities (Spec)
+            // Check if neutral insurrections are blocked (e.g. by Make Examples policy)
+            const isBlocked = (0, makeExamples_1.isNeutralInsurrectionBlocked)(loc, currentTurn);
+            if (!existingInsurgents && !isBlocked) {
                 let chance = 0;
                 if (loc.stability >= 40)
                     chance = 25;
@@ -110,14 +118,11 @@ const processInsurrections = (locations, characters, armies, playerFaction) => {
                 else
                     chance = 100;
                 if (Math.random() * 100 < chance) {
-                    // Strength Calculation (Spec)
-                    // City: (50 - Stability) * (Population / 1000)
-                    // Rural: (50 - Stability) * (Population / 10000)
                     const divisor = loc.type === types_1.LocationType.CITY ? 1000 : 10000;
                     const numInsurgents = Math.floor((50 - loc.stability) * (loc.population / divisor));
                     if (numInsurgents > 0) {
-                        // Create Neutral Insurgent Army
                         const insurgentArmyId = `neutral_rising_${loc.id}_${Math.random()}`;
+                        console.log(`[INSURRECTION] Creating Neutral insurgent army at ${loc.name} (${loc.id})`);
                         nextArmies.push({
                             id: insurgentArmyId,
                             faction: types_1.FactionId.NEUTRAL,
@@ -136,8 +141,9 @@ const processInsurrections = (locations, characters, armies, playerFaction) => {
                             foodSourceId: loc.id,
                             lastSafePosition: { type: 'LOCATION', id: loc.id }
                         });
-                        logs.push(`Spontaneous uprising in ${loc.name}! The people have taken up arms (${chance}% risk realized).`);
-                        // Reduce population
+                        // Spontaneous uprising log - without risk percentage per user request
+                        const spontaneousLog = (0, logFactory_1.createSpontaneousUprisingLog)(loc.name, loc.id, loc.faction, currentTurn);
+                        logs.push(spontaneousLog);
                         return { ...loc, population: Math.max(0, loc.population - numInsurgents) };
                     }
                 }
@@ -148,19 +154,18 @@ const processInsurrections = (locations, characters, armies, playerFaction) => {
     return { locations: nextLocations, characters: nextCharacters, armies: nextArmies, logs, notification, refunds };
 };
 exports.processInsurrections = processInsurrections;
+// Construction logs are removed per user request
 const processConstruction = (state) => {
     let nextLocations = [...state.locations];
     let nextRoads = state.roads.map(r => ({ ...r, stages: [...r.stages] }));
     let nextArmies = [...state.armies];
-    const logs = [];
-    // FIX: Clear orphaned FORTIFY actions (army has action but no associated construction)
+    const logs = []; // Empty - construction logs removed
+    // Clear orphaned FORTIFY actions
     nextArmies = nextArmies.map(a => {
         if (a.action === 'FORTIFY') {
             const hasLocationConstruction = nextLocations.some(l => l.activeConstruction?.armyId === a.id);
             const hasRoadConstruction = nextRoads.some(r => r.stages.some((s) => s.activeConstruction?.armyId === a.id));
             if (!hasLocationConstruction && !hasRoadConstruction) {
-                // Note: Uncomment DEBUG_AI import if needed: import { DEBUG_AI } from '../../data/gameConstants';
-                // if (DEBUG_AI) console.log(`[CLEANUP] Clearing orphaned FORTIFY action from army ${a.id}`);
                 return { ...a, action: undefined };
             }
         }
@@ -168,14 +173,19 @@ const processConstruction = (state) => {
     });
     // Locations
     nextLocations = nextLocations.map(l => {
-        // Fix Anomaly (SIEGE 3): Interrupt construction if attacked/besieged
+        let referenceFaction = l.faction;
+        // If construction is active, enemies are those hostile to the builder
+        if (l.activeConstruction) {
+            const builder = nextArmies.find(a => a.id === l.activeConstruction.armyId);
+            if (builder)
+                referenceFaction = builder.faction;
+        }
         const enemyPresent = nextArmies.some(a => a.locationType === 'LOCATION' &&
             a.locationId === l.id &&
-            a.faction !== l.faction &&
+            a.faction !== referenceFaction &&
             a.strength > 0);
         if (enemyPresent && l.activeConstruction) {
-            logs.push(`Fortification works in ${l.name} abandoned due to enemy presence!`);
-            // Free the builder army
+            // Log removed per user request
             const builder = nextArmies.find(a => a.id === l.activeConstruction.armyId);
             if (builder) {
                 const idx = nextArmies.findIndex(a => a.id === builder.id);
@@ -193,7 +203,7 @@ const processConstruction = (state) => {
                     if (idx !== -1)
                         nextArmies[idx] = { ...finishedArmy, action: undefined };
                 }
-                logs.push(`Construction of ${l.activeConstruction.name} completed in ${l.name}.`);
+                // Log removed per user request
                 return {
                     ...l,
                     fortificationLevel: l.activeConstruction.targetLevel,
@@ -209,6 +219,29 @@ const processConstruction = (state) => {
     nextRoads = nextRoads.map(r => ({
         ...r,
         stages: r.stages.map(s => {
+            // Check for enemy presence on this road stage
+            // We verify against the builder's faction to avoid flagging own troops as enemies on neutral/null stages
+            let builderFaction = s.faction;
+            if (s.activeConstruction) {
+                const builder = nextArmies.find(a => a.id === s.activeConstruction.armyId);
+                if (builder)
+                    builderFaction = builder.faction;
+            }
+            const hostileArmiesPresent = nextArmies.some(a => a.locationType === 'ROAD' &&
+                a.roadId === r.id &&
+                a.stageIndex === s.index &&
+                (builderFaction ? a.faction !== builderFaction : true) &&
+                a.strength > 0);
+            // Cancel construction if enemy is present
+            if (hostileArmiesPresent && s.activeConstruction) {
+                const builder = nextArmies.find(a => a.id === s.activeConstruction.armyId);
+                if (builder) {
+                    const idx = nextArmies.findIndex(a => a.id === builder.id);
+                    if (idx !== -1)
+                        nextArmies[idx] = { ...builder, action: undefined };
+                }
+                return { ...s, activeConstruction: undefined };
+            }
             if (s.activeConstruction) {
                 const remaining = s.activeConstruction.turnsRemaining - 1;
                 if (remaining <= 0) {
@@ -218,7 +251,7 @@ const processConstruction = (state) => {
                         if (idx !== -1)
                             nextArmies[idx] = { ...finishedArmy, action: undefined };
                     }
-                    logs.push(`Construction of ${s.activeConstruction.name} completed at ${s.name}.`);
+                    // Log removed per user request
                     return {
                         ...s,
                         fortificationLevel: s.activeConstruction.targetLevel,
@@ -233,9 +266,10 @@ const processConstruction = (state) => {
     return { locations: nextLocations, roads: nextRoads, armies: nextArmies, logs };
 };
 exports.processConstruction = processConstruction;
-const processAutoCapture = (locations, roads, armies, playerFaction) => {
+const processAutoCapture = (locations, roads, armies, characters, playerFaction, currentTurn = 1) => {
     let nextLocations = [...locations];
     let nextRoads = [...roads];
+    let nextCharacters = [...characters];
     const logs = [];
     let tradeNotification = null;
     // Locations
@@ -244,17 +278,20 @@ const processAutoCapture = (locations, roads, armies, playerFaction) => {
         const defenders = armies.filter(a => a.locationType === 'LOCATION' && a.locationId === loc.id && a.faction === loc.faction && a.strength > 0);
         if (invaders.length > 0 && defenders.length === 0) {
             const winner = invaders[0].faction;
-            logs.push(`${loc.name} captured by ${types_1.FACTION_NAMES[winner]} (Uncontested).`);
+            const previousFaction = loc.faction;
+            // Create capture log with dynamic severity
+            const captureLog = (0, logFactory_1.createCaptureUncontestedLog)(loc.name, loc.id, previousFaction, winner, currentTurn);
+            logs.push(captureLog);
             const newFortLevel = Math.max(0, loc.fortificationLevel - 1);
             const isInsurgentCapture = invaders.some(a => a.isInsurgent);
-            // Spec: If insurrection succeeds (takes control), stability restores up to 49% (max +10) if lower.
             let newStability = loc.stability;
             if (isInsurgentCapture && winner !== types_1.FactionId.NEUTRAL) {
                 if (newStability < 49) {
-                    newStability = Math.min(49, newStability + 10);
+                    // DEPRECATED: Stability boost disabled (was +10). Kept for potential rebalancing.
+                    newStability = Math.min(49, newStability + 0);
                 }
             }
-            return {
+            const updatedLoc = {
                 ...loc,
                 faction: winner,
                 defense: constants_1.FORTIFICATION_LEVELS[newFortLevel].bonus,
@@ -262,21 +299,33 @@ const processAutoCapture = (locations, roads, armies, playerFaction) => {
                 stability: newStability,
                 activeConstruction: undefined
             };
+            // VALIDATE GOVERNOR STATUS FOR PREVIOUS OWNER
+            // We search for a governor of the previousFaction in this location
+            const governor = nextCharacters.find(c => c.locationId === loc.id && c.status === types_1.CharacterStatus.GOVERNING && c.faction === previousFaction);
+            if (governor) {
+                // Pass nextLocations as context so they can find friendly territory
+                // Use updatedLoc because validateGovernorStatus needs to see the NEW faction to trigger flee/die
+                const validationResult = (0, governorService_1.validateGovernorStatus)(governor, updatedLoc, nextLocations, nextRoads, currentTurn);
+                if (!validationResult.isValid) {
+                    nextCharacters = nextCharacters.map(c => c.id === validationResult.character.id ? validationResult.character : c);
+                    if (validationResult.log)
+                        logs.push(validationResult.log);
+                }
+            }
+            // NEW: Update status of other leaders (Available <-> Undercover)
+            nextCharacters = (0, leaderStatusUpdates_1.handleLeaderStatusOnCapture)(updatedLoc.id, updatedLoc.faction, nextCharacters);
+            return updatedLoc;
         }
         return loc;
     });
     // Check Grain Trade Logic after captures
     const windward = nextLocations.find(l => l.id === 'windward');
     const greatPlains = nextLocations.find(l => l.id === 'great_plains');
-    // Fix Anomaly (EMBARGO): Strictly handle Grain Trade restoration
     if (windward && greatPlains) {
-        // If controlled by SAME faction, they have the right to Embargo. We do NOT interfere.
-        // Restoration only happens if control is split (forcing trade).
         if (windward.faction === greatPlains.faction) {
-            // Do nothing. Maintain current state (Active or Embargoed).
+            // Do nothing - same faction control
         }
         else {
-            // Control is split. Trade MUST be active.
             if (!windward.isGrainTradeActive) {
                 nextLocations = nextLocations.map(l => {
                     if (l.id === 'windward')
@@ -285,7 +334,8 @@ const processAutoCapture = (locations, roads, armies, playerFaction) => {
                         return { ...l, stability: Math.min(100, l.stability + 20) };
                     return l;
                 });
-                logs.push("The Grain Trade has been restored due to change in control.");
+                const tradeLog = (0, logFactory_1.createGrainTradeRestoredLog)(currentTurn);
+                logs.push(tradeLog);
                 tradeNotification = { type: 'RESTORED', factionName: "Changes in control" };
             }
         }
@@ -305,6 +355,6 @@ const processAutoCapture = (locations, roads, armies, playerFaction) => {
             return s;
         })
     }));
-    return { locations: nextLocations, roads: nextRoads, logs, tradeNotification };
+    return { locations: nextLocations, roads: nextRoads, characters: nextCharacters, logs, tradeNotification };
 };
 exports.processAutoCapture = processAutoCapture;

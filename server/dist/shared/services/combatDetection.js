@@ -34,15 +34,29 @@ const detectBattles = (locations, armies, roads) => {
             // If defender is NOT present (Scenario 3), then the invader is the attacker against the 'Owner' (who has no troops). 
             // In Scenario 3, defenderFaction is loc.faction. Invader is factions[0]. invaderFactions has 1 element.
             // If Scenario 3 and loc.faction is in factions? No, covered by Scenario 1.
-            if (invaderFactions.length === 0 && factions.length > 0 && factions[0] !== loc.faction) {
-                // Should be covered by invaderFactions (factions[0] !== defenderFaction).
-                // Double check Scenario 3: factions=[A], loc.faction=B. defender=B. invader=A. invader!=defender. OK.
+            // Scenario 3 Correction: If loc.faction is Neutral and Insurgents are Neutral, they are "Invaders" against the "Owner" (if owner is not Neutral)?
+            // No, Insurgents have their own property `isInsurgent`.
+            // If `isInsurgent` is true, they effectively act as an aggressive faction against the location controller.
+            const insurgentArmies = armiesHere.filter(a => a.isInsurgent);
+            if (insurgentArmies.length > 0) {
+                // Even if faction is same (e.g. Civil War or Neutral Instability), they fight.
+                const insurgentFactions = Array.from(new Set(insurgentArmies.map(a => a.faction)));
+                insurgentFactions.forEach(insFa => {
+                    // Prevent duplicate if already in invaderFactions
+                    if (!invaderFactions.includes(insFa) && insFa !== defenderFaction) {
+                        invaderFactions.push(insFa);
+                    }
+                    // Special case: Rebel vs Same Faction (Civil War) - rare in this design but possible
+                    // The logic below filters `attackerFaction !== defenderFaction`.
+                    // If we need Same-Faction combat (Rebels), we might need to adjust logic.
+                    // But for Neutral vs Human, they are different, so valid.
+                });
             }
             invaderFactions.forEach(attackerFaction => {
                 // STRICT FILTERING: Only include armies belonging to the designated attacker or defender.
                 // Third parties wait for the next resolution cycle.
-                // Fix Anomaly (Siege Loop): Ignore GARRISONED invaders. They are laying siege/waiting and do not trigger auto-combat.
-                const attackers = armiesHere.filter(a => a.faction === attackerFaction && !a.isGarrisoned);
+                // Fix Anomaly (Siege Loop): Ignore GARRISONED invaders, UNLESS they are Insurgents (who must fight).
+                const attackers = armiesHere.filter(a => a.faction === attackerFaction && (!a.isGarrisoned || a.isInsurgent));
                 const defenders = armiesHere.filter(a => a.faction === defenderFaction);
                 // Spec 7.5.1: If entering enemy zone without troops, no combat.
                 // Control changes immediately (handled by turnProcessor post-processing).
@@ -76,18 +90,30 @@ const detectBattles = (locations, armies, roads) => {
                 // If one army is "justMoved" and the other is not, the one that is NOT justMoved is the defender.
                 const stationaryFaction = factions.find(f => armiesHere.some(a => a.faction === f && !a.justMoved));
                 const ownerIsPresent = stage.faction && factions.includes(stage.faction);
-                let defenderFac = garrisonedFaction
-                    ? garrisonedFaction
-                    : (stationaryFaction ? stationaryFaction : (ownerIsPresent ? stage.faction : factions[0]));
-                // Tie-breaker fallback if both are moving or both stationary: use owner or first found.
-                // Logic above: Garrison -> Stationary -> Owner -> First.
-                // This correctly handles:
-                // 1. Unfortified defender holding road (Stationary) vs Attacker (Moving) -> Defender is Stationary.
-                // 2. Fortified defender (Garrisoned) -> Defender is Garrisoned.
-                // 3. Meeting engagement (Both Moving) -> Owner is defender? Or arbitrary. 
-                //    If both moving (justMoved=true), stationaryFaction is undefined. ownerIsPresent used.
+                // Determine defender
+                let defenderFac;
+                if (garrisonedFaction) {
+                    defenderFac = garrisonedFaction;
+                }
+                else if (stationaryFaction) {
+                    defenderFac = stationaryFaction;
+                }
+                else if (ownerIsPresent) {
+                    defenderFac = stage.faction;
+                }
+                else {
+                    // Both moving (Meeting Engagement) - Arbitrary, usually first faction in list
+                    defenderFac = factions[0];
+                }
                 const finalDefenderFac = defenderFac;
                 // Support multiple attacker factions
+                // CRITICAL FIX: Ensure we don't accidentally select the defender as an invader
+                // The filter `f !== finalDefenderFac` handles this, but if we have [A, B] and A is defender, B is invader.
+                // If we have [A, B] and neither is stationary/garrison/owner, A becomes defender, B becomes invader.
+                // This correctly creates a battle for B attacking A.
+                // Note: For PvP meeting engagement, WHO attacks WHOM matters for UI triggering.
+                // If B attacks A, B gets "Battle Imminent" (Attacker) and A gets "Battle Imminent" (Defender).
+                // This is correct.
                 const invaderFactions = factions.filter(f => f !== finalDefenderFac);
                 invaderFactions.forEach(attackerFac => {
                     // Fix Anomaly (COMBAT SUR LES ROUTES 1): Defense Bonus Application
@@ -100,7 +126,10 @@ const detectBattles = (locations, armies, roads) => {
                         roadId: road.id, stageIndex: stage.index,
                         attackerFaction: attackerFac,
                         defenderFaction: finalDefenderFac,
-                        attackers: armiesHere.filter(a => a.faction === attackerFac && !a.isGarrisoned),
+                        // Fix for Roads: Include armies even if they are "Garrisoned" if it's a road?
+                        // Usually road armies aren't garrisoned unless strictly "Camped".
+                        // Use !isGarrisoned generally, but ensure "Just Moved" ones are active.
+                        attackers: armiesHere.filter(a => a.faction === attackerFac && (!a.isGarrisoned || a.justMoved)),
                         defenders: armiesHere.filter(a => a.faction === finalDefenderFac),
                         defenseBonus: appliedDefense,
                         isInsurgentBattle: false

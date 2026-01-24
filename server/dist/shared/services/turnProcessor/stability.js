@@ -1,8 +1,9 @@
 "use strict";
-// Stability Module - Process stability changes from leaders and low taxes
+// Stability Module - Process stability changes from leaders, low taxes, and high tax penalties
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.applyLeaderStabilityModifiers = applyLeaderStabilityModifiers;
 exports.applyLowTaxStabilityRecovery = applyLowTaxStabilityRecovery;
+exports.applyHighTaxStabilityPenalty = applyHighTaxStabilityPenalty;
 exports.processStability = processStability;
 const types_1 = require("../../types");
 /**
@@ -17,7 +18,7 @@ const types_1 = require("../../types");
 function applyLeaderStabilityModifiers(locations, characters) {
     let updatedLocations = locations.map(l => ({ ...l }));
     characters.forEach(char => {
-        if (char.status === types_1.CharacterStatus.AVAILABLE && char.stats.stabilityPerTurn !== 0) {
+        if ((char.status === types_1.CharacterStatus.AVAILABLE || char.status === types_1.CharacterStatus.GOVERNING) && char.stats.stabilityPerTurn !== 0) {
             const targetLocId = char.locationId;
             const loc = updatedLocations.find(l => l.id === targetLocId);
             // Only apply stability modifier if location is controlled by leader's faction
@@ -32,7 +33,7 @@ function applyLeaderStabilityModifiers(locations, characters) {
             }
         }
     });
-    return { locations: updatedLocations };
+    return { locations: updatedLocations, logs: [] };
 }
 /**
  * Apply passive stability recovery for locations with very low taxes.
@@ -66,20 +67,107 @@ function applyLowTaxStabilityRecovery(locations) {
         }
         return loc;
     });
-    return { locations: updatedLocations };
+    return { locations: updatedLocations, logs: [] };
 }
 /**
- * Process all stability changes for a turn.
- * Combines leader modifiers and low tax recovery.
+ * Apply stability penalties for locations with very high taxes/food collection.
+ * Only applies if NO leader of the controlling faction is present.
+ *
+ * Spec:
+ * - Cities with VERY_HIGH personal taxes + no leader: -5/turn
+ * - Cities with VERY_HIGH commercial taxes + no leader: -2/turn
+ * - Rural with VERY_HIGH food collection + no leader: -4/turn
  *
  * @param locations - All locations
  * @param characters - All characters
- * @returns Updated locations
+ * @param turn - Current turn number
+ * @returns Updated locations and warning logs
  */
-function processStability(locations, characters) {
+function applyHighTaxStabilityPenalty(locations, characters, turn) {
+    const logs = [];
+    // Find which locations have a leader present from the controlling faction
+    const leaderLocationsByFaction = new Map();
+    characters.forEach(char => {
+        if ((char.status === types_1.CharacterStatus.AVAILABLE || char.status === types_1.CharacterStatus.GOVERNING) && char.locationId) {
+            const existingFactions = leaderLocationsByFaction.get(char.locationId) || [];
+            if (!existingFactions.includes(char.faction)) {
+                leaderLocationsByFaction.set(char.locationId, [...existingFactions, char.faction]);
+            }
+        }
+    });
+    const hasLeaderPresent = (locId, faction) => {
+        const factionsAtLocation = leaderLocationsByFaction.get(locId) || [];
+        return factionsAtLocation.includes(faction);
+    };
+    const updatedLocations = locations.map(loc => {
+        if (loc.faction === types_1.FactionId.NEUTRAL)
+            return loc;
+        let stabilityPenalty = 0;
+        const messages = [];
+        // CITY: Check personal taxes (VERY_HIGH = -5)
+        if (loc.type === types_1.LocationType.CITY && loc.taxLevel === 'VERY_HIGH') {
+            if (!hasLeaderPresent(loc.id, loc.faction)) {
+                stabilityPenalty += 5;
+                messages.push(`Citizens are becoming restless about the confiscatory personal taxes in ${loc.name}. Stability drops by 5.`);
+            }
+        }
+        // CITY: Check commercial taxes (VERY_HIGH = -2)
+        if (loc.type === types_1.LocationType.CITY && loc.tradeTaxLevel === 'VERY_HIGH') {
+            if (!hasLeaderPresent(loc.id, loc.faction)) {
+                stabilityPenalty += 2;
+                messages.push(`Merchants are becoming restless about the confiscatory commercial taxes in ${loc.name}. Stability drops by 2.`);
+            }
+        }
+        // RURAL: Check food collection (VERY_HIGH = -4)
+        if (loc.type === types_1.LocationType.RURAL && loc.foodCollectionLevel === 'VERY_HIGH') {
+            if (!hasLeaderPresent(loc.id, loc.faction)) {
+                stabilityPenalty += 4;
+                messages.push(`Peasants and farmers are becoming restless about the confiscatory food collection in ${loc.name}. Stability drops by 4.`);
+            }
+        }
+        // Generate logs for each penalty
+        messages.forEach(message => {
+            logs.push({
+                id: `stability_penalty_${loc.id}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                type: types_1.LogType.ECONOMY,
+                message,
+                turn,
+                visibleToFactions: [loc.faction], // Only visible to controlling faction
+                baseSeverity: types_1.LogSeverity.WARNING,
+                warningForFactions: [loc.faction],
+                highlightTarget: {
+                    type: 'LOCATION',
+                    id: loc.id
+                }
+            });
+        });
+        if (stabilityPenalty > 0) {
+            const newStability = Math.max(0, loc.stability - stabilityPenalty);
+            return { ...loc, stability: newStability };
+        }
+        return loc;
+    });
+    return { locations: updatedLocations, logs };
+}
+/**
+ * Process all stability changes for a turn.
+ * Combines leader modifiers, low tax recovery, and high tax penalties.
+ *
+ * @param locations - All locations
+ * @param characters - All characters
+ * @param turn - Current turn number
+ * @returns Updated locations and logs
+ */
+function processStability(locations, characters, turn = 1) {
+    let allLogs = [];
     // First apply leader modifiers
     let result = applyLeaderStabilityModifiers(locations, characters);
+    allLogs = [...allLogs, ...result.logs];
     // Then apply low tax recovery
     result = applyLowTaxStabilityRecovery(result.locations);
-    return result;
+    allLogs = [...allLogs, ...result.logs];
+    // Then apply high tax penalties (new)
+    result = applyHighTaxStabilityPenalty(result.locations, characters, turn);
+    allLogs = [...allLogs, ...result.logs];
+    return { locations: result.locations, logs: allLogs };
 }

@@ -7,6 +7,10 @@ const types_1 = require("../../types");
 const constants_1 = require("../../constants");
 const combatDetection_1 = require("../combatDetection");
 const combat_1 = require("../combat");
+const logFactory_1 = require("../logs/logFactory");
+const makeExamples_1 = require("../domain/governor/makeExamples");
+const governorService_1 = require("../domain/governor/governorService");
+const leaderStatusUpdates_1 = require("../turnLogic/leaderStatusUpdates");
 /**
  * Resolve all AI vs AI battles for the current turn.
  *
@@ -30,21 +34,13 @@ function resolveAIBattles(state, existingInsurrectionNotification) {
     while (loops < 10) {
         loops++;
         battles = (0, combatDetection_1.detectBattles)(locations, armies, roads);
-        // Filter out Player battles AND Sieging battles
-        const activeAiBattles = battles.filter(b => b.attackerFaction !== state.playerFaction &&
-            b.defenderFaction !== state.playerFaction &&
+        const humanFactions = state.humanFactions || [state.playerFaction];
+        // Filter out battles involving ANY human faction, and sieging battles
+        const activeAiBattles = battles.filter(b => !humanFactions.includes(b.attackerFaction) &&
+            !humanFactions.includes(b.defenderFaction) &&
             !b.attackers.some(a => a.isSieging));
         if (activeAiBattles.length === 0) {
-            // Log sieges only on first pass
-            if (loops === 1) {
-                const siegeBattles = battles.filter(b => b.attackerFaction !== state.playerFaction &&
-                    b.defenderFaction !== state.playerFaction &&
-                    b.attackers.some(a => a.isSieging));
-                siegeBattles.forEach(b => {
-                    const locName = locations.find(l => l.id === b.locationId)?.name;
-                    logs.push(`AI: ${types_1.FACTION_NAMES[b.attackerFaction]} lays siege to ${types_1.FACTION_NAMES[b.defenderFaction]} at ${locName}.`);
-                });
-            }
+            // AI siege logs removed per user request
             break;
         }
         // Resolve only the first battle, then re-detect
@@ -74,13 +70,26 @@ function resolveAIBattles(state, existingInsurrectionNotification) {
                             stability = Math.min(49, stability + 10);
                         }
                     }
-                    locations[locIndex] = {
+                    const updatedLoc = {
                         ...loc,
                         faction: battle.attackerFaction,
                         defense: constants_1.FORTIFICATION_LEVELS[newFort].bonus,
                         fortificationLevel: newFort,
                         stability
                     };
+                    locations[locIndex] = updatedLoc;
+                    // Governor Validation for previous owner
+                    const governor = characters.find(c => c.locationId === loc.id && c.status === types_1.CharacterStatus.GOVERNING && c.faction === loc.faction);
+                    if (governor) {
+                        const validation = (0, governorService_1.validateGovernorStatus)(governor, updatedLoc, locations, roads, state.turn);
+                        if (!validation.isValid) {
+                            characters = characters.map(c => c.id === validation.character.id ? validation.character : c);
+                            if (validation.log)
+                                logs.push(validation.log);
+                        }
+                    }
+                    // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                    characters = (0, leaderStatusUpdates_1.handleLeaderStatusOnCapture)(updatedLoc.id, updatedLoc.faction, characters);
                 }
             }
             // Handle insurgent armies
@@ -103,11 +112,44 @@ function resolveAIBattles(state, existingInsurrectionNotification) {
                     };
                 }
             }
-            logs.push(`AI Battle: ${types_1.FACTION_NAMES[battle.attackerFaction]} seized control from ${types_1.FACTION_NAMES[battle.defenderFaction]}.`);
+            // AI Battle log removed per user request
         }
         else {
             stats.deathToll += Math.min(deadDef, losses) + deadAtt;
-            logs.push(`AI Battle: ${types_1.FACTION_NAMES[battle.defenderFaction]} repelled ${types_1.FACTION_NAMES[battle.attackerFaction]}.`);
+            // AI Battle log removed per user request
+            // === MAKE EXAMPLES PROCESSING ===
+            // When an insurrection is repressed and MAKE_EXAMPLES is active
+            if (battle.isInsurgentBattle && battle.locationId) {
+                const locIndex = locations.findIndex(l => l.id === battle.locationId);
+                if (locIndex !== -1) {
+                    const loc = locations[locIndex];
+                    // Check if Make Examples policy is active
+                    if ((0, makeExamples_1.isMakeExamplesActive)(loc)) {
+                        const insurgentStrength = battle.attackers.reduce((s, a) => s + a.strength, 0);
+                        // Find governor doing the repression
+                        // (Leader present + same faction + not dead/undercover)
+                        const governor = characters.find(c => c.locationId === loc.id &&
+                            c.faction === battle.defenderFaction &&
+                            c.status !== types_1.CharacterStatus.DEAD &&
+                            c.status !== types_1.CharacterStatus.UNDERCOVER);
+                        const governorName = governor ? governor.name : "The Governor";
+                        const result = (0, makeExamples_1.processMakeExamples)({
+                            location: loc,
+                            controllerFaction: battle.defenderFaction,
+                            insurgentStrength,
+                            turn: state.turn,
+                            governorName
+                        });
+                        // Apply updates
+                        locations[locIndex] = result.location;
+                        stats.deathToll += result.casualties;
+                        // Add repression log
+                        if (result.log) {
+                            logs.push(result.log);
+                        }
+                    }
+                }
+            }
             // Failure notification for non-neutral insurrections
             if (battle.isInsurgentBattle && !insurrectionNotification && battle.attackerFaction !== types_1.FactionId.NEUTRAL) {
                 const armyIds = battle.attackers.map(a => a.id);
@@ -145,7 +187,9 @@ function resolveAIBattles(state, existingInsurrectionNotification) {
                         characters = characters.map(c => c.id === leader.id
                             ? { ...c, status: types_1.CharacterStatus.DEAD }
                             : c);
-                        logs.push(`${leader.name} died in battle.`);
+                        // Leader death log - INFO severity
+                        const deathLog = (0, logFactory_1.createLeaderDiedLog)(leader.name, state.turn);
+                        logs.push(deathLog);
                     }
                     else {
                         const escapeLocs = locations.filter(loc => loc.faction === leader.faction);

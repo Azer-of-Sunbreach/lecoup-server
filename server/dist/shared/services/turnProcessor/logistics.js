@@ -3,6 +3,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processConvoys = processConvoys;
 exports.processNavalConvoys = processNavalConvoys;
+const logFactory_1 = require("../logs/logFactory");
 /**
  * Process land convoy movements and deliveries.
  * Convoys move one stage per turn and deliver food when they reach their destination.
@@ -10,9 +11,10 @@ exports.processNavalConvoys = processNavalConvoys;
  * @param convoys - Current list of active convoys
  * @param roads - All roads in the game
  * @param locations - All locations (will be modified for food delivery)
+ * @param currentTurn - Current game turn for log creation
  * @returns Updated convoys, locations and logs
  */
-function processConvoys(convoys, roads, locations) {
+function processConvoys(convoys, roads, locations, currentTurn = 1) {
     const logs = [];
     const updatedLocations = locations.map(l => ({ ...l }));
     const nextConvoys = [];
@@ -22,15 +24,38 @@ function processConvoys(convoys, roads, locations) {
             return;
         const nextIndex = convoy.stageIndex + (convoy.direction === 'FORWARD' ? 1 : -1);
         if (nextIndex < 0 || nextIndex >= road.stages.length) {
-            // Convoy has arrived at destination
+            // Convoy has reached end of current road
+            // Check if there's more roads in the path
+            if (convoy.path && convoy.pathIndex !== undefined && convoy.pathIndex < convoy.path.length - 1) {
+                // Move to next road in path
+                const nextPathIndex = convoy.pathIndex + 1;
+                const nextRoadId = convoy.path[nextPathIndex];
+                const nextRoad = roads.find(r => r.id === nextRoadId);
+                if (nextRoad) {
+                    // Determine direction on new road based on connection point
+                    const currentRoadEndLoc = convoy.direction === 'FORWARD' ? road.to : road.from;
+                    const isStartOfNextRoad = nextRoad.from === currentRoadEndLoc;
+                    nextConvoys.push({
+                        ...convoy,
+                        roadId: nextRoadId,
+                        stageIndex: isStartOfNextRoad ? 0 : nextRoad.stages.length - 1,
+                        direction: isStartOfNextRoad ? 'FORWARD' : 'BACKWARD',
+                        pathIndex: nextPathIndex,
+                        lastSafePosition: { type: 'LOCATION', id: currentRoadEndLoc }
+                    });
+                    return;
+                }
+            }
+            // Final destination reached - deliver food
             const destCityIndex = updatedLocations.findIndex(l => l.id === convoy.destinationCityId);
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
-                logs.push(`Convoy arrived at ${updatedLocations[destCityIndex].name} with ${convoy.foodAmount} food.`);
+                const arrivalLog = (0, logFactory_1.createConvoyArrivalLog)(updatedLocations[destCityIndex].name, convoy.foodAmount, currentTurn);
+                logs.push(arrivalLog);
             }
         }
         else {
-            // Convoy continues moving
+            // Convoy continues moving on current road
             nextConvoys.push({ ...convoy, stageIndex: nextIndex });
         }
     });
@@ -46,9 +71,10 @@ function processConvoys(convoys, roads, locations) {
  *
  * @param navalConvoys - Current list of active naval convoys
  * @param locations - All locations (will be modified for food delivery)
+ * @param currentTurn - Current game turn for log creation
  * @returns Updated naval convoys, locations and logs
  */
-function processNavalConvoys(navalConvoys, locations) {
+function processNavalConvoys(navalConvoys, locations, currentTurn = 1) {
     const logs = [];
     const updatedLocations = locations.map(l => ({ ...l }));
     const nextNavalConvoys = [];
@@ -59,7 +85,8 @@ function processNavalConvoys(navalConvoys, locations) {
             const destCityIndex = updatedLocations.findIndex(l => l.id === convoy.destinationCityId);
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
-                logs.push(`Naval convoy arrived at ${updatedLocations[destCityIndex].name} with ${convoy.foodAmount} food.`);
+                const navalArrivalLog = (0, logFactory_1.createNavalConvoyArrivalLog)(updatedLocations[destCityIndex].name, convoy.foodAmount, currentTurn);
+                logs.push(navalArrivalLog);
             }
         }
         else {

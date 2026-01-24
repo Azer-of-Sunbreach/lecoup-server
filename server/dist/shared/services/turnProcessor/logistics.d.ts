@@ -7,15 +7,17 @@ import { ConvoyProcessingResult, NavalConvoyProcessingResult } from './types';
  * @param convoys - Current list of active convoys
  * @param roads - All roads in the game
  * @param locations - All locations (will be modified for food delivery)
+ * @param currentTurn - Current game turn for log creation
  * @returns Updated convoys, locations and logs
  */
-export declare function processConvoys(convoys: Convoy[], roads: Road[], locations: Location[]): ConvoyProcessingResult;
+export declare function processConvoys(convoys: Convoy[], roads: Road[], locations: Location[], currentTurn?: number): ConvoyProcessingResult;
 /**
  * Process naval convoy movements and deliveries.
  * Naval convoys decrement their days remaining and deliver when they arrive.
  *
  * @param navalConvoys - Current list of active naval convoys
  * @param locations - All locations (will be modified for food delivery)
+ * @param currentTurn - Current game turn for log creation
  * @returns Updated naval convoys, locations and logs
  */
-export declare function processNavalConvoys(navalConvoys: NavalConvoy[], locations: Location[]): NavalConvoyProcessingResult;
+export declare function processNavalConvoys(navalConvoys: NavalConvoy[], locations: Location[], currentTurn?: number): NavalConvoyProcessingResult;
