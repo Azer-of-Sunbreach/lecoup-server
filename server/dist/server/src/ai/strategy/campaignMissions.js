@@ -54,12 +54,18 @@ function scoreTargets(state, faction, targets, profile, activeMissions) {
             score += 50;
         if (target.type === 'CITY')
             score += 30;
-        score -= (target.defense || 0) / 100;
+        // Calculate garrison intel first - we need it for fortification check
         const intel = state.armies
             .filter(a => a.locationId === target.id && a.faction === target.faction)
             .reduce((s, a) => s + a.strength, 0);
-        // Opportunistic attacks
-        if (intel < 1000)
+        // FIX: Fortification bonus only counts if garrison >= 500 (as per game rules)
+        // If garrison < 500, fortifications are ineffective and should be ignored
+        const effectiveDefense = intel >= 500 ? (target.defense || 0) : 0;
+        score -= effectiveDefense / 100;
+        // Opportunistic attacks - weak garrison is a major opportunity
+        if (intel < 500)
+            score += 60; // HUGE bonus for undefended targets
+        else if (intel < 1000)
             score += 40;
         else if (intel < 2000)
             score += 20;
@@ -80,8 +86,10 @@ function createCampaignMission(state, faction, theater, best, profile, activeMis
         return;
     }
     // Calculate required strength
-    const fortificationStr = target.defense || 0;
-    const requiredStrength = Math.max(1500, fortificationStr + (best.intel * 1.2));
+    // FIX: Fortification bonus only counts if garrison >= 500
+    const effectiveFortification = best.intel >= 500 ? (target.defense || 0) : 0;
+    const requiredStrength = Math.max(1500, effectiveFortification + (best.intel * 1.2));
+    console.log(`[AI STRATEGY ${faction}] Target ${target.id}: intel=${best.intel}, fortification=${target.defense}, effectiveFort=${effectiveFortification}, requiredStrength=${Math.floor(requiredStrength)}`);
     // Determine if we should do a CONVERGENT attack
     // Only if we have 2+ staging points AND enough force distributed across them
     const isConvergent = allStagingPoints.length >= 2 && shouldDoConvergentAttack(state, faction, allStagingPoints, requiredStrength);

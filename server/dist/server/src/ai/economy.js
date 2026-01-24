@@ -48,8 +48,8 @@ const manageEconomy = (state, faction, profile, budget) => {
     const myRurals = updates.locations.filter(l => l.faction === faction && l.type === types_1.LocationType.RURAL);
     const globalFoodNet = myCities.reduce((sum, c) => sum + c.foodIncome, 0);
     const isDesperateForFood = globalFoodNet < -10;
-    (0, index_1.optimizeCityTaxes)(myCities, isDesperateForGold);
-    (0, index_1.optimizeRuralCollection)(myRurals, isDesperateForFood);
+    (0, index_1.optimizeCityTaxes)(myCities, isDesperateForGold, faction);
+    (0, index_1.optimizeRuralCollection)(myRurals, isDesperateForFood, faction);
     // 2. EMERGENCY SEIZE ACTIONS (before logistics to secure resources)
     const seizeResult = (0, index_1.handleSeizeActions)(faction, state, updates.locations);
     updates.locations = seizeResult.locations;

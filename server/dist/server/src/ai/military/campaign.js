@@ -288,9 +288,11 @@ function handleSiegeDecision(mission, faction, armies, assigned, state, targetLo
     const isFortified = targetLoc.fortificationLevel > 0;
     const hasDefenders = enemyGarrisonStr >= 500;
     const isNeutral = targetLoc.faction === types_1.FactionId.NEUTRAL;
-    const defBonus = constants_1.FORTIFICATION_LEVELS[targetLoc.fortificationLevel]?.bonus || 0;
+    // FIX: Fortification bonus only applies if garrison >= 500 (as per game rules)
+    const defBonus = hasDefenders ? (constants_1.FORTIFICATION_LEVELS[targetLoc.fortificationLevel]?.bonus || 0) : 0;
     const effectiveDef = enemyGarrisonStr + defBonus;
-    const canAssault = strengthAtTarget > effectiveDef * 1.5;
+    // FIX 3B: Direct comparison - we need more strength than effective defense to assault
+    const canAssault = strengthAtTarget > effectiveDef;
     // FIX: Nobles CAN siege - only Neutral faction is excluded
     // Nobles just can't negotiate with neutrals (handled below)
     if ((hasDefenders || !canAssault) && isFortified && faction !== types_1.FactionId.NEUTRAL) {
@@ -397,7 +399,17 @@ function executeSiege(mission, faction, armies, assigned, state, targetLoc, armi
             attackerName: faction
         };
     }
-    state.logs.push(`${faction} lays siege to ${targetLoc.name}! Defenses reduce to Level ${newLvl}.`);
+    // Siege log - visible to all, CRITICAL for territory owner
+    state.logs.push({
+        id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: 'COMBAT',
+        message: `${faction} lays siege to ${targetLoc.name}! Defenses reduce to Level ${newLvl}.`,
+        turn: state.turn,
+        visibleToFactions: [], // Visible to all
+        baseSeverity: 'INFO',
+        criticalForFactions: targetLoc.faction !== 'NEUTRAL' ? [targetLoc.faction] : undefined,
+        highlightTarget: { type: 'LOCATION', id: targetId }
+    });
     if (gameConstants_1.DEBUG_AI)
         console.log(`[AI MILITARY ${faction}] EXECUTED SIEGE at ${targetId}. Cost: ${siegeCost}, Manpower: ${requiredManpower}`);
     // 5. POST SIEGE ATTACK DECISION
@@ -409,7 +421,9 @@ function executeSiege(mission, faction, armies, assigned, state, targetLoc, armi
         !a.isInsurgent &&
         !a.action);
     const offensiveStr = nonSiegingArmies.reduce((s, a) => s + a.strength, 0);
-    const effectiveDefenderStr = enemyGarrisonStr + newDef;
+    // FIX: Fortification bonus only applies if garrison >= 500
+    const postSiegeDefBonus = enemyGarrisonStr >= 500 ? newDef : 0;
+    const effectiveDefenderStr = enemyGarrisonStr + postSiegeDefBonus;
     if (offensiveStr > effectiveDefenderStr) {
         if (gameConstants_1.DEBUG_AI)
             console.log(`[AI MILITARY ${faction}] Post-Siege Attack: ${offensiveStr} vs ${effectiveDefenderStr} - CHARGE!`);
@@ -443,7 +457,13 @@ function handleNonSiegeScenario(mission, faction, armies, assigned, targetLoc, a
             assigned.add(a.id);
         }
     });
-    if (targetLoc.fortificationLevel === 0 || strengthAtTarget > (targetLoc.defense + 2000) * 1.5) {
+    // Calculate enemy garrison for fortification check
+    const enemyGarrison = armies
+        .filter(a => a.locationId === targetId && a.faction !== faction && a.locationType === 'LOCATION')
+        .reduce((s, a) => s + a.strength, 0);
+    // FIX: Fortification bonus only applies if garrison >= 500
+    const effectiveDefense = enemyGarrison >= 500 ? (targetLoc.defense || 0) : 0;
+    if (targetLoc.fortificationLevel === 0 || strengthAtTarget > (effectiveDefense + 2000) * 1.5) {
         mission.stage = 'ASSAULTING';
     }
     if (targetLoc.faction === faction) {

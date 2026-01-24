@@ -2,21 +2,25 @@
 // Garrison Module - Calculate minimum garrison requirements
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMinGarrison = getMinGarrison;
-const types_1 = require("./types");
+const types_1 = require("../../../../shared/types");
+const types_2 = require("./types");
 /**
  * Calculate minimum garrison based on stability, population, and LEGENDARY leader presence.
  *
  * Formula: (10 * (Population/100000)) * (120 - Stability) + 100
  * - Minimum 500, Maximum 4000
- * - Strategic locations have minimum 1000
+ * - Strategic locations have minimum 1000 garrison
+ * - Frontier locations (adjacent to enemy) have minimum 1000 garrison
  * - LEGENDARY leaders can substitute for garrison (returns 0)
  *
  * @param location - The location to calculate garrison for
  * @param characters - All characters (to check for LEGENDARY ability)
  * @param faction - The faction we're calculating for
+ * @param roads - Optional roads array for frontier detection
+ * @param locations - Optional locations array for frontier detection
  * @returns Minimum garrison requirement (0-4000)
  */
-function getMinGarrison(location, characters, faction) {
+function getMinGarrison(location, characters, faction, roads, locations) {
     if (!location)
         return 500;
     // Check if LEGENDARY leader is present - they can substitute for garrison
@@ -35,9 +39,23 @@ function getMinGarrison(location, characters, faction) {
     let required = Math.min(4000, Math.max(500, Math.floor(baseNeed)));
     // STRATEGIC DEFENSE OVERRIDE
     // Strategic locations have minimum 1000 garrison
-    const myStrategic = types_1.STRATEGIC_LOCATIONS[faction] || [];
+    const myStrategic = types_2.STRATEGIC_LOCATIONS[faction] || [];
     if (myStrategic.includes(location.id)) {
         required = Math.max(required, 1000);
+    }
+    // FRONTIER DEFENSE OVERRIDE
+    // If location has enemy-controlled neighbor, minimum 1000 garrison
+    if (roads && locations) {
+        const isFrontier = roads.some(r => {
+            if (r.from !== location.id && r.to !== location.id)
+                return false;
+            const neighborId = r.from === location.id ? r.to : r.from;
+            const neighbor = locations.find(l => l.id === neighborId);
+            return neighbor && neighbor.faction !== faction && neighbor.faction !== types_1.FactionId.NEUTRAL;
+        });
+        if (isFrontier) {
+            required = Math.max(required, 1000);
+        }
     }
     return required;
 }

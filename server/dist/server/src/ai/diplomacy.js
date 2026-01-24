@@ -5,6 +5,7 @@ const types_1 = require("../../../shared/types");
 const constants_1 = require("../../../shared/constants");
 const utils_1 = require("./utils");
 const leaders_config_1 = require("./leaders_config");
+const logFactory_1 = require("../../../shared/services/logs/logFactory");
 // Helper to determine how valuable a leader is to keep on the field
 const getLeaderValue = (char) => {
     let value = 0;
@@ -32,19 +33,20 @@ const getLeaderValue = (char) => {
     return value;
 };
 const manageDiplomacy = (state, faction, goals, // Deprecated in favor of missions
-profile, budget) => {
+profile, budget, disableInsurrections = false) => {
     let updates = {
         resources: { ...state.resources },
         characters: [...state.characters],
         locations: [...state.locations],
         pendingNegotiations: [...state.pendingNegotiations],
-        logs: [...state.logs],
+        logs: [...(state.logs || [])],
         aiState: { ...state.aiState } // Needed to update mission status
     };
     let currentGold = budget.allocations.diplomacy;
     const missions = state.aiState?.[faction]?.missions || [];
     // Filter diplomacy missions
-    const diploMissions = missions.filter(m => (m.type === 'INSURRECTION' || m.type === 'NEGOTIATE') && m.status !== 'COMPLETED' && m.status !== 'FAILED');
+    const diploMissions = missions.filter(m => ((m.type === 'INSURRECTION' && !disableInsurrections) || m.type === 'NEGOTIATE') &&
+        m.status !== 'COMPLETED' && m.status !== 'FAILED');
     // Sort by priority
     diploMissions.sort((a, b) => b.priority - a.priority);
     for (const mission of diploMissions) {
@@ -55,7 +57,12 @@ profile, budget) => {
             currentGold = handleNegotiation(mission, state, faction, updates, currentGold);
         }
     }
-    updates.resources[faction].gold = currentGold + budget.reserved + budget.allocations.recruitment;
+    // Calculate how much was actually spent and deduct it from resources
+    const diplomacySpent = budget.allocations.diplomacy - currentGold;
+    if (diplomacySpent > 0) {
+        updates.resources[faction].gold = Math.max(0, state.resources[faction].gold - diplomacySpent);
+        console.log(`[AI DIPLOMACY ${faction}] Spent ${diplomacySpent} gold on diplomacy. Remaining: ${updates.resources[faction].gold}`);
+    }
     return updates;
 };
 exports.manageDiplomacy = manageDiplomacy;
@@ -216,7 +223,8 @@ function handleInsurrection(mission, state, faction, updates, currentGold) {
             actionsTaken: { ...(loc.actionsTaken || {}), incite: 1 }
         };
     }
-    updates.logs.push(`${spy.name} begins an operation to destabilize ${targetLoc.name}.`);
+    // Use specialized log with faction-aware visibility and highlight
+    updates.logs.push((0, logFactory_1.createInsurrectionPreparationLog)(spy.name, targetLoc.name, mission.targetId, targetLoc.faction, state.turn));
     mission.status = 'ACTIVE';
     return currentGold;
 }
@@ -272,8 +280,7 @@ function handleNegotiation(mission, state, faction, updates, currentGold) {
                     foodStock: source.foodStock - amount
                 };
                 foodSourceIds.push(source.id);
-                // Notification handled by UI usually, but logs help debug
-                updates.logs.push(`${faction} sends ${amount} bushels of grain to starving ${targetLoc.name}!`);
+                // AI food aid log removed - AI actions don't generate logs
             }
         }
     }
@@ -288,7 +295,7 @@ function handleNegotiation(mission, state, faction, updates, currentGold) {
     // We effectively just "pushed" the negotiation. The result is handled by TurnProcessor usually.
     // "Negotiations take time or depend on RNG/Influence"
     // For now, we just spend gold to try.
-    updates.logs.push(`Diplomats sent to ${targetLoc.name} to negotiate allegiance.`);
+    // AI negotiation log removed - negotiations result log is generated elsewhere when completed
     mission.status = 'ACTIVE';
     return currentGold;
 }

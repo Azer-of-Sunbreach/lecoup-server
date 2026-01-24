@@ -4,11 +4,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.manageMilitary = void 0;
 const gameConstants_1 = require("../../../shared/data/gameConstants");
+const mergeRegiments_1 = require("../../../shared/services/domain/military/mergeRegiments");
 // Import from new modular structure
 const campaign_1 = require("./military/campaign");
 const defense_1 = require("./military/defense");
 const roadDefense_1 = require("./military/roadDefense");
 const idleHandler_1 = require("./military/idleHandler");
+const reversalHandler_1 = require("./military/reversalHandler");
 /**
  * Main military management function for AI factions.
  *
@@ -28,6 +30,9 @@ const manageMilitary = (state, faction, profile) => {
         console.log(`[AI MILITARY ${faction}] === STARTING manageMilitary ===`);
         console.log(`[AI MILITARY ${faction}] Total missions: ${missions.length}`);
     }
+    // 0. CHECK FOR URGENT REVERSALS (Home base capture)
+    // This modifies newArmies in place if reversals occur
+    (0, reversalHandler_1.handleEnRouteReversals)(state, faction, newArmies);
     const campaignMissions = missions.filter(m => m.type === 'CAMPAIGN');
     if (gameConstants_1.DEBUG_AI) {
         console.log(`[AI MILITARY ${faction}] Campaign missions: ${campaignMissions.length}`);
@@ -81,6 +86,57 @@ const manageMilitary = (state, faction, profile) => {
         console.log(`[AI MILITARY ${faction}] === FINISHED manageMilitary ===`);
     // 2. IDLE ARMIES BEHAVIOR
     (0, idleHandler_1.handleIdleArmies)(state, faction, newArmies, assignedArmyIds);
+    // 3. CONSOLIDATE ARMIES (merge when 5+ eligible at same location)
+    const consolidatedResult = consolidateArmies(faction, {
+        ...state,
+        armies: newArmies
+    });
+    newArmies = consolidatedResult.armies;
     return newArmies;
 };
 exports.manageMilitary = manageMilitary;
+/**
+ * Consolidate AI armies at each location.
+ * Calls executeMergeRegiments when there are 5 or more eligible armies at the same location.
+ * Note: executeMergeRegiments already excludes spent, insurgent, sieging, and action armies.
+ */
+function consolidateArmies(faction, state) {
+    let currentArmies = [...state.armies];
+    let currentCharacters = [...state.characters];
+    // Count eligible armies per location
+    const locationCounts = new Map();
+    for (const army of currentArmies) {
+        if (army.faction !== faction)
+            continue;
+        if (army.locationType !== 'LOCATION')
+            continue;
+        if (!army.locationId)
+            continue;
+        // Same criteria as executeMergeRegiments
+        if (army.isSpent || army.isInsurgent || army.isSieging || army.action)
+            continue;
+        const locId = army.locationId;
+        locationCounts.set(locId, (locationCounts.get(locId) || 0) + 1);
+    }
+    // Merge at locations with 5+ eligible armies
+    for (const [locationId, count] of locationCounts) {
+        if (count < 5)
+            continue;
+        const tempState = {
+            ...state,
+            armies: currentArmies,
+            characters: currentCharacters
+        };
+        const result = (0, mergeRegiments_1.executeMergeRegiments)(tempState, locationId, faction);
+        if (result.success && result.newState.armies) {
+            currentArmies = result.newState.armies;
+            if (result.newState.characters) {
+                currentCharacters = result.newState.characters;
+            }
+            if (gameConstants_1.DEBUG_AI) {
+                console.log(`[AI CONSOLIDATE ${faction}] ${result.message}`);
+            }
+        }
+    }
+    return { armies: currentArmies, characters: currentCharacters };
+}
