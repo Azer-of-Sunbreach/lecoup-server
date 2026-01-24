@@ -18,8 +18,8 @@ exports.INITIAL_LOCATIONS = [
     },
     {
         id: 'sunbreach', name: 'Sunbreach', type: 'CITY', linkedLocationId: 'sunbreach_lands', faction: types_1.FactionId.REPUBLICANS,
-        population: 150000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
-        goldIncome: 0, foodIncome: 0, foodStock: 300, stability: 51, defense: 4000, fortificationLevel: 3,
+        population: 150000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
+        goldIncome: 0, foodIncome: 0, foodStock: 300, stability: 56, defense: 4000, fortificationLevel: 3,
         position: { x: 120, y: 380 },
         backgroundPosition: { x: 186, y: 343 },
         actionsTaken: { seizeGold: 0, seizeFood: 0, recruit: 0, incite: 0 }
@@ -35,7 +35,7 @@ exports.INITIAL_LOCATIONS = [
     },
     {
         id: 'stormbay', name: 'Stormbay', type: 'CITY', linkedLocationId: 'order_lands', faction: types_1.FactionId.CONSPIRATORS,
-        population: 120000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 120000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 350, stability: 100, defense: 10000, fortificationLevel: 4,
         position: { x: 230, y: 580 },
         backgroundPosition: { x: 285, y: 660 },
@@ -77,15 +77,15 @@ exports.INITIAL_LOCATIONS = [
     {
         id: 'northern_barony', name: 'Northern Barony', type: 'RURAL', linkedLocationId: 'port_de_sable', faction: types_1.FactionId.NOBLES,
         population: 600000, ruralCategory: types_1.RuralCategory.ORDINARY, isCoastal: true, foodCollectionLevel: 'NORMAL',
-        goldIncome: 0, foodIncome: 0, foodStock: 0, stability: 65, defense: 0, fortificationLevel: 0,
+        goldIncome: 0, foodIncome: 0, foodStock: 0, stability: 60, defense: 0, fortificationLevel: 0,
         position: { x: 250, y: 150 },
         backgroundPosition: { x: 312, y: 160 },
         actionsTaken: { seizeGold: 0, seizeFood: 0, recruit: 0, incite: 0 }
     },
     {
         id: 'port_de_sable', name: 'Port-de-Sable', type: 'CITY', linkedLocationId: 'northern_barony', faction: types_1.FactionId.NOBLES,
-        population: 80000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
-        goldIncome: 0, foodIncome: 0, foodStock: 250, stability: 60, defense: 4000, fortificationLevel: 3,
+        population: 80000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
+        goldIncome: 0, foodIncome: 0, foodStock: 250, stability: 50, defense: 4000, fortificationLevel: 3,
         position: { x: 220, y: 120 },
         backgroundPosition: { x: 231, y: 196 },
         actionsTaken: { seizeGold: 0, seizeFood: 0, recruit: 0, incite: 0 }
@@ -100,7 +100,7 @@ exports.INITIAL_LOCATIONS = [
     },
     {
         id: 'mirebridge', name: 'Mirebridge', type: 'CITY', linkedLocationId: 'esmarch_duchy', faction: types_1.FactionId.NOBLES,
-        population: 50000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 50000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 120, stability: 75, defense: 4000, fortificationLevel: 3,
         position: { x: 530, y: 150 },
         backgroundPosition: { x: 528, y: 140 },
@@ -132,7 +132,7 @@ exports.INITIAL_LOCATIONS = [
     },
     {
         id: 'gullwing', name: 'Gullwing', type: 'CITY', linkedLocationId: 'gullwing_duchy', faction: types_1.FactionId.NOBLES,
-        population: 45000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 45000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 150, stability: 75, defense: 4000, fortificationLevel: 3,
         position: { x: 780, y: 530 },
         backgroundPosition: { x: 800, y: 649 },
@@ -165,7 +165,7 @@ exports.INITIAL_LOCATIONS = [
     },
     {
         id: 'brinewaith', name: 'Brinewaith', type: 'CITY', linkedLocationId: 'saltcraw_viscounty', faction: types_1.FactionId.NOBLES,
-        population: 12000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 12000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 135, stability: 50, defense: 4000, fortificationLevel: 3,
         position: { x: 50, y: 510 },
         backgroundPosition: { x: 48, y: 521 },
@@ -181,7 +181,7 @@ exports.INITIAL_LOCATIONS = [
     },
     {
         id: 'gre_au_vent', name: 'Gré-au-vent', type: 'CITY', linkedLocationId: 'larion_islands', faction: types_1.FactionId.NOBLES,
-        population: 10000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
+        population: 10000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL', isCoastal: true,
         goldIncome: 0, foodIncome: 0, foodStock: 135, stability: 50, defense: 4000, fortificationLevel: 3,
         position: { x: 180, y: 50 },
         backgroundPosition: { x: 259, y: 18 },

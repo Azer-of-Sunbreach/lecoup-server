@@ -4,7 +4,7 @@
  * Import directly from './data' instead.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CHARACTERS = exports.ROADS = exports.INITIAL_GARRISONS = exports.INITIAL_LOCATIONS = exports.FORTIFY_DEFENSE_BONUS = exports.FORTIFY_COST = exports.FORTIFICATION_LEVELS = exports.getNavalTravelTime = exports.PORT_SEQUENCE = exports.FOOD_PER_SOLDIER = exports.REQUISITION_STABILITY_PENALTY = exports.REQUISITION_AMOUNT = exports.INCITE_BASE_CHANCE = exports.INCITE_BASE_STABILITY_DAMAGE = exports.COST_INCITE = exports.RECRUIT_AMOUNT = exports.RECRUIT_COST = exports.BONUS_FISHING_HUNTING = exports.BONUS_HUNTING_ONLY = void 0;
+exports.CHARACTERS = exports.ROADS = exports.INITIAL_GARRISONS = exports.INITIAL_LOCATIONS = exports.getNavalTravelTimeForMap = exports.getNavalTimesForMap = exports.getPortsForMap = exports.FORTIFY_DEFENSE_BONUS = exports.FORTIFY_COST = exports.FORTIFICATION_LEVELS = exports.getNavalTravelTime = exports.PORT_SEQUENCE = exports.FOOD_PER_SOLDIER = exports.REQUISITION_STABILITY_PENALTY = exports.REQUISITION_AMOUNT = exports.INCITE_BASE_CHANCE = exports.INCITE_BASE_STABILITY_DAMAGE = exports.COST_INCITE = exports.RECRUIT_AMOUNT = exports.RECRUIT_COST = exports.BONUS_FISHING_HUNTING = exports.BONUS_HUNTING_ONLY = void 0;
 // Re-export everything from the data module for backward compatibility
 var data_1 = require("./data");
 // Constants
@@ -23,6 +23,10 @@ Object.defineProperty(exports, "getNavalTravelTime", { enumerable: true, get: fu
 Object.defineProperty(exports, "FORTIFICATION_LEVELS", { enumerable: true, get: function () { return data_1.FORTIFICATION_LEVELS; } });
 Object.defineProperty(exports, "FORTIFY_COST", { enumerable: true, get: function () { return data_1.FORTIFY_COST; } });
 Object.defineProperty(exports, "FORTIFY_DEFENSE_BONUS", { enumerable: true, get: function () { return data_1.FORTIFY_DEFENSE_BONUS; } });
+// Multi-map port support
+Object.defineProperty(exports, "getPortsForMap", { enumerable: true, get: function () { return data_1.getPortsForMap; } });
+Object.defineProperty(exports, "getNavalTimesForMap", { enumerable: true, get: function () { return data_1.getNavalTimesForMap; } });
+Object.defineProperty(exports, "getNavalTravelTimeForMap", { enumerable: true, get: function () { return data_1.getNavalTravelTimeForMap; } });
 // Data
 Object.defineProperty(exports, "INITIAL_LOCATIONS", { enumerable: true, get: function () { return data_1.INITIAL_LOCATIONS; } });
 Object.defineProperty(exports, "INITIAL_GARRISONS", { enumerable: true, get: function () { return data_1.INITIAL_GARRISONS; } });

@@ -40,3 +40,5 @@ export declare const INITIAL_AI_RESOURCES: {
 };
 export declare const FORTIFY_COST = 40;
 export declare const FORTIFY_DEFENSE_BONUS = 20;
+export declare const APPEASE_POPULATION_COSTS: Record<string, number>;
+export declare const getAppeaseFoodCost: (population: number) => number;

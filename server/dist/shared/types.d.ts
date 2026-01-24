@@ -1,3 +1,4 @@
+export * from './types/governorTypes';
 export declare enum FactionId {
     REPUBLICANS = "REPUBLICANS",
     CONSPIRATORS = "CONSPIRATORS",
@@ -24,9 +25,57 @@ export declare enum CharacterStatus {
     AVAILABLE = "AVAILABLE",
     ON_MISSION = "ON_MISSION",// Insurrection logic mostly
     MOVING = "MOVING",// Traveling alone or with army
+    UNDERCOVER = "UNDERCOVER",// Leader on undercover mission in enemy territory
+    GOVERNING = "GOVERNING",// Leader serving as governor in a controlled region
     DEAD = "DEAD"
 }
-export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND';
+export declare enum LogSeverity {
+    INFO = "INFO",
+    WARNING = "WARNING",
+    CRITICAL = "CRITICAL",
+    GOOD = "GOOD"
+}
+export declare enum LogType {
+    TURN_MARKER = "TURN_MARKER",
+    GAME_START = "GAME_START",
+    MOVEMENT = "MOVEMENT",
+    CAPTURE = "CAPTURE",
+    CONVOY = "CONVOY",
+    INSURRECTION = "INSURRECTION",
+    NEGOTIATION = "NEGOTIATION",
+    FAMINE = "FAMINE",
+    COMBAT = "COMBAT",
+    ECONOMY = "ECONOMY",
+    COMMERCE = "COMMERCE",
+    LEADER = "LEADER",
+    NARRATIVE = "NARRATIVE",
+    CLANDESTINE = "CLANDESTINE"
+}
+export interface LogHighlightTarget {
+    type: 'LOCATION' | 'ARMY' | 'ROAD_STAGE';
+    id: string;
+    stageIndex?: number;
+}
+/**
+ * Structured log entry with personalization and hover highlighting support.
+ * Logs can be filtered by faction and have dynamic severity based on viewer.
+ */
+export interface LogEntry {
+    id: string;
+    type: LogType;
+    message: string;
+    turn: number;
+    visibleToFactions: FactionId[];
+    baseSeverity: LogSeverity;
+    criticalForFactions?: FactionId[];
+    warningForFactions?: FactionId[];
+    highlightTarget?: LogHighlightTarget;
+}
+export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND' | 'MAN_OF_CHURCH' | 'DAREDEVIL' | 'GHOST' | 'PARANOID';
+export * from './types/leaderTypes';
+import { GovernorPolicy } from './types/governorTypes';
+export * from './types/governorTypes';
+export * from './types/clandestineTypes';
 export interface Coordinates {
     x: number;
     y: number;
@@ -45,6 +94,7 @@ export interface Location {
     type: 'CITY' | 'RURAL';
     linkedLocationId: string | null;
     faction: FactionId;
+    previousFaction?: FactionId;
     population: number;
     goldIncome: number;
     foodIncome: number;
@@ -67,6 +117,22 @@ export interface Location {
         seizeFood: number;
         recruit: number;
         incite: number;
+    };
+    governorPolicies?: Partial<Record<GovernorPolicy, boolean>>;
+    neutralInsurrectionBlockedUntil?: number;
+    neutralInsurrectionBlockedBy?: string;
+    governorFoodCost?: number;
+    burnedFields?: number;
+    burnedDistricts?: number;
+    demographics?: {
+        nobles: number;
+        wealthyCommoners: number;
+        labouringFolks: number;
+    };
+    resentment?: {
+        [FactionId.NOBLES]: number;
+        [FactionId.CONSPIRATORS]: number;
+        [FactionId.REPUBLICANS]: number;
     };
 }
 export interface RoadStage {
@@ -138,6 +204,8 @@ export interface Convoy {
     direction: 'FORWARD' | 'BACKWARD';
     lastSafePosition: SafePosition;
     isCaptured: boolean;
+    path?: string[];
+    pathIndex?: number;
 }
 export interface NavalConvoy {
     id: string;
@@ -167,8 +235,57 @@ export interface Character {
         commandBonus: number;
         insurrectionValue: number;
         ability: LeaderAbility[];
+        traits?: ('IRON_FIST' | 'FAINT_HEARTED' | 'SCORCHED_EARTH')[];
+        clandestineOps?: number;
+        discretion?: number;
+        statesmanship?: number;
     };
     bonuses: any;
+    budget?: number;
+    /** @alias budget - Preferred name for new AI leader system */
+    clandestineBudget?: number;
+    undercoverMission?: {
+        destinationId: string;
+        turnsRemaining: number;
+        turnStarted?: number;
+    };
+    /** Active clandestine actions this leader is performing (if UNDERCOVER in enemy territory) */
+    activeClandestineActions?: import('./types/clandestineTypes').ActiveClandestineAction[];
+    /** Governor appointment mission - leader traveling to become governor */
+    governorMission?: {
+        destinationId: string;
+        turnsRemaining: number;
+    };
+    /** Active governor policies when acting as governor */
+    activeGovernorPolicies?: GovernorPolicy[];
+    /** Assigned army ID when serving as commander - alias for armyId for semantic clarity */
+    assignedArmyId?: string;
+    /** True if leader has been eliminated - derived from status === DEAD */
+    isDead?: boolean;
+    /** True if leader was detected when arriving in enemy territory (for alert display) */
+    isDetectedOnArrival?: boolean;
+    /** Pending alert events for this leader (synchronized, displayed at turn start) */
+    pendingAlertEvents?: import('./types/clandestineTypes').LeaderAlertEvent[];
+    /** Stealth level 1-5 (Inept to Exceptional) - determines detection threshold */
+    stealthLevel?: number;
+    /** Current detection level (0 = undetected, increases with actions) */
+    detectionLevel?: number;
+    /** Flags for pending acknowledgment by player (for timing of PARANOID/HUNT effects) */
+    pendingDetectionEffects?: {
+        /** True if PARANOID governor effect is pending notification */
+        paranoidGovernorNotified?: boolean;
+        /** True if HUNT_NETWORKS effect is pending notification */
+        huntNetworksNotified?: boolean;
+        /** True if threshold exceeded notification was sent */
+        thresholdExceededNotified?: boolean;
+    };
+    /**
+     * Specific clandestine action intended for this mission.
+     * Preserves intent during travel so agent executes the correct plan on arrival.
+     */
+    plannedMissionAction?: import('./types/clandestineTypes').ClandestineActionId;
+    /** Last turn this leader was exfiltrated/moved. Prevents double-exfiltration exploit. */
+    lastExfiltrationTurn?: number;
 }
 export interface NegotiationMission {
     targetLocationId: string;
@@ -207,6 +324,24 @@ export interface SiegeNotification {
     targetName: string;
     attackerName: string;
 }
+/**
+ * Battle info for display in Battle Resolution Phase panel
+ */
+export interface BattleInfo {
+    attackerFaction: FactionId;
+    defenderFaction: FactionId;
+    locationName: string;
+}
+/**
+ * Battle Resolution Phase state (multiplayer only)
+ * Tracks the combat resolution phase for all players
+ */
+export interface BattleResolutionPhase {
+    isActive: boolean;
+    currentIndex: number;
+    totalBattles: number;
+    battles: BattleInfo[];
+}
 export interface AITheater {
     id: number;
     locationIds: string[];
@@ -215,7 +350,7 @@ export interface AITheater {
     armyStrength: number;
     isContested: boolean;
 }
-export type MissionType = 'CAMPAIGN' | 'DEFEND' | 'PATROL' | 'REINFORCE' | 'INSURRECTION' | 'NEGOTIATE' | 'STABILIZE' | 'ROAD_DEFENSE';
+export type MissionType = 'CAMPAIGN' | 'DEFEND' | 'PATROL' | 'REINFORCE' | 'INSURRECTION' | 'NEGOTIATE' | 'STABILIZE' | 'ROAD_DEFENSE' | 'COUNTER_INSURRECTION';
 export type MissionStatus = 'PLANNING' | 'ACTIVE' | 'COMPLETED' | 'FAILED';
 export interface AIMission {
     id: string;
@@ -240,6 +375,12 @@ export interface FactionAIState {
     missions: AIMission[];
     savings: number;
 }
+export interface LeaderEliminatedNotification {
+    faction: FactionId;
+    leaderName: string;
+    header: string;
+    buttonText: string;
+}
 export interface GameState {
     turn: number;
     playerFaction: FactionId;
@@ -256,7 +397,7 @@ export interface GameState {
         };
     };
     pendingNegotiations: NegotiationMission[];
-    logs: string[];
+    logs: LogEntry[];
     stats: GameStats;
     pendingCombatResponse?: CoreGameState['pendingCombatResponse'];
     aiState?: {
@@ -281,11 +422,20 @@ export interface GameState {
     insurrectionNotification: InsurrectionNotification | null;
     famineNotification: FamineNotification | null;
     siegeNotification: SiegeNotification | null;
+    leaderEliminatedNotification: LeaderEliminatedNotification | null;
     victory?: {
         winner: FactionId;
         message: string;
     };
     hasScannedBattles: boolean;
+    /** @alias logs - Preferred name for new AI leader system */
+    eventLog?: LogEntry[];
+    /** @alias resources - Faction data including gold, for new AI leader system */
+    factions?: {
+        [key in FactionId]?: {
+            gold: number;
+        };
+    };
 }
 export declare const FACTION_COLORS: {
     REPUBLICANS: string;
@@ -331,11 +481,12 @@ export interface CoreGameState {
         defenderFaction: FactionId;
         awaitingDefenderChoice: boolean;
     };
+    battleResolutionPhase?: BattleResolutionPhase;
     aiState?: {
         [key in FactionId]?: FactionAIState;
     };
     stats: GameStats;
-    logs: string[];
+    logs: LogEntry[];
     victory?: {
         winner: FactionId;
         message: string;
@@ -363,6 +514,7 @@ export interface UIState {
     insurrectionNotification: InsurrectionNotification | null;
     famineNotification: FamineNotification | null;
     siegeNotification: SiegeNotification | null;
+    leaderEliminatedNotification: LeaderEliminatedNotification | null;
     hasScannedBattles: boolean;
 }
 /** Player info in multiplayer lobby */

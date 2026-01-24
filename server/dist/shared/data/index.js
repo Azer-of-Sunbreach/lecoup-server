@@ -3,7 +3,7 @@
  * Data Module - Central export for all game data
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getInitialResources = exports.generateInitialArmies = exports.createInitialState = exports.CHARACTERS = exports.ROADS = exports.INITIAL_GARRISONS = exports.INITIAL_LOCATIONS = exports.FORTIFY_DEFENSE_BONUS = exports.FORTIFY_COST = exports.INITIAL_AI_RESOURCES = exports.INITIAL_PLAYER_RESOURCES = exports.FORTIFICATION_LEVELS = exports.getNavalTravelTime = exports.NAVAL_STAGE_DAYS = exports.PORT_SEQUENCE = exports.FOOD_PER_SOLDIER = exports.REQUISITION_STABILITY_PENALTY = exports.REQUISITION_AMOUNT = exports.INCITE_BASE_CHANCE = exports.INCITE_BASE_STABILITY_DAMAGE = exports.COST_INCITE = exports.MAX_RECRUITS_PER_TURN = exports.RECRUIT_AMOUNT = exports.RECRUIT_COST = exports.BONUS_FISHING_HUNTING = exports.BONUS_HUNTING_ONLY = void 0;
+exports.getInitialResources = exports.generateInitialArmies = exports.createInitialState = exports.CHARACTERS = exports.ROADS = exports.INITIAL_GARRISONS = exports.INITIAL_LOCATIONS = exports.getNavalTravelTimeForMap = exports.getNavalTimesForMap = exports.getPortsForMap = exports.getNavalTravelTimeUnified = exports.ALL_NAVAL_TIMES = exports.isPort = exports.ALL_PORTS = exports.LARION_ALTERNATE_NAVAL_TIMES = exports.LARION_ALTERNATE_PORTS = exports.LARION_LARGE_NAVAL_TIMES = exports.LARION_LARGE_PORTS = exports.LARION_NAVAL_TIMES = exports.LARION_PORTS = exports.getAppeaseFoodCost = exports.APPEASE_POPULATION_COSTS = exports.FORTIFY_DEFENSE_BONUS = exports.FORTIFY_COST = exports.INITIAL_AI_RESOURCES = exports.INITIAL_PLAYER_RESOURCES = exports.FORTIFICATION_LEVELS = exports.getNavalTravelTime = exports.NAVAL_STAGE_DAYS = exports.PORT_SEQUENCE = exports.FOOD_PER_SOLDIER = exports.REQUISITION_STABILITY_PENALTY = exports.REQUISITION_AMOUNT = exports.INCITE_BASE_CHANCE = exports.INCITE_BASE_STABILITY_DAMAGE = exports.COST_INCITE = exports.MAX_RECRUITS_PER_TURN = exports.RECRUIT_AMOUNT = exports.RECRUIT_COST = exports.BONUS_FISHING_HUNTING = exports.BONUS_HUNTING_ONLY = void 0;
 // Game constants (pure values)
 var gameConstants_1 = require("./gameConstants");
 Object.defineProperty(exports, "BONUS_HUNTING_ONLY", { enumerable: true, get: function () { return gameConstants_1.BONUS_HUNTING_ONLY; } });
@@ -25,6 +25,23 @@ Object.defineProperty(exports, "INITIAL_PLAYER_RESOURCES", { enumerable: true, g
 Object.defineProperty(exports, "INITIAL_AI_RESOURCES", { enumerable: true, get: function () { return gameConstants_1.INITIAL_AI_RESOURCES; } });
 Object.defineProperty(exports, "FORTIFY_COST", { enumerable: true, get: function () { return gameConstants_1.FORTIFY_COST; } });
 Object.defineProperty(exports, "FORTIFY_DEFENSE_BONUS", { enumerable: true, get: function () { return gameConstants_1.FORTIFY_DEFENSE_BONUS; } });
+Object.defineProperty(exports, "APPEASE_POPULATION_COSTS", { enumerable: true, get: function () { return gameConstants_1.APPEASE_POPULATION_COSTS; } });
+Object.defineProperty(exports, "getAppeaseFoodCost", { enumerable: true, get: function () { return gameConstants_1.getAppeaseFoodCost; } });
+// Port data for multiple maps
+var ports_1 = require("./ports");
+Object.defineProperty(exports, "LARION_PORTS", { enumerable: true, get: function () { return ports_1.LARION_PORTS; } });
+Object.defineProperty(exports, "LARION_NAVAL_TIMES", { enumerable: true, get: function () { return ports_1.LARION_NAVAL_TIMES; } });
+Object.defineProperty(exports, "LARION_LARGE_PORTS", { enumerable: true, get: function () { return ports_1.LARION_LARGE_PORTS; } });
+Object.defineProperty(exports, "LARION_LARGE_NAVAL_TIMES", { enumerable: true, get: function () { return ports_1.LARION_LARGE_NAVAL_TIMES; } });
+Object.defineProperty(exports, "LARION_ALTERNATE_PORTS", { enumerable: true, get: function () { return ports_1.LARION_ALTERNATE_PORTS; } });
+Object.defineProperty(exports, "LARION_ALTERNATE_NAVAL_TIMES", { enumerable: true, get: function () { return ports_1.LARION_ALTERNATE_NAVAL_TIMES; } });
+Object.defineProperty(exports, "ALL_PORTS", { enumerable: true, get: function () { return ports_1.ALL_PORTS; } });
+Object.defineProperty(exports, "isPort", { enumerable: true, get: function () { return ports_1.isPort; } });
+Object.defineProperty(exports, "ALL_NAVAL_TIMES", { enumerable: true, get: function () { return ports_1.ALL_NAVAL_TIMES; } });
+Object.defineProperty(exports, "getNavalTravelTimeUnified", { enumerable: true, get: function () { return ports_1.getNavalTravelTimeUnified; } });
+Object.defineProperty(exports, "getPortsForMap", { enumerable: true, get: function () { return ports_1.getPortsForMap; } });
+Object.defineProperty(exports, "getNavalTimesForMap", { enumerable: true, get: function () { return ports_1.getNavalTimesForMap; } });
+Object.defineProperty(exports, "getNavalTravelTimeForMap", { enumerable: true, get: function () { return ports_1.getNavalTravelTimeForMap; } });
 // Initial data
 var locations_1 = require("./locations");
 Object.defineProperty(exports, "INITIAL_LOCATIONS", { enumerable: true, get: function () { return locations_1.INITIAL_LOCATIONS; } });

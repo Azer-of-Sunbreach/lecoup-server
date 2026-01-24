@@ -6,16 +6,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createInitialState = exports.getInitialResources = exports.generateInitialArmies = void 0;
 const types_1 = require("../types");
-const locations_1 = require("./locations");
-const roads_1 = require("./roads");
+const larion_alternate_1 = require("./maps/larion_alternate");
+const larion_alternate_2 = require("./maps/larion_alternate");
 const characters_1 = require("./characters");
 const gameConstants_1 = require("./gameConstants");
 /**
  * Generate initial armies based on garrison data and locations
  */
 const generateInitialArmies = () => {
-    return Object.entries(locations_1.INITIAL_GARRISONS).map(([locId, strength], index) => {
-        const loc = locations_1.INITIAL_LOCATIONS.find(l => l.id === locId);
+    return Object.entries(larion_alternate_1.LARION_ALTERNATE_GARRISONS).map(([locId, strength], index) => {
+        const loc = larion_alternate_1.LARION_ALTERNATE_LOCATIONS.find(l => l.id === locId);
         if (!loc)
             return null;
         return {
@@ -70,12 +70,12 @@ exports.getInitialResources = getInitialResources;
 const createInitialState = () => ({
     turn: 1,
     playerFaction: types_1.FactionId.REPUBLICANS,
-    locations: locations_1.INITIAL_LOCATIONS,
-    characters: characters_1.CHARACTERS,
+    locations: larion_alternate_1.LARION_ALTERNATE_LOCATIONS,
+    characters: characters_1.CHARACTERS_NEW,
     armies: (0, exports.generateInitialArmies)(),
     convoys: [],
     navalConvoys: [],
-    roads: roads_1.ROADS,
+    roads: larion_alternate_2.LARION_ALTERNATE_ROADS,
     resources: {
         [types_1.FactionId.REPUBLICANS]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.REPUBLICANS },
         [types_1.FactionId.CONSPIRATORS]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.CONSPIRATORS },
@@ -83,7 +83,12 @@ const createInitialState = () => ({
         [types_1.FactionId.NEUTRAL]: { gold: 0 },
     },
     pendingNegotiations: [],
-    logs: ["The coup has begun. Count Rivenberg has claimed the regency for himself.", "Baron Lekal has called on the great Dukes to defend their feudal rights.", "Sir Azer and the Republicans took control of Sunbreach.", "Civil war engulfs Larion."],
+    logs: [
+        { id: 'init_1', type: types_1.LogType.GAME_START, message: "The coup has begun. Count Rivenberg has claimed the regency for himself.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
+        { id: 'init_2', type: types_1.LogType.GAME_START, message: "Baron Lekal has called on the great Dukes to defend their feudal rights.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
+        { id: 'init_3', type: types_1.LogType.GAME_START, message: "Sir Azer and the Republicans took control of Sunbreach.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
+        { id: 'init_4', type: types_1.LogType.GAME_START, message: "Civil war engulfs Larion.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO }
+    ],
     stats: { deathToll: 0 },
     selectedType: null,
     selectedId: null,
@@ -101,6 +106,7 @@ const createInitialState = () => ({
     insurrectionNotification: null,
     famineNotification: null,
     siegeNotification: null,
+    leaderEliminatedNotification: null,
     hasScannedBattles: false
 });
 exports.createInitialState = createInitialState;

@@ -58,6 +58,7 @@ const extractUIState = (state) => {
         insurrectionNotification: state.insurrectionNotification,
         famineNotification: state.famineNotification,
         siegeNotification: state.siegeNotification,
+        leaderEliminatedNotification: state.leaderEliminatedNotification,
         hasScannedBattles: state.hasScannedBattles
     };
 };
@@ -97,6 +98,7 @@ const combineToLegacyState = (core, ui) => {
         insurrectionNotification: ui.insurrectionNotification,
         famineNotification: ui.famineNotification,
         siegeNotification: ui.siegeNotification,
+        leaderEliminatedNotification: ui.leaderEliminatedNotification,
         victory: core.victory,
         hasScannedBattles: ui.hasScannedBattles
     };
@@ -121,6 +123,7 @@ const createInitialUIState = (faction) => ({
     insurrectionNotification: null,
     famineNotification: null,
     siegeNotification: null,
+    leaderEliminatedNotification: null,
     hasScannedBattles: false
 });
 exports.createInitialUIState = createInitialUIState;

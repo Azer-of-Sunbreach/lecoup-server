@@ -23,7 +23,9 @@ const calculateEconomyAndFood = (locs, armies, chars, roads) => {
             if (isEmbargoActive && loc.id === 'great_plains') {
                 embargoBonus = 60;
             }
-            const foodProd = (base * mult) + bonus + collectionMod + embargoBonus;
+            // Burned Fields Deduction
+            const burnedFields = loc.burnedFields || 0;
+            const foodProd = Math.max(0, (base * mult) + bonus + collectionMod + embargoBonus - burnedFields);
             // Armies consume from foodSourceId
             const armiesDrawingFromHere = armies.filter(a => a.foodSourceId === loc.id);
             const armyConsumption = Math.ceil(armiesDrawingFromHere.reduce((sum, a) => sum + a.strength, 0) / 1000);
@@ -114,7 +116,9 @@ const calculateEconomyAndFood = (locs, armies, chars, roads) => {
             // Gré-au-vent special income
             if (loc.id === 'gre_au_vent')
                 bonusGold += 25;
-            const totalGold = Math.max(0, baseGold + goldTaxPart + tradeGold + bonusGold + managerBonus);
+            // Burned Districts Deduction
+            const burnedDistricts = loc.burnedDistricts || 0;
+            const totalGold = Math.max(0, baseGold + goldTaxPart + tradeGold + bonusGold + managerBonus - burnedDistricts);
             return { ...loc, goldIncome: totalGold, foodIncome: foodNet };
         }
         return loc;
