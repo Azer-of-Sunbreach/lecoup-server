@@ -89,9 +89,7 @@ export const executeIncite = (
             logs: [
                 ...state.logs,
                 createInsurrectionPreparationLog(
-                    character.name,
                     character.id,
-                    loc.name,
                     loc.id,
                     loc.faction,
                     state.turn
