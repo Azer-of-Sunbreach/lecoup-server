@@ -166,7 +166,7 @@ export const CLANDESTINE_ACTION_RISKS: Record<string, number> = {
  * One-time actions have costPerTurn = 0.
  */
 export const CLANDESTINE_ACTION_COSTS: Record<string, number> = {
-    UNDERMINE_AUTHORITIES: 20,
+    UNDERMINE_AUTHORITIES: 10,
     DISTRIBUTE_PAMPHLETS: 10,
     INCITE_NEUTRAL_INSURRECTIONS: 50,
     SPREAD_PROPAGANDA: 10,

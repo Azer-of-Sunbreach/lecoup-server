@@ -4,8 +4,8 @@
  */
 
 import { GameState, FactionId, Army, LogType, LogSeverity } from '../types';
-import { INITIAL_LOCATIONS, INITIAL_GARRISONS } from './locations';
-import { ROADS } from './roads';
+import { LARION_ALTERNATE_LOCATIONS, LARION_ALTERNATE_GARRISONS } from './maps/larion_alternate';
+import { LARION_ALTERNATE_ROADS } from './maps/larion_alternate';
 import { CHARACTERS_NEW as CHARACTERS } from './characters';
 import { INITIAL_PLAYER_RESOURCES, INITIAL_AI_RESOURCES } from './gameConstants';
 
@@ -13,8 +13,8 @@ import { INITIAL_PLAYER_RESOURCES, INITIAL_AI_RESOURCES } from './gameConstants'
  * Generate initial armies based on garrison data and locations
  */
 export const generateInitialArmies = (): Army[] => {
-    return Object.entries(INITIAL_GARRISONS).map(([locId, strength], index) => {
-        const loc = INITIAL_LOCATIONS.find(l => l.id === locId);
+    return Object.entries(LARION_ALTERNATE_GARRISONS).map(([locId, strength], index) => {
+        const loc = LARION_ALTERNATE_LOCATIONS.find(l => l.id === locId);
         if (!loc) return null;
         return {
             id: `start_army_${index}`,
@@ -68,12 +68,12 @@ export const getInitialResources = (playerFaction: FactionId) => {
 export const createInitialState = (): GameState => ({
     turn: 1,
     playerFaction: FactionId.REPUBLICANS,
-    locations: INITIAL_LOCATIONS,
+    locations: LARION_ALTERNATE_LOCATIONS,
     characters: CHARACTERS,
     armies: generateInitialArmies(),
     convoys: [],
     navalConvoys: [],
-    roads: ROADS,
+    roads: LARION_ALTERNATE_ROADS,
     resources: {
         [FactionId.REPUBLICANS]: { gold: INITIAL_PLAYER_RESOURCES.REPUBLICANS },
         [FactionId.CONSPIRATORS]: { gold: INITIAL_PLAYER_RESOURCES.CONSPIRATORS },

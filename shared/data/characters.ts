@@ -656,7 +656,7 @@ export const CHARACTERS: OldCharacter[] = [
     {
         id: 'tymon', name: 'Sir Tymon', title: 'Knight Commander', faction: FactionId.CONSPIRATORS, status: CharacterStatus.AVAILABLE, locationId: 'hornvale', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Duty over oaths.',
         bonuses: {},
-        stats: { stabilityPerTurn: 5, commandBonus: 0.15, insurrectionValue: 10, ability: ['NONE'] }
+        stats: { stabilityPerTurn: 3, commandBonus: 0.15, insurrectionValue: 10, ability: ['NONE'] }
     },
     {
         id: 'ethell', name: 'Lady Ethell', title: "King Fredrik's favorite", faction: FactionId.CONSPIRATORS, status: CharacterStatus.AVAILABLE, locationId: 'stormbay', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'An ear in every noble manor.',

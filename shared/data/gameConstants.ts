@@ -32,6 +32,7 @@ export const FOOD_PER_SOLDIER = 0.001; // 1 food unit per 1000 soldiers
 export const PORT_SEQUENCE = ['mirebridge', 'port_de_sable', 'sunbreach', 'stormbay', 'gullwing', 'brinewaith', 'gre_au_vent'];
 
 // Naval travel times (in days/turns) - only stores one direction, function handles symmetry
+// NOTE: This is the base Larion map times. For map-agnostic lookup, use getNavalTravelTimeUnified from ports.ts
 export const NAVAL_TRAVEL_TIMES: Record<string, Record<string, number>> = {
     mirebridge: { port_de_sable: 2, gre_au_vent: 2, sunbreach: 4, brinewaith: 5, stormbay: 6, gullwing: 8 },
     port_de_sable: { sunbreach: 2, gre_au_vent: 2, brinewaith: 3, stormbay: 4, gullwing: 6 },
@@ -41,10 +42,14 @@ export const NAVAL_TRAVEL_TIMES: Record<string, Record<string, number>> = {
     stormbay: { gullwing: 2 }
 };
 
+// Import the unified naval times that includes all maps
+import { ALL_NAVAL_TIMES } from './ports';
+
 // Helper function to get naval travel time between any two ports (handles symmetry)
+// Uses merged travel times from ALL maps to support ports like Cathair
 export const getNavalTravelTime = (from: string, to: string): number => {
     if (from === to) return 0;
-    return NAVAL_TRAVEL_TIMES[from]?.[to] || NAVAL_TRAVEL_TIMES[to]?.[from] || 2;
+    return ALL_NAVAL_TIMES[from]?.[to] || ALL_NAVAL_TIMES[to]?.[from] || 2;
 };
 
 // Deprecated - kept for reference

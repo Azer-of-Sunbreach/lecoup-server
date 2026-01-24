@@ -27,6 +27,25 @@ export {
     getAppeaseFoodCost,
 } from './gameConstants';
 
+// Port data for multiple maps
+export {
+    LARION_PORTS,
+    LARION_NAVAL_TIMES,
+    LARION_LARGE_PORTS,
+    LARION_LARGE_NAVAL_TIMES,
+    LARION_ALTERNATE_PORTS,
+    LARION_ALTERNATE_NAVAL_TIMES,
+    ALL_PORTS,
+    isPort,
+    ALL_NAVAL_TIMES,
+    getNavalTravelTimeUnified,
+    getPortsForMap,
+    getNavalTimesForMap,
+    getNavalTravelTimeForMap,
+} from './ports';
+
+export type { MapId as PortMapId } from './ports';
+
 export type { FortificationLevel } from './gameConstants';
 
 // Initial data
