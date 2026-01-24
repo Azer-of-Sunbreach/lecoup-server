@@ -22,6 +22,11 @@ export {
   FORTIFY_COST,
   FORTIFY_DEFENSE_BONUS,
 
+  // Multi-map port support
+  getPortsForMap,
+  getNavalTimesForMap,
+  getNavalTravelTimeForMap,
+
   // Data
   INITIAL_LOCATIONS,
   INITIAL_GARRISONS,

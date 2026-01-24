@@ -93,6 +93,10 @@ export interface LogEntry {
 
   // Element to highlight on map when hovering this log
   highlightTarget?: LogHighlightTarget;
+
+  // Internationalization
+  i18nKey?: string;               // Key in logs.json (e.g. "turnMarker")
+  i18nParams?: Record<string, any>; // Parameters for the translation
 }
 
 // Extended to include new abilities from leader system refactoring
@@ -375,6 +379,10 @@ export interface Character {
    * Preserves intent during travel so agent executes the correct plan on arrival.
    */
   plannedMissionAction?: import('./types/clandestineTypes').ClandestineActionId;
+
+  // === Evolution 6: Anti-Exploit (2026-01-13) ===
+  /** Last turn this leader was exfiltrated/moved. Prevents double-exfiltration exploit. */
+  lastExfiltrationTurn?: number;
 }
 
 export interface NegotiationMission {
