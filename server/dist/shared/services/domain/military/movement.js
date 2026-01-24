@@ -9,6 +9,7 @@ exports.executeSplitArmy = exports.executeArmyMove = exports.canMoveArmy = void 
 const types_1 = require("../../../types");
 const data_1 = require("../../../data");
 const economy_1 = require("../../../utils/economy");
+const logFactory_1 = require("../../../services/logs/logFactory");
 /**
  * Check if an army can move to a destination
  */
@@ -122,12 +123,12 @@ const executeArmyMove = (state, armyId, destLocId, playerFaction) => {
                                 return { ...l, stability: Math.min(100, l.stability + 20) };
                             return l;
                         });
-                        newLogs = [...newLogs, "Grain Trade restored by conquest."];
+                        newLogs = [...newLogs, (0, logFactory_1.createGrainTradeConquestLog)(state.turn)];
                         newTradeNotification = { type: 'RESTORED', factionName: "Changes in control" };
                     }
                 }
             }
-            newLogs = [...newLogs, `${destLoc.name} secured by ${types_1.FACTION_NAMES[playerFaction]}.`];
+            newLogs = [...newLogs, (0, logFactory_1.createLocationSecuredLog)(destLoc.name, destLocId, destLoc.faction, playerFaction, state.turn)];
         }
     }
     else {
@@ -167,8 +168,14 @@ const executeArmyMove = (state, armyId, destLocId, playerFaction) => {
             foodSourceId: newFoodSourceId
         } : a);
         updatedChars = updatedChars.map(c => c.armyId === armyId ? { ...c, status: types_1.CharacterStatus.MOVING } : c);
-        const destName = state.locations.find(l => l.id === destLocId)?.name;
-        newLogs = [...newLogs, `Forces marching to ${destName}.`];
+        const destLoc = state.locations.find(l => l.id === destLocId);
+        const destName = destLoc?.name || 'Unknown';
+        const destFaction = destLoc?.faction || types_1.FactionId.NEUTRAL;
+        // Only add log if enemy is marching to player's territory
+        const approachingLog = (0, logFactory_1.createForcesApproachingLog)(destName, destFaction, playerFaction, armyId, state.turn);
+        if (approachingLog) {
+            newLogs = [...newLogs, approachingLog];
+        }
     }
     // Recalculate Economy
     updatedLocs = (0, economy_1.calculateEconomyAndFood)(updatedLocs, updatedArmies, updatedChars, state.roads);

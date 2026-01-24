@@ -6,3 +6,4 @@ export * from './politics';
 export * from './economy';
 export * from './retreat';
 export * from './convoys';
+export * from './territorial';

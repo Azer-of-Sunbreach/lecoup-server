@@ -3,11 +3,12 @@
  * Handles player negotiations with neutral factions
  * Extracted from App.tsx handleNegotiate()
  */
-import { GameState, FactionId } from '../../../types';
+import { GameState, FactionId, LogEntry } from '../../../types';
 export interface NegotiationResult {
     success: boolean;
     newState: Partial<GameState>;
     message: string;
+    log?: LogEntry;
 }
 /**
  * Initiate a negotiation with a neutral location

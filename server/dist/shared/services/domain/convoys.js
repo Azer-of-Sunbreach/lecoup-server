@@ -6,6 +6,9 @@ const executeSendConvoy = (state, locationId, amount, destinationId, faction) =>
     const loc = state.locations.find(l => l.id === locationId);
     if (!loc)
         return { success: false, newState: state, error: 'Location not found' };
+    // Validation: Cannot send convoy to itself
+    if (locationId === destinationId)
+        return { success: false, newState: state, error: 'Cannot send convoy to same location' };
     // Validation (simplified)
     if (loc.faction !== faction)
         return { success: false, newState: state, error: 'Not your location' };
@@ -42,25 +45,31 @@ const executeSendConvoy = (state, locationId, amount, destinationId, faction) =>
         newState: {
             ...state,
             locations: newLocations,
-            convoys: [...state.convoys, newConvoy],
-            logs: [...state.logs, `Convoy dispatched to ${destCity.name}.`]
+            convoys: [...state.convoys, newConvoy]
+            // Convoy dispatch log removed - player action doesn't need logging
         }
     };
 };
 exports.executeSendConvoy = executeSendConvoy;
 const executeSendNavalConvoy = (state, locationId, amount, destinationId, faction) => {
     const loc = state.locations.find(l => l.id === locationId);
-    if (!loc)
+    if (!loc) {
+        console.log(`[NAVAL] Failed: Location not found (${locationId})`);
         return { success: false, newState: state, error: 'Location not found' };
+    }
     if (loc.faction !== faction)
         return { success: false, newState: state, error: 'Not your location' };
-    if (loc.foodStock < amount)
+    if (loc.foodStock < amount) {
+        console.log(`[NAVAL] Failed: Insufficient food at ${locationId}. Has ${loc.foodStock}, needs ${amount}`);
         return { success: false, newState: state, error: 'Not enough food' };
+    }
     if (!loc.isCoastal)
         return { success: false, newState: state, error: 'Location not coastal' };
     const destCity = state.locations.find(l => l.id === destinationId);
-    if (!destCity)
+    if (!destCity) {
+        console.log(`[NAVAL] Failed: Destination not found (${destinationId})`);
         return { success: false, newState: state, error: 'Destination not found' };
+    }
     if (!destCity.isCoastal)
         return { success: false, newState: state, error: 'Destination not coastal' };
     const days = (0, constants_1.getNavalTravelTime)(locationId, destinationId);
@@ -78,8 +87,8 @@ const executeSendNavalConvoy = (state, locationId, amount, destinationId, factio
         newState: {
             ...state,
             locations: newLocations,
-            navalConvoys: [...state.navalConvoys, newNavalConvoy],
-            logs: [...state.logs, `Naval convoy dispatched to ${destCity.name}.`]
+            navalConvoys: [...state.navalConvoys, newNavalConvoy]
+            // Naval convoy dispatch log removed - player action doesn't need logging
         }
     };
 };

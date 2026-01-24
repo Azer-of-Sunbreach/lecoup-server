@@ -17,6 +17,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executeIncite = void 0;
 const types_1 = require("../../../types");
+const logFactory_1 = require("../../logs/logFactory");
 /**
  * Execute insurrection initiation
  *
@@ -67,7 +68,10 @@ const executeIncite = (state, locId, charId, goldAmount, faction) => {
                     gold: state.resources[faction].gold - finalCost
                 }
             },
-            logs: [...state.logs, `${character.name} is preparing an insurrection in ${loc.name}.`].slice(-50)
+            logs: [
+                ...state.logs,
+                (0, logFactory_1.createInsurrectionPreparationLog)(character.name, loc.name, loc.id, loc.faction, state.turn)
+            ]
         },
         message: `${character.name} is preparing an insurrection in ${loc.name}`
     };

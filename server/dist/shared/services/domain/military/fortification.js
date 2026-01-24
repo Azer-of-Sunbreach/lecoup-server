@@ -24,14 +24,17 @@ const executeFortify = (state, type, id, faction, stageIndex) => {
         activeConstruction = stage?.activeConstruction;
     }
     if (activeConstruction) {
+        console.log(`[FORTIFY] Failed: Construction in progress at ${id} (idx: ${stageIndex})`);
         return { success: false, newState: {}, message: 'Construction already in progress' };
     }
     const nextLevel = currentLevel + 1;
     const fortData = data_1.FORTIFICATION_LEVELS[nextLevel];
     if (!fortData) {
+        console.log(`[FORTIFY] Failed: Max level reached at ${id}`);
         return { success: false, newState: {}, message: 'Maximum fortification level reached' };
     }
     if (state.resources[faction].gold < fortData.cost) {
+        console.log(`[FORTIFY] Failed: Insufficient gold (${state.resources[faction].gold} < ${fortData.cost})`);
         return { success: false, newState: {}, message: 'Insufficient gold' };
     }
     // Filter eligible armies
@@ -45,6 +48,7 @@ const executeFortify = (state, type, id, faction, stageIndex) => {
             : (a.locationType === 'ROAD' && a.roadId === id && a.stageIndex === stageIndex)));
     const totalAvailable = eligibleArmies.reduce((sum, a) => sum + a.strength, 0);
     if (totalAvailable < fortData.manpower) {
+        console.log(`[FORTIFY] Failed: Low manpower at ${id}. Need ${fortData.manpower}, have ${totalAvailable}. Eligible armies: ${eligibleArmies.length}`);
         return { success: false, newState: {}, message: `Need ${fortData.manpower} troops, have ${totalAvailable}` };
     }
     // Prepare Merge & Split
@@ -118,8 +122,8 @@ const executeFortify = (state, type, id, faction, stageIndex) => {
                     ...state.resources[faction],
                     gold: state.resources[faction].gold - fortData.cost
                 }
-            },
-            logs: [...state.logs, `Construction of ${fortData.name} started.`].slice(-50)
+            }
+            // Construction log removed - player action doesn't need logging
         },
         message: `Construction of ${fortData.name} started`
     };

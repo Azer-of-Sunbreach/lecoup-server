@@ -15,9 +15,7 @@ export interface LeaderActionResult {
 export declare const executeAttachLeader: (state: GameState, armyId: string, charId: string) => LeaderActionResult;
 /**
  * Detach a leader from their army
+ * NOTE: If leader is GOVERNING, they retain that status (governor can command armies in their region)
  */
 export declare const executeDetachLeader: (state: GameState, charId: string) => LeaderActionResult;
-/**
- * Move a leader to a new location
- */
 export declare const executeMoveLeader: (state: GameState, charId: string, destId: string) => LeaderActionResult;

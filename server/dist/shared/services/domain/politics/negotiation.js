@@ -6,6 +6,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executeNegotiate = void 0;
+const logFactory_1 = require("../../logs/logFactory");
 /**
  * Initiate a negotiation with a neutral location
  */
@@ -23,7 +24,10 @@ const executeNegotiate = (state, locId, gold, food, foodSourceIds, faction) => {
         }
         newLocations = newLocations.map(l => l.id === foodSourceIds[0] ? { ...l, foodStock: l.foodStock - food } : l);
     }
-    const targetName = state.locations.find(l => l.id === locId)?.name || 'Unknown';
+    const target = state.locations.find(l => l.id === locId);
+    const targetName = target?.name || 'Unknown';
+    // Create multiplayer notification log (WARNING for other players)
+    const negotiationLog = (0, logFactory_1.createNegotiationAttemptLog)(targetName, locId, faction, state.turn);
     return {
         success: true,
         newState: {
@@ -38,17 +42,17 @@ const executeNegotiate = (state, locId, gold, food, foodSourceIds, faction) => {
             pendingNegotiations: [
                 ...state.pendingNegotiations,
                 {
-                    factionId: faction, // FIX: Added missing factionId
+                    factionId: faction,
                     targetLocationId: locId,
                     goldOffer: gold,
                     foodOffer: food,
                     foodSourceCityIds: foodSourceIds,
                     turnsRemaining: 0
                 }
-            ],
-            logs: [...state.logs, `Agent sent to negotiate with ${targetName}.`].slice(-50)
+            ]
         },
-        message: `Agent sent to negotiate with ${targetName}`
+        message: `Agent sent to negotiate with ${targetName}`,
+        log: negotiationLog // Return log for multiplayer broadcast
     };
 };
 exports.executeNegotiate = executeNegotiate;

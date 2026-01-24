@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Domain Services - Main Barrel File
+ * Leaders Domain Services - Index
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -17,15 +17,4 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// Military services
-__exportStar(require("./military"), exports);
-// Politics services
-__exportStar(require("./politics"), exports);
-// Economy services
-__exportStar(require("./economy"), exports);
-// Retreat services
-__exportStar(require("./retreat"), exports);
-// Logistics services
-__exportStar(require("./convoys"), exports);
-// Territorial services
-__exportStar(require("./territorial"), exports);
+__exportStar(require("./leaderPathfinding"), exports);
