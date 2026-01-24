@@ -95,7 +95,6 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
 
                     // Success log - visible to all, WARNING for enemies, INFO for winner
                     const successLog = createNegotiationsSuccessLog(
-                        target.name,
                         target.id,
                         winnerFaction,
                         state.turn
@@ -104,7 +103,6 @@ export function processNegotiations(state: GameState): NegotiationProcessingResu
                 } else {
                     // Failed log - visible only to initiator per user request
                     const failedLog = createNegotiationsFailedLog(
-                        target.name,
                         target.id,
                         neg.factionId || state.playerFaction,
                         state.turn

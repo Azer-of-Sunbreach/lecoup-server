@@ -241,7 +241,7 @@ export function resolveAIBattles(
                                 : c
                         );
                         // Leader death log - INFO severity
-                        const deathLog = createLeaderDiedLog(leader.name, leader.id, state.turn);
+                        const deathLog = createLeaderDiedLog(leader.id, state.turn);
                         logs.push(deathLog);
                     } else {
                         const escapeLocs = locations.filter(loc => loc.faction === leader.faction);

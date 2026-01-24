@@ -38,7 +38,7 @@ export function processFamine(state: GameState): FamineProcessingResult {
                 const newStab = Math.max(0, loc.stability - 30);
                 if (loc.stability > 0) {
                     // Updated message per user request
-                    const famineLog = createFamineLog(loc.name, loc.faction, state.turn);
+                    const famineLog = createFamineLog(loc.id, loc.faction, state.turn);
                     logs.push(famineLog);
                 }
                 return { ...loc, foodStock: 0, stability: newStab };
@@ -47,7 +47,7 @@ export function processFamine(state: GameState): FamineProcessingResult {
                 const newStab = Math.max(0, loc.stability - 5);
                 // Generate warning log for low food stocks
                 if (loc.faction !== FactionId.NEUTRAL) {
-                    const lowFoodLog = createLowFoodWarningLog(loc.name, loc.id, loc.faction, state.turn);
+                    const lowFoodLog = createLowFoodWarningLog(loc.id, loc.faction, state.turn);
                     logs.push(lowFoodLog);
                 }
                 return { ...loc, foodStock: projectedStock, stability: newStab };
