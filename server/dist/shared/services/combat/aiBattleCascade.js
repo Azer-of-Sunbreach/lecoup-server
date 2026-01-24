@@ -6,11 +6,21 @@ const types_1 = require("../../types");
 const constants_1 = require("../../constants");
 const combatDetection_1 = require("../combatDetection");
 const powerCalculation_1 = require("./powerCalculation");
+const governorService_1 = require("../domain/governor/governorService");
+const leaderStatusUpdates_1 = require("../turnLogic/leaderStatusUpdates");
 /**
  * Auto-resolve all AI vs AI battles (neither faction is player)
  * Loops until no more AI battles exist (max 10 iterations for safety)
+ *
+ * @param playerFaction - The player's faction (or AI faction in multiplayer)
+ * @param armies - Current armies
+ * @param characters - Current characters
+ * @param locations - Current locations
+ * @param roads - Current roads
+ * @param stats - Current game stats
+ * @param humanFactions - Array of human-controlled factions (for multiplayer)
  */
-const resolveAIBattleCascade = (playerFaction, armies, characters, locations, roads, stats) => {
+const resolveAIBattleCascade = (playerFaction, armies, characters, locations, roads, stats, humanFactions) => {
     let newArmies = [...armies];
     let newCharacters = [...characters];
     let newLocations = [...locations];
@@ -21,8 +31,16 @@ const resolveAIBattleCascade = (playerFaction, armies, characters, locations, ro
     let loops = 0;
     while (loops < 10) {
         loops++;
-        const aiBattles = currentBattles.filter(b => b.attackerFaction !== playerFaction &&
-            b.defenderFaction !== playerFaction &&
+        // FIX: In multiplayer, check against ALL human factions, not just playerFaction
+        // In single-player, humanFactions is undefined so we fall back to playerFaction check
+        const isHumanFaction = (faction) => {
+            if (humanFactions && humanFactions.length > 0) {
+                return humanFactions.includes(faction);
+            }
+            return faction === playerFaction;
+        };
+        const aiBattles = currentBattles.filter(b => !isHumanFaction(b.attackerFaction) &&
+            !isHumanFaction(b.defenderFaction) &&
             !b.attackers.some(a => a.isSieging));
         if (aiBattles.length === 0)
             break;
@@ -43,13 +61,38 @@ const resolveAIBattleCascade = (playerFaction, armies, characters, locations, ro
                 newLocations = newLocations.map(l => {
                     if (l.id === battle.locationId) {
                         const newFort = Math.max(0, l.fortificationLevel - 1);
-                        return {
+                        // Stability handling for insurgent victories:
+                        // - Faction insurrections (attackerFaction != NEUTRAL): +10 stability max
+                        // - Spontaneous neutral uprisings (attackerFaction == NEUTRAL): no change
+                        let newStability = l.stability;
+                        if (battle.isInsurgentBattle) {
+                            if (battle.attackerFaction !== types_1.FactionId.NEUTRAL) {
+                                // Faction insurrection victory: +10 stability max
+                                newStability = Math.min(l.stability + 10, 100);
+                            }
+                            // Neutral spontaneous uprising: no stability change
+                        }
+                        const updatedLoc = {
                             ...l,
                             faction: battle.attackerFaction,
                             defense: constants_1.FORTIFICATION_LEVELS[newFort].bonus,
                             fortificationLevel: newFort,
-                            stability: battle.isInsurgentBattle ? Math.max(49, l.stability) : l.stability
+                            stability: newStability
                         };
+                        // GOVERNOR VALIDATION for previous owner
+                        // Default to turn 0 as we don't have turn info here
+                        const governor = newCharacters.find(c => c.locationId === battle.locationId && c.status === types_1.CharacterStatus.GOVERNING && c.faction === l.faction);
+                        if (governor) {
+                            const validation = (0, governorService_1.validateGovernorStatus)(governor, updatedLoc, newLocations, newRoads, 0);
+                            if (!validation.isValid) {
+                                newCharacters = newCharacters.map(c => c.id === validation.character.id ? validation.character : c);
+                                if (validation.log)
+                                    logMessages.push(validation.log.message);
+                            }
+                        }
+                        // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                        newCharacters = (0, leaderStatusUpdates_1.handleLeaderStatusOnCapture)(updatedLoc.id, updatedLoc.faction, newCharacters);
+                        return updatedLoc;
                     }
                     return l;
                 });
@@ -90,7 +133,7 @@ const resolveAIBattleCascade = (playerFaction, armies, characters, locations, ro
                     logMessages.push(`${l.name} died.`);
                 }
                 else {
-                    newCharacters = newCharacters.map(c => c.id === l.id ? { ...c, status: types_1.CharacterStatus.AVAILABLE, armyId: undefined } : c);
+                    newCharacters = newCharacters.map(c => c.id === l.id ? { ...c, status: types_1.CharacterStatus.AVAILABLE, armyId: null } : c);
                 }
             }
         });

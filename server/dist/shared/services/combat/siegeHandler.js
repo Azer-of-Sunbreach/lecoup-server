@@ -43,6 +43,7 @@ const handleSiege = (combat, siegeCost, playerFaction, armies, locations, roads,
                 const remainder = sieger.strength - reqMen;
                 const siegeArmyId = `siege_force_${Date.now()}`;
                 const siegeTargetId = combat.locationId || combat.roadId;
+                // Siege army retreats to build siege weapons
                 const siegeArmy = {
                     ...sieger,
                     ...retreatPos,
@@ -56,18 +57,21 @@ const handleSiege = (combat, siegeCost, playerFaction, armies, locations, roads,
                     tripDestinationId: siegeTargetId,
                     turnsUntilArrival: 0
                 };
-                // FIX: Remainder army should NOT have enemy city as destination!
-                // Clear destination and garrison to prevent auto-attack next turn
+                // Remainder army STAYS at combat location to attack the weakened fortification
                 const siegerExists = newArmies.some(a => a.id === sieger.id);
                 const remainderArmy = {
                     ...sieger,
-                    ...retreatPos, // Move to retreat position
+                    // Keep at combat location, NOT retreat position
+                    locationType: 'LOCATION',
+                    locationId: combat.locationId,
+                    roadId: null,
+                    stageIndex: 0,
                     strength: remainder,
-                    isSpent: true, // Spent this turn
+                    isSpent: false, // Can continue acting (attack weakened position)
                     isSieging: false,
-                    isGarrisoned: true, // Stay in place, don't auto-move
-                    destinationId: null, // CRITICAL: Clear destination to prevent auto-attack
-                    tripDestinationId: null, // Clear trip destination too
+                    isGarrisoned: false, // Will try to attack
+                    destinationId: combat.locationId, // Keep destination to attack
+                    tripDestinationId: combat.locationId,
                     turnsUntilArrival: 0
                 };
                 if (siegerExists) {
@@ -102,23 +106,106 @@ const handleSiege = (combat, siegeCost, playerFaction, armies, locations, roads,
             }
         }
     }
-    else {
-        // Road siege
-        const roadSiegeTargetId = combat.roadId;
-        newArmies = newArmies.map(a => {
-            if (attIds.includes(a.id)) {
-                return {
-                    ...a,
+    else if (combat.roadId && combat.stageIndex !== undefined) {
+        // Road siege - same split logic as location sieges
+        const road = roads.find(r => r.id === combat.roadId);
+        const stage = road?.stages.find(s => s.index === combat.stageIndex);
+        const curLevel = stage ? stage.fortificationLevel : 0;
+        const reqMen = curLevel >= 3 ? 1000 : 500;
+        const sortedAttackers = newArmies.filter(a => attIds.includes(a.id)).sort((a, b) => b.strength - a.strength);
+        if (sortedAttackers.length > 0 && road) {
+            const sieger = sortedAttackers[0];
+            // Calculate retreat position for siege army (one stage back from combat)
+            // The siege force retreats to build siege weapons while remainder attacks
+            const retreatStageIndex = sieger.direction === 'FORWARD'
+                ? Math.max(0, combat.stageIndex - 1) // Going forward, retreat is stage behind
+                : Math.min(road.stages.length - 1, combat.stageIndex + 1); // Going backward, retreat is stage ahead
+            // Check if we can retreat - if at stage 0 going forward or last stage going backward,
+            // retreat to the origin location instead
+            const canRetreatOnRoad = (sieger.direction === 'FORWARD' && combat.stageIndex > 0) ||
+                (sieger.direction === 'BACKWARD' && combat.stageIndex < road.stages.length - 1);
+            let siegePosition;
+            if (canRetreatOnRoad) {
+                siegePosition = {
+                    locationType: 'ROAD',
+                    locationId: null,
+                    roadId: combat.roadId,
+                    stageIndex: retreatStageIndex
+                };
+            }
+            else {
+                // Retreat to origin location
+                const originLocId = sieger.direction === 'FORWARD' ? road.from : road.to;
+                siegePosition = {
+                    locationType: 'LOCATION',
+                    locationId: originLocId,
+                    roadId: null,
+                    stageIndex: 0
+                };
+            }
+            // Combat position for remainder (stays at combat stage to fight)
+            const combatPosition = {
+                locationType: 'ROAD',
+                locationId: null,
+                roadId: combat.roadId,
+                stageIndex: combat.stageIndex
+            };
+            if (sieger.strength > reqMen) {
+                // Split army: siege force + remainder
+                const remainder = sieger.strength - reqMen;
+                const siegeArmyId = `siege_force_${Date.now()}`;
+                // Siege army retreats to build siege weapons
+                const siegeArmy = {
+                    ...sieger,
+                    ...siegePosition,
+                    id: siegeArmyId,
+                    strength: reqMen,
+                    isSieging: true,
+                    isGarrisoned: false, // Will try to advance next turn
+                    isSpent: true,
+                    action: undefined,
+                    destinationId: sieger.destinationId,
+                    tripDestinationId: sieger.tripDestinationId,
+                    turnsUntilArrival: 0
+                };
+                // Remainder army stays at combat stage to attack
+                const siegerExists = newArmies.some(a => a.id === sieger.id);
+                const remainderArmy = {
+                    ...sieger,
+                    ...combatPosition,
+                    strength: remainder,
+                    isSpent: false, // Can continue acting (attack weakened position)
+                    isSieging: false,
+                    isGarrisoned: false, // Will try to advance next turn
+                    turnsUntilArrival: 0
+                };
+                if (siegerExists) {
+                    newArmies = newArmies.map(a => a.id === sieger.id ? remainderArmy : a);
+                }
+                else {
+                    newArmies.push(remainderArmy);
+                }
+                newArmies.push(siegeArmy);
+            }
+            else {
+                // Entire army becomes siege force and retreats
+                const siegerExists = newArmies.some(a => a.id === sieger.id);
+                const updatedSieger = {
+                    ...sieger,
+                    ...siegePosition,
                     isSieging: true,
                     isGarrisoned: true,
                     isSpent: true,
-                    destinationId: a.destinationId || roadSiegeTargetId,
-                    tripDestinationId: a.tripDestinationId || roadSiegeTargetId,
                     turnsUntilArrival: 0
                 };
+                if (siegerExists) {
+                    newArmies = newArmies.map(a => a.id === sieger.id ? updatedSieger : a);
+                }
+                else {
+                    newArmies.push(updatedSieger);
+                }
             }
-            return a;
-        });
+        }
     }
     // Update fortification levels
     if (combat.locationId) {

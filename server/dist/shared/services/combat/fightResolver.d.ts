@@ -10,4 +10,4 @@ export interface FightResult {
 /**
  * Resolve a direct combat engagement (FIGHT choice)
  */
-export declare const resolveFight: (combat: CombatState, armies: Army[], characters: Character[], locations: Location[], roads: Road[], stats: GameStats) => FightResult;
+export declare const resolveFight: (combat: CombatState, armies: Army[], characters: Character[], locations: Location[], roads: Road[], stats: GameStats, turn?: number) => FightResult;

@@ -2,13 +2,19 @@
 // Retreat Handler - Handles RETREAT and RETREAT_CITY choices
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleDefenderRetreatToCity = exports.handleAttackerRetreat = void 0;
+const types_1 = require("../../types");
 const helpers_1 = require("./helpers");
+const governorService_1 = require("../domain/governor/governorService");
+const leaderStatusUpdates_1 = require("../turnLogic/leaderStatusUpdates");
+const types_2 = require("../../types");
 /**
  * Handle attacker retreat (RETREAT choice)
+ * FIX BUG RETRAITE 2: After retreat, advance blocked defenders one step
  */
-const handleAttackerRetreat = (combat, armies, prevArmies, roads, locations) => {
+const handleAttackerRetreat = (combat, armies, prevArmies, roads, locations, characters) => {
     let newArmies = [...armies];
     let newLocations = [...locations];
+    let newCharacters = [...characters];
     combat.attackers.forEach(army => {
         // First try to find in newArmies (accounts for siege split modifications)
         // Then fallback to prevState, then to the combat snapshot
@@ -56,9 +62,61 @@ const handleAttackerRetreat = (combat, armies, prevArmies, roads, locations) => 
             newArmies.push(updatedArmy);
         }
     });
+    // FIX BUG RETRAITE 2: Advance blocked defenders
+    // Defenders who were blocked by collision (not justMoved, have destination, not garrisoned)
+    // should now advance one step since the attacker retreated
+    combat.defenders.forEach(defenderSnapshot => {
+        const defender = newArmies.find(a => a.id === defenderSnapshot.id);
+        if (!defender)
+            return;
+        // Only advance if:
+        // 1. Not already moved this turn (was blocked by collision)
+        // 2. Has a destination (was intending to move)
+        // 3. Not garrisoned (not stationary)
+        // 4. On a road (road-to-road movement)
+        if (!defender.justMoved &&
+            defender.destinationId &&
+            !defender.isGarrisoned &&
+            defender.locationType === 'ROAD' &&
+            defender.roadId) {
+            const road = roads.find(r => r.id === defender.roadId);
+            if (!road)
+                return;
+            // Calculate next stage index based on direction
+            const nextIndex = defender.stageIndex + (defender.direction === 'FORWARD' ? 1 : -1);
+            // Check if arriving at destination
+            if (nextIndex < 0 || nextIndex >= road.stages.length) {
+                // Arriving at destination location
+                const destLoc = locations.find(l => l.id === defender.destinationId);
+                if (destLoc) {
+                    newArmies = newArmies.map(a => a.id === defender.id ? {
+                        ...a,
+                        locationType: 'LOCATION',
+                        locationId: defender.destinationId,
+                        roadId: null,
+                        stageIndex: 0,
+                        destinationId: null,
+                        turnsUntilArrival: 0,
+                        justMoved: true,
+                        lastSafePosition: { type: 'LOCATION', id: defender.destinationId }
+                    } : a);
+                }
+            }
+            else {
+                // Continue on road
+                newArmies = newArmies.map(a => a.id === defender.id ? {
+                    ...a,
+                    stageIndex: nextIndex,
+                    turnsUntilArrival: Math.max(0, a.turnsUntilArrival - 1),
+                    justMoved: true
+                } : a);
+            }
+        }
+    });
     return {
         armies: newArmies,
         locations: newLocations,
+        characters: newCharacters,
         logMessage: "Attackers retreated."
     };
 };
@@ -66,9 +124,10 @@ exports.handleAttackerRetreat = handleAttackerRetreat;
 /**
  * Handle defender retreat to linked city (RETREAT_CITY choice)
  */
-const handleDefenderRetreatToCity = (combat, armies, locations) => {
+const handleDefenderRetreatToCity = (combat, armies, locations, characters) => {
     let newArmies = [...armies];
     let newLocations = [...locations];
+    let newCharacters = [...characters];
     let logMsg = "";
     if (combat.locationId) {
         const loc = locations.find(l => l.id === combat.locationId);
@@ -87,13 +146,39 @@ const handleDefenderRetreatToCity = (combat, armies, locations) => {
             const isInsurgentBattle = combat.isInsurgentBattle || combat.attackers.some(a => a.isInsurgent);
             newLocations = newLocations.map(l => {
                 if (l.id === combat.locationId) {
-                    const newStability = isInsurgentBattle ? Math.max(49, l.stability) : l.stability;
-                    return {
+                    // Stability handling for insurgent victories:
+                    // - Faction insurrections (attackerFaction != NEUTRAL): +10 stability max
+                    // - Spontaneous neutral uprisings (attackerFaction == NEUTRAL): no change
+                    let newStability = l.stability;
+                    if (isInsurgentBattle) {
+                        if (combat.attackerFaction !== types_1.FactionId.NEUTRAL) {
+                            // Faction insurrection victory: +10 stability max
+                            newStability = Math.min(l.stability + 10, 100);
+                        }
+                        // Neutral spontaneous uprising: no stability change
+                    }
+                    const updatedLoc = {
                         ...l,
                         faction: combat.attackerFaction,
                         defense: 0,
-                        stability: newStability
+                        stability: newStability,
+                        // Clear governor policies when location changes hands
+                        governorPolicies: {}
                     };
+                    // GOVERNOR VALIDATION for previous owner (defender)
+                    const governor = newCharacters.find(c => c.locationId === combat.locationId && c.status === types_2.CharacterStatus.GOVERNING && c.faction === l.faction);
+                    if (governor) {
+                        // Use newLocations (which contains other potential friendly territories)
+                        const validation = (0, governorService_1.validateGovernorStatus)(governor, updatedLoc, newLocations, [], 0); // No roads passed, turn 0
+                        if (!validation.isValid) {
+                            newCharacters = newCharacters.map(c => c.id === validation.character.id ? validation.character : c);
+                            if (validation.log)
+                                logMsg += ` ${validation.log.message}`;
+                        }
+                    }
+                    // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                    newCharacters = (0, leaderStatusUpdates_1.handleLeaderStatusOnCapture)(updatedLoc.id, updatedLoc.faction, newCharacters);
+                    return updatedLoc;
                 }
                 return l;
             });
@@ -103,6 +188,7 @@ const handleDefenderRetreatToCity = (combat, armies, locations) => {
     return {
         armies: newArmies,
         locations: newLocations,
+        characters: newCharacters,
         logMessage: logMsg
     };
 };

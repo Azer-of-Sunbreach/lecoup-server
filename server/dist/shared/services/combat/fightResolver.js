@@ -2,14 +2,19 @@
 // Fight Resolver - Handles direct combat (FIGHT choice)
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.resolveFight = void 0;
+const types_1 = require("../../types");
 const constants_1 = require("../../constants");
 const powerCalculation_1 = require("./powerCalculation");
 const leaderSurvival_1 = require("./leaderSurvival");
+const orphanedLeaders_1 = require("./orphanedLeaders");
 const helpers_1 = require("./helpers");
+const makeExamples_1 = require("../domain/governor/makeExamples");
+const governorService_1 = require("../domain/governor/governorService");
+const leaderStatusUpdates_1 = require("../turnLogic/leaderStatusUpdates");
 /**
  * Resolve a direct combat engagement (FIGHT choice)
  */
-const resolveFight = (combat, armies, characters, locations, roads, stats) => {
+const resolveFight = (combat, armies, characters, locations, roads, stats, turn = 0) => {
     let newArmies = [...armies];
     let newCharacters = [...characters];
     let newLocations = [...locations];
@@ -85,14 +90,40 @@ const resolveFight = (combat, armies, characters, locations, roads, stats) => {
                 if (l.id === combat.locationId) {
                     const newFortLevel = Math.max(0, l.fortificationLevel - 1);
                     const newDefense = constants_1.FORTIFICATION_LEVELS[newFortLevel].bonus;
-                    const newStability = combat.isInsurgentBattle ? Math.max(49, l.stability) : l.stability;
-                    return {
+                    // Stability handling for insurgent victories:
+                    // - Faction insurrections (attackerFaction != NEUTRAL): +10 stability max
+                    // - Spontaneous neutral uprisings (attackerFaction == NEUTRAL): no change
+                    let newStability = l.stability;
+                    if (combat.isInsurgentBattle) {
+                        if (combat.attackerFaction !== types_1.FactionId.NEUTRAL) {
+                            // Faction insurrection victory: +10 stability max
+                            newStability = Math.min(l.stability + 10, 100);
+                        }
+                        // Neutral spontaneous uprising: no stability change
+                    }
+                    const updatedLoc = {
                         ...l,
                         faction: combat.attackerFaction,
                         defense: newDefense,
                         fortificationLevel: newFortLevel,
-                        stability: newStability
+                        stability: newStability,
+                        // Clear governor policies when location changes hands
+                        governorPolicies: {}
                     };
+                    // GOVERNOR VALIDATION for previous owner
+                    const governor = newCharacters.find(c => c.locationId === combat.locationId && c.status === types_1.CharacterStatus.GOVERNING && c.faction === l.faction);
+                    if (governor) {
+                        // Use newLocations (which contains other potential friendly territories) for flee destination
+                        const validation = (0, governorService_1.validateGovernorStatus)(governor, updatedLoc, newLocations, newRoads, 0); // Turn 0?
+                        if (!validation.isValid) {
+                            newCharacters = newCharacters.map(c => c.id === validation.character.id ? validation.character : c);
+                            if (validation.log)
+                                logMsg += ` ${validation.log.message}`;
+                        }
+                    }
+                    // UPDATE LEADER STATUS: UNDERCOVER -> AVAILABLE for winner, AVAILABLE -> UNDERCOVER for loser
+                    newCharacters = (0, leaderStatusUpdates_1.handleLeaderStatusOnCapture)(updatedLoc.id, updatedLoc.faction, newCharacters);
+                    return updatedLoc;
                 }
                 return l;
             });
@@ -154,8 +185,45 @@ const resolveFight = (combat, armies, characters, locations, roads, stats) => {
             });
         }
         logMsg += `Defeat at ${locationName}. Attackers wiped out.`;
+        // === MAKE EXAMPLES PROCESSING ===
+        // When an insurrection is repressed and MAKE_EXAMPLES is active
+        if (combat.isInsurgentBattle && combat.locationId) {
+            const locIndex = newLocations.findIndex(l => l.id === combat.locationId);
+            if (locIndex !== -1) {
+                const loc = newLocations[locIndex];
+                // Check if Make Examples policy is active
+                if ((0, makeExamples_1.isMakeExamplesActive)(loc)) {
+                    const insurgentStrength = actualAttackers.reduce((s, a) => s + a.strength, 0);
+                    // Find governor doing the repression
+                    // Note: 'characters' arg includes all chars.
+                    const governor = characters.find(c => c.locationId === loc.id &&
+                        c.faction === combat.defenderFaction &&
+                        c.status !== types_1.CharacterStatus.DEAD &&
+                        c.status !== types_1.CharacterStatus.UNDERCOVER);
+                    const governorName = governor ? governor.name : "The Governor";
+                    const result = (0, makeExamples_1.processMakeExamples)({
+                        location: loc,
+                        controllerFaction: combat.defenderFaction,
+                        insurgentStrength,
+                        turn,
+                        governorName
+                    });
+                    // Apply updates
+                    newLocations[locIndex] = result.location;
+                    newStats.deathToll += result.casualties;
+                    logMsg += ` Governor made brutal examples. ${result.casualties} civilians executed.`;
+                }
+            }
+        }
     }
+    // Identify armies that will be removed (strength <= 0)
+    const removedArmyIds = newArmies.filter(a => a.strength <= 0).map(a => a.id);
     newArmies = newArmies.filter(a => a.strength > 0);
+    // Process orphaned leaders from winning faction (Pyrrhic victory scenario)
+    // Leaders of the LOSING faction are already handled by processLeaderSurvival above.
+    const winningFaction = attWin ? combat.attackerFaction : combat.defenderFaction;
+    const orphanedResult = (0, orphanedLeaders_1.processOrphanedLeaders)(removedArmyIds, newArmies, newCharacters, { combat, winningFaction, locations, roads });
+    newCharacters = orphanedResult.updatedCharacters;
     return {
         armies: newArmies,
         locations: newLocations,

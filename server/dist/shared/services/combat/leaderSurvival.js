@@ -19,7 +19,7 @@ const processLeaderSurvival = (armyIds, isAttacker, characters, context) => {
     armyIds.forEach(armyId => {
         const leaders = updatedCharacters.filter(c => c.armyId === armyId);
         leaders.forEach(leader => {
-            let survivalChance = calculateSurvivalChance(isAttacker, attackerWon, combat, locations);
+            let survivalChance = calculateSurvivalChance(leader, isAttacker, attackerWon, combat, locations);
             if (Math.random() < survivalChance) {
                 // Leader survives - escape to friendly territory
                 const escapeLocs = locations.filter(l => l.faction === leader.faction);
@@ -53,9 +53,12 @@ exports.processLeaderSurvival = processLeaderSurvival;
 /**
  * Calculate survival chance based on combat context.
  */
-function calculateSurvivalChance(isAttacker, attackerWon, combat, locations) {
-    // Failed insurrection = 0% survival
+function calculateSurvivalChance(leader, isAttacker, attackerWon, combat, locations) {
+    // Failed insurrection = 0% survival (unless Daredevil)
     if (combat.isInsurgentBattle && !attackerWon) {
+        if (leader.stats.ability.includes('DAREDEVIL')) {
+            return 0.75; // 75% chance to escape
+        }
         return 0;
     }
     // Attackers have 90% survival
