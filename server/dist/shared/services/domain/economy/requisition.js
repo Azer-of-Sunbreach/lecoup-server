@@ -38,7 +38,13 @@ const executeRequisition = (state, locId, type, faction) => {
     let newLocations = [...state.locations];
     let newResources = { ...state.resources };
     if (type === 'GOLD') {
+        const goldBefore = newResources[faction].gold;
+        console.log(`[SEIZE_GOLD] Faction: ${faction}, Location: ${loc.name}`);
+        console.log(`[SEIZE_GOLD] Gold BEFORE: ${goldBefore}`);
+        console.log(`[SEIZE_GOLD] REQUISITION_AMOUNT constant: ${data_1.REQUISITION_AMOUNT}`);
         newResources[faction].gold += data_1.REQUISITION_AMOUNT;
+        console.log(`[SEIZE_GOLD] Gold AFTER: ${newResources[faction].gold}`);
+        console.log(`[SEIZE_GOLD] Difference: ${newResources[faction].gold - goldBefore}`);
         newLocations = newLocations.map(l => l.id === locId ? {
             ...l,
             stability: Math.max(0, l.stability - data_1.REQUISITION_STABILITY_PENALTY),
@@ -75,8 +81,8 @@ const executeRequisition = (state, locId, type, faction) => {
         success: true,
         newState: {
             locations: newLocations,
-            resources: newResources,
-            logs: [...state.logs, `Seized ${type} from ${loc.name}.`].slice(-50)
+            resources: newResources
+            // Requisition log removed - player action doesn't need logging
         },
         message: `Seized ${type} from ${loc.name}`
     };

@@ -9,7 +9,4 @@ export interface TaxationResult {
     newState: Partial<GameState>;
     message: string;
 }
-/**
- * Update city management settings (taxes, grain trade, etc.)
- */
 export declare const executeUpdateCityManagement: (state: GameState, locId: string, updates: Partial<Location>) => TaxationResult;

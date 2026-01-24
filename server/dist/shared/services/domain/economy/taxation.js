@@ -10,8 +10,25 @@ const economy_1 = require("../../../utils/economy");
 /**
  * Update city management settings (taxes, grain trade, etc.)
  */
+const resentmentTaxEvents_1 = require("../politics/resentmentTaxEvents");
 const executeUpdateCityManagement = (state, locId, updates) => {
-    let tempLocs = state.locations.map(l => l.id === locId ? { ...l, ...updates } : l);
+    let tempLocs = state.locations.map(l => {
+        if (l.id !== locId)
+            return l;
+        // Apply base updates first
+        let updatedLoc = { ...l, ...updates };
+        // Calculate and apply resentment changes
+        if ('taxLevel' in updates && updates.taxLevel) {
+            updatedLoc = (0, resentmentTaxEvents_1.applyTaxChangeResentment)(updatedLoc, l.taxLevel, updates.taxLevel, 'PERSONAL');
+        }
+        if ('tradeTaxLevel' in updates && updates.tradeTaxLevel) {
+            updatedLoc = (0, resentmentTaxEvents_1.applyTaxChangeResentment)(updatedLoc, l.tradeTaxLevel, updates.tradeTaxLevel, 'TRADE');
+        }
+        if ('foodCollectionLevel' in updates && updates.foodCollectionLevel) {
+            updatedLoc = (0, resentmentTaxEvents_1.applyTaxChangeResentment)(updatedLoc, l.foodCollectionLevel, updates.foodCollectionLevel, 'FOOD_COLLECTION');
+        }
+        return updatedLoc;
+    });
     // Fix: Embargo Logic side-effects (Spec 4.1.1)
     // If Grain Trade is toggled, immediate stability hit/bonus to Windward and Great Plains
     if (locId === 'windward' && 'isGrainTradeActive' in updates) {
