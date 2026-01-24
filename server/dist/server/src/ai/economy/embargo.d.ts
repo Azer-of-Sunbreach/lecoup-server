@@ -1,8 +1,8 @@
-import { GameState, FactionId, Location } from '../../../../shared/types';
+import { GameState, FactionId, Location, LogEntry } from '../../../../shared/types';
 import { FactionPersonality } from '../types';
 export interface EmbargoResult {
     locations: Location[];
-    logs: string[];
+    logs: LogEntry[];
     grainTradeNotification?: GameState['grainTradeNotification'];
 }
 /**

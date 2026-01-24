@@ -1,9 +1,9 @@
-import { GameState, FactionId, Location } from '../../../../shared/types';
+import { GameState, FactionId, Location, LogEntry } from '../../../../shared/types';
 interface SeizeResult {
     locations: Location[];
     goldGained: number;
     foodGained: number;
-    logs: string[];
+    logs: LogEntry[];
 }
 /**
  * Handle emergency seize actions for AI faction.

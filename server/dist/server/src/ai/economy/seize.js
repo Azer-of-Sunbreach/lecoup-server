@@ -63,7 +63,7 @@ function handleSeizeActions(faction, state, locations) {
                 };
             }
             foodGained += data_1.REQUISITION_AMOUNT;
-            logs.push(`${factionName} seizes food from ${rural.name} to feed ${city.name}.`);
+            // AI seize log removed per specs - AI actions don't generate logs
             console.log(`[AI SEIZE ${faction}] Seized ${data_1.REQUISITION_AMOUNT} food from ${rural.name} for starving ${city.name}`);
         }
     }
@@ -92,7 +92,7 @@ function handleSeizeActions(faction, state, locations) {
                     }
                 };
                 goldGained += data_1.REQUISITION_AMOUNT;
-                logs.push(`${factionName} seizes gold from ${city.name}'s treasury.`);
+                // AI seize log removed per specs - AI actions don't generate logs
                 console.log(`[AI SEIZE ${faction}] Seized ${data_1.REQUISITION_AMOUNT} gold from ${city.name} (stability was ${city.stability}%)`);
                 // Only seize from one city per turn to limit instability
                 break;

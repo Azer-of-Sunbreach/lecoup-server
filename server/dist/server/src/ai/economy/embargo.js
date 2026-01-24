@@ -3,6 +3,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleGrainEmbargo = handleGrainEmbargo;
 const types_1 = require("../../../../shared/types");
+const logFactory_1 = require("../../../../shared/services/logs/logFactory");
 /**
  * Handle grain embargo logic for Windward.
  *
@@ -143,7 +144,7 @@ function applyEmbargo(windward, greatPlains, faction, logs, setNotification) {
     windward.stability -= 20;
     greatPlains.stability -= 20;
     const msg = `Embargo applied on Grain Trade by ${types_1.FACTION_NAMES[faction]}!`;
-    logs.push(msg);
+    logs.push((0, logFactory_1.createEmbargoLog)(msg, 1));
     setNotification({
         type: 'EMBARGO',
         factionName: types_1.FACTION_NAMES[faction]

@@ -3,41 +3,65 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.optimizeCityTaxes = optimizeCityTaxes;
 exports.optimizeRuralCollection = optimizeRuralCollection;
-const types_1 = require("./types");
+const types_1 = require("../../../../shared/types");
+const types_2 = require("./types");
+// ============================================================================
+// STABILITY THRESHOLDS
+// ============================================================================
 /**
- * Optimize city tax levels based on stability and gold needs.
+ * Minimum stability thresholds by faction.
+ * CONSPIRATORS are more meticulous (70%), others use 50%.
+ */
+const STABILITY_THRESHOLDS = {
+    [types_1.FactionId.CONSPIRATORS]: { normal: 70, emergency: 50 },
+    [types_1.FactionId.REPUBLICANS]: { normal: 50, emergency: 40 },
+    [types_1.FactionId.NOBLES]: { normal: 50, emergency: 40 },
+    [types_1.FactionId.NEUTRAL]: { normal: 50, emergency: 40 },
+};
+function getMinimumStabilityThreshold(faction, hasEmergency = false) {
+    const thresholds = STABILITY_THRESHOLDS[faction] || STABILITY_THRESHOLDS[types_1.FactionId.NEUTRAL];
+    return hasEmergency ? thresholds.emergency : thresholds.normal;
+}
+// ============================================================================
+// CITY TAX OPTIMIZATION
+// ============================================================================
+/**
+ * Optimize city tax levels based on stability thresholds and gold needs.
  *
  * @param cities - All cities controlled by the faction
  * @param isDesperateForGold - Whether faction urgently needs gold
+ * @param faction - Faction ID for threshold lookup
+ * @param hasEmergency - Whether in emergency mode
  */
-function optimizeCityTaxes(cities, isDesperateForGold) {
+function optimizeCityTaxes(cities, isDesperateForGold, faction = types_1.FactionId.NEUTRAL, hasEmergency = false) {
+    const threshold = getMinimumStabilityThreshold(faction, hasEmergency);
     for (const city of cities) {
-        const currentTaxIdx = types_1.TAX_LEVELS.indexOf(city.taxLevel || 'NORMAL');
-        const currentTradeTaxIdx = types_1.TAX_LEVELS.indexOf(city.tradeTaxLevel || 'NORMAL');
+        const currentTaxIdx = types_2.TAX_LEVELS.indexOf(city.taxLevel || 'NORMAL');
+        const currentTradeTaxIdx = types_2.TAX_LEVELS.indexOf(city.tradeTaxLevel || 'NORMAL');
         let newTaxLevel = city.taxLevel || 'NORMAL';
         let newTradeTaxLevel = city.tradeTaxLevel || 'NORMAL';
         let stabilityChange = 0;
-        // Personal taxes - adjust based on stability
-        if (city.stability > 80 && currentTaxIdx < 4) {
-            newTaxLevel = types_1.TAX_LEVELS[currentTaxIdx + 1];
+        // Personal taxes - only raise if projected stays above threshold
+        const projectedAfterTaxRaise = city.stability - 30;
+        if (projectedAfterTaxRaise >= threshold && currentTaxIdx < 4) {
+            // Only raise if stability high enough to stay above threshold after penalty
+            newTaxLevel = types_2.TAX_LEVELS[currentTaxIdx + 1];
             stabilityChange -= 30;
         }
-        else if (city.stability > 60 && isDesperateForGold && currentTaxIdx < 3) {
-            newTaxLevel = types_1.TAX_LEVELS[currentTaxIdx + 1];
-            stabilityChange -= 30;
-        }
-        else if (city.stability < 40 && currentTaxIdx > 0) {
-            newTaxLevel = types_1.TAX_LEVELS[currentTaxIdx - 1];
+        else if (city.stability < threshold && currentTaxIdx > 0) {
+            // Lower if below threshold (recovery mode)
+            newTaxLevel = types_2.TAX_LEVELS[currentTaxIdx - 1];
             stabilityChange += 30;
         }
         let projectedStability = Math.min(100, Math.max(0, city.stability + stabilityChange));
-        // Trade taxes - more conservative
-        if (projectedStability > 50 && currentTradeTaxIdx < 3) {
-            newTradeTaxLevel = types_1.TAX_LEVELS[currentTradeTaxIdx + 1];
+        // Trade taxes - more conservative, only if has buffer above threshold
+        const projectedAfterTradeRaise = projectedStability - 5;
+        if (projectedAfterTradeRaise > threshold + 10 && currentTradeTaxIdx < 3) {
+            newTradeTaxLevel = types_2.TAX_LEVELS[currentTradeTaxIdx + 1];
             projectedStability -= 5;
         }
         else if (projectedStability < 30 && currentTradeTaxIdx > 0) {
-            newTradeTaxLevel = types_1.TAX_LEVELS[currentTradeTaxIdx - 1];
+            newTradeTaxLevel = types_2.TAX_LEVELS[currentTradeTaxIdx - 1];
             projectedStability += 5;
         }
         // Apply changes
@@ -48,27 +72,32 @@ function optimizeCityTaxes(cities, isDesperateForGold) {
         }
     }
 }
+// ============================================================================
+// RURAL COLLECTION OPTIMIZATION
+// ============================================================================
 /**
- * Optimize rural food collection levels based on stability and food needs.
+ * Optimize rural food collection levels based on stability thresholds.
  *
  * @param rurals - All rural areas controlled by the faction
  * @param isDesperateForFood - Whether faction urgently needs food
+ * @param faction - Faction ID for threshold lookup
+ * @param hasEmergency - Whether in emergency mode
  */
-function optimizeRuralCollection(rurals, isDesperateForFood) {
+function optimizeRuralCollection(rurals, isDesperateForFood, faction = types_1.FactionId.NEUTRAL, hasEmergency = false) {
+    const threshold = getMinimumStabilityThreshold(faction, hasEmergency);
     for (const rural of rurals) {
-        const currentCollIdx = types_1.TAX_LEVELS.indexOf(rural.foodCollectionLevel || 'NORMAL');
+        const currentCollIdx = types_2.TAX_LEVELS.indexOf(rural.foodCollectionLevel || 'NORMAL');
         let newCollLevel = rural.foodCollectionLevel || 'NORMAL';
         let stabilityChange = 0;
-        if (rural.stability > 70 && currentCollIdx < 4) {
-            newCollLevel = types_1.TAX_LEVELS[currentCollIdx + 1];
+        // Only raise if projected stays above threshold
+        const projectedAfterRaise = rural.stability - 20;
+        if (projectedAfterRaise >= threshold && currentCollIdx < 4) {
+            newCollLevel = types_2.TAX_LEVELS[currentCollIdx + 1];
             stabilityChange -= 20;
         }
-        else if (rural.stability > 50 && isDesperateForFood && currentCollIdx < 4) {
-            newCollLevel = types_1.TAX_LEVELS[currentCollIdx + 1];
-            stabilityChange -= 20;
-        }
-        else if (rural.stability < 40 && currentCollIdx > 0) {
-            newCollLevel = types_1.TAX_LEVELS[currentCollIdx - 1];
+        else if (rural.stability < threshold && currentCollIdx > 0) {
+            // Lower if below threshold (recovery mode)
+            newCollLevel = types_2.TAX_LEVELS[currentCollIdx - 1];
             stabilityChange += 20;
         }
         if (newCollLevel !== rural.foodCollectionLevel) {
