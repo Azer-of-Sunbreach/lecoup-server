@@ -10,13 +10,13 @@
  */
 
 import { GameState, Location, Road, FactionId, LocationType, Army, LogEntry, CharacterStatus, Character, GovernorPolicy, LogType } from '../../../types';
-import { PORT_SEQUENCE, getNavalTravelTime } from '../../../data/gameConstants';
+import { getNavalTravelTime } from '../../../data/gameConstants';
+import { isPort, ALL_PORTS } from '../../../data/ports';
 import { calculateTotalInfiltrationRisk } from './infiltrationRisk';
 import {
     createGenericLog,
     createInfiltrationSuccessLog,
     createInfiltrationDetectedLog,
-    createInfiltrationRiskDebugLog,
     createLeaderDepartureSpottedLog,
     createInfiltrationEliminatedLog
 } from '../../logs/logFactory';
@@ -92,8 +92,8 @@ export function calculateLeaderTravelTime(
     const fromCityId = fromLoc.type === LocationType.CITY ? fromLoc.id : fromLoc.linkedLocationId;
     const toCityId = toLoc.type === LocationType.CITY ? toLoc.id : toLoc.linkedLocationId;
 
-    const isFromPort = !!fromCityId && PORT_SEQUENCE.includes(fromCityId);
-    const isToPort = !!toCityId && PORT_SEQUENCE.includes(toCityId);
+    const isFromPort = !!fromCityId && isPort(fromCityId);
+    const isToPort = !!toCityId && isPort(toCityId);
 
     let bestTime = Infinity;
 
@@ -118,7 +118,7 @@ export function calculateLeaderTravelTime(
 
     // Option 3: Hybrid - naval to intermediate port, then land
     if (isFromPort && !isToPort && fromCityId && toRuralId) {
-        for (const transitPortId of PORT_SEQUENCE) {
+        for (const transitPortId of ALL_PORTS) {
             if (transitPortId === fromCityId) continue;
 
             const transitCity = locations.find(l => l.id === transitPortId);
@@ -142,7 +142,7 @@ export function calculateLeaderTravelTime(
 
     // Option 4: Hybrid - land to intermediate port, then naval
     if (!isFromPort && isToPort && fromRuralId && toCityId) {
-        for (const transitPortId of PORT_SEQUENCE) {
+        for (const transitPortId of ALL_PORTS) {
             if (transitPortId === toCityId) continue;
 
             const transitCity = locations.find(l => l.id === transitPortId);
@@ -165,7 +165,7 @@ export function calculateLeaderTravelTime(
 
     // Option 5: Double hybrid - land to port A, naval to port B, land to destination
     if (!isFromPort && !isToPort && fromRuralId && toRuralId) {
-        for (const startPortId of PORT_SEQUENCE) {
+        for (const startPortId of ALL_PORTS) {
             const startPortCity = locations.find(l => l.id === startPortId);
             if (!startPortCity) continue;
             const startPortRuralId = startPortCity.linkedLocationId;
@@ -175,7 +175,7 @@ export function calculateLeaderTravelTime(
             if (!landToPort) continue;
             const landToPortTime = calculateLandTravelTime(landToPort, roads);
 
-            for (const endPortId of PORT_SEQUENCE) {
+            for (const endPortId of ALL_PORTS) {
                 if (endPortId === startPortId) continue;
 
                 const endPortCity = locations.find(l => l.id === endPortId);
@@ -335,11 +335,10 @@ export function processUndercoverMissionTravel<T extends Character>(
             const destination = locationMap.get(mission.destinationId);
             if (destination) {
                 logs.push(createLeaderDepartureSpottedLog(
-                    c.name,
-                    FACTION_NAMES[c.faction],
-                    sourceLocation.name,
+                    c.id,
+                    c.faction,
                     sourceLocation.id,
-                    destination.name,
+                    destination.id,
                     turn,
                     sourceLocation.faction
                 ));
@@ -353,13 +352,19 @@ export function processUndercoverMissionTravel<T extends Character>(
             return c;
         }
 
-        if (mission.turnsRemaining > 0) {
-            // Still traveling - continue (turnsRemaining 1 -> 0 means arrive next turn)
+        // Decrement travel time
+        let currentTurnsRemaining = mission.turnsRemaining;
+        if (currentTurnsRemaining > 0) {
+            currentTurnsRemaining--;
+        }
+
+        if (currentTurnsRemaining > 0) {
+            // Still traveling - continue
             return {
                 ...c,
                 undercoverMission: {
                     ...mission,
-                    turnsRemaining: mission.turnsRemaining - 1
+                    turnsRemaining: currentTurnsRemaining
                 }
             };
         }
@@ -406,15 +411,6 @@ export function processUndercoverMissionTravel<T extends Character>(
                 isHuntNetworkActive
             );
 
-            // LOG DEBUG RISK (shows final risk after all modifiers including Hunt Networks)
-            logs.push(createInfiltrationRiskDebugLog(
-                c.name,
-                destination.name,
-                risk,
-                turn,
-                c.faction
-            ));
-
             // Roll risk (0.0 - 1.0)
             const roll = Math.random();
 
@@ -437,9 +433,8 @@ export function processUndercoverMissionTravel<T extends Character>(
             // DETECTED - Leader arrives but enemy knows about them
             // 1. Log for defender (Spotted enemy agent)
             logs.push(createInfiltrationDetectedLog(
-                c.name,
-                factionName,
-                destination.name,
+                c.id,
+                c.faction,
                 destination.id,
                 turn,
                 destination.faction,
@@ -449,9 +444,8 @@ export function processUndercoverMissionTravel<T extends Character>(
 
             // 2. Log for sender (Your agent was spotted)
             logs.push(createInfiltrationDetectedLog(
-                c.name,
-                factionName,
-                destination.name,
+                c.id,
+                c.faction,
                 destination.id,
                 turn,
                 c.faction,
@@ -476,7 +470,10 @@ export function processUndercoverMissionTravel<T extends Character>(
                 isDetectedOnArrival: true, // NEW: Track detection for alerts
                 pendingAlertEvents: c.pendingAlertEvents
                     ? [...c.pendingAlertEvents, { ...infiltrationEvent, timestamp: Date.now() }]
-                    : [{ ...infiltrationEvent, timestamp: Date.now() }]
+                    : [{ ...infiltrationEvent, timestamp: Date.now() }],
+                // FORCE RESET detection on arrival (Safety net)
+                detectionLevel: 0,
+                pendingDetectionEffects: undefined
             };
 
         } else {
@@ -484,8 +481,7 @@ export function processUndercoverMissionTravel<T extends Character>(
             // Log for sender only (Destination faction doesn't know)
             if (c.faction !== destination.faction) {
                 logs.push(createInfiltrationSuccessLog(
-                    c.name,
-                    destination.name,
+                    c.id,
                     destination.id,
                     turn,
                     c.faction
@@ -509,7 +505,10 @@ export function processUndercoverMissionTravel<T extends Character>(
                 isDetectedOnArrival: false, // NEW: Track detection for alerts
                 pendingAlertEvents: c.pendingAlertEvents
                     ? [...c.pendingAlertEvents, { ...infiltrationEvent, timestamp: Date.now() }]
-                    : [{ ...infiltrationEvent, timestamp: Date.now() }]
+                    : [{ ...infiltrationEvent, timestamp: Date.now() }],
+                // FORCE RESET detection on arrival (Safety net)
+                detectionLevel: 0,
+                pendingDetectionEffects: undefined
             };
         }
     });

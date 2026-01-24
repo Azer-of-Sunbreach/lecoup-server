@@ -1,4 +1,5 @@
 import { Character, Location, LogEntry, LogSeverity, LogType, FactionId } from '../../../types';
+import { createClandestineSabotageWarningLog } from '../../logs/logFactory';
 import { LeaderStatLevel } from '../../../types/leaderTypes';
 
 export interface DistributePamphletsResult {
@@ -58,19 +59,11 @@ export function processDistributePamphlets(
     // 2. Check for Warning Log (25% chance)
     let log: LogEntry | null = null;
     if (Math.random() < 0.25) {
-        log = {
-            id: `pamphlets-warn-${turn}-${location.id}`,
-            // Using LEADER type as it relates to clandestine actions (closest fit)
-            type: LogType.LEADER,
-            message: `Something is steering the people’s mind against us in ${location.name}…`,
-            turn,
-            visibleToFactions: [controllerFaction],
-            baseSeverity: LogSeverity.WARNING,
-            highlightTarget: {
-                type: 'LOCATION',
-                id: location.id
-            }
-        };
+        log = createClandestineSabotageWarningLog(
+            location.id,
+            controllerFaction,
+            turn
+        );
     }
 
     return {

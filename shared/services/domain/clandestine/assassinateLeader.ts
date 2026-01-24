@@ -22,12 +22,14 @@ import { CharacterTrait } from '../../../types/leaderTypes';
 export function isAssassinationAvailable(
     location: Location,
     leader: Character
-): { available: boolean; reason?: string } {
+): { available: boolean; reason?: string; reasonKey?: string; reasonParams?: any } {
     // 1. Check Trait
     if (leader.stats.traits && leader.stats.traits.includes(CharacterTrait.FAINT_HEARTED)) {
         return {
             available: false,
-            reason: `${leader.name} would refuse to obey such an order.`
+            reason: `${leader.name} would refuse to obey such an order.`,
+            reasonKey: 'clandestineMenu.validation.faintHeartedRefusal',
+            reasonParams: { leader: leader.name }
         };
     }
 
@@ -53,7 +55,8 @@ export function isAssassinationAvailable(
     if (trust > 24) {
         return {
             available: false,
-            reason: 'Trust towards the enemy is too high here.'
+            reason: 'Trust towards the enemy is too high here.',
+            reasonKey: 'clandestineMenu.validation.trustTooHigh'
         };
     }
 

@@ -75,7 +75,9 @@ export function processStealFromGranaries(
         message: `Sabotage successful! We destroyed ${destroyedAmount} food from the granaries in ${targetLocation.name}.`,
         turn,
         visibleToFactions: [leader.faction],
-        baseSeverity: LogSeverity.GOOD
+        baseSeverity: LogSeverity.GOOD,
+        i18nKey: 'stealGrainSuccess',
+        i18nParams: { amount: destroyedAmount, location: targetLocation.id }
     };
 
     // Warning Log for Victim (50% Chance)
@@ -91,7 +93,9 @@ export function processStealFromGranaries(
             highlightTarget: {
                 type: 'LOCATION',
                 id: location.id
-            }
+            },
+            i18nKey: 'stealGrainWarning',
+            i18nParams: { location: location.id }
         };
     }
 

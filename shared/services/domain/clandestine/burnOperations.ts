@@ -81,7 +81,9 @@ export function processBurnOperation(
                     message: `Sabotage failed! Our agents were identified attempting to start fires in ${location.name}. Resentment has increased.`,
                     turn,
                     visibleToFactions: [leader.faction],
-                    baseSeverity: LogSeverity.WARNING
+                    baseSeverity: LogSeverity.WARNING,
+                    i18nKey: 'burnFailIdentified',
+                    i18nParams: { location: location.id }
                 }
             };
         } else {
@@ -94,7 +96,9 @@ export function processBurnOperation(
                     message: `Sabotage failed! Our agents failed to start the fires in ${location.name} but remained undetected.`,
                     turn,
                     visibleToFactions: [leader.faction],
-                    baseSeverity: LogSeverity.INFO
+                    baseSeverity: LogSeverity.INFO,
+                    i18nKey: 'burnFailUnidentified',
+                    i18nParams: { location: location.id }
                 }
             };
         }
@@ -137,7 +141,9 @@ export function processBurnOperation(
         highlightTarget: {
             type: 'LOCATION',
             id: location.id
-        }
+        },
+        i18nKey: isUrban ? 'burnUrbanWarning' : 'burnRuralWarning',
+        i18nParams: { location: location.id }
     };
 
     const feedbackLog: LogEntry = {
@@ -146,7 +152,9 @@ export function processBurnOperation(
         message: `Sabotage successful! We burned ${targetName} in ${location.name}, destroying ${amount} worth of resources.`,
         turn,
         visibleToFactions: [leader.faction],
-        baseSeverity: LogSeverity.GOOD
+        baseSeverity: LogSeverity.GOOD,
+        i18nKey: isUrban ? 'burnUrbanSuccess' : 'burnRuralSuccess',
+        i18nParams: { location: location.id, amount }
     };
 
     return {

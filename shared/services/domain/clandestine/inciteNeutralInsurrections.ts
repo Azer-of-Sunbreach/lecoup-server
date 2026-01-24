@@ -10,6 +10,7 @@
 import { Character, Location, LogEntry, LogType, LogSeverity, FactionId, Army } from '../../../types';
 import { ActiveClandestineAction } from '../../../types/clandestineTypes';
 import { isNeutralInsurrectionBlocked, createBlockedInsurrectionLog } from '../governor/makeExamples';
+import { createNeutralInsurrectionWarningLog } from '../../logs/logFactory';
 
 /**
  * Result of the incite neutral insurrections process
@@ -90,16 +91,11 @@ export function processInciteNeutralInsurrections(
 
     // T1 (duration 1): Send Warning Log
     if (duration === 1) {
-        const warningLog: LogEntry = {
-            id: `incite-insurrection-warn-${turn}-${location.id}-${uniqueId}`,
-            type: LogType.INSURRECTION,
-            message: `Enemy agents have been reported stirring imminent neutral insurrections against us in ${location.name}!`,
-            turn,
-            visibleToFactions: [location.faction],
-            baseSeverity: LogSeverity.CRITICAL,
-            criticalForFactions: [location.faction],
-            highlightTarget: { type: 'LOCATION', id: location.id }
-        };
+        const warningLog = createNeutralInsurrectionWarningLog(
+            location.id,
+            location.faction,
+            turn
+        );
 
         return { log: warningLog };
     }
@@ -120,7 +116,9 @@ export function processInciteNeutralInsurrections(
                 turn,
                 visibleToFactions: [leader.faction],
                 baseSeverity: LogSeverity.WARNING,
-                highlightTarget: { type: 'LOCATION', id: location.id }
+                highlightTarget: { type: 'LOCATION', id: location.id },
+                i18nKey: 'neutralInsurrectionBlocked',
+                i18nParams: { leader: leader.id, location: location.id, governor: governorName }
             };
 
             // Refund the cost (50 gold)
@@ -160,7 +158,9 @@ export function processInciteNeutralInsurrections(
             message: `Our agents in ${location.name} have successfully incited ${strength} commoners to take up arms against the ${location.faction}!`,
             turn,
             visibleToFactions: [leader.faction],
-            baseSeverity: LogSeverity.GOOD
+            baseSeverity: LogSeverity.GOOD,
+            i18nKey: 'neutralInsurrectionSpawn',
+            i18nParams: { location: location.id, strength, faction: location.faction }
         };
 
         return {

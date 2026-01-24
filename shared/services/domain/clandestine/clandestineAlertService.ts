@@ -188,13 +188,16 @@ export function buildClandestineAlerts(
                     : 'clandestineAlerts.infiltrationSuccess',
                 messageParams: {
                     leader: leader.name,
-                    location: location.name
+                    leaderId: leader.id,
+                    location: location.name,
+                    locationId: location.id
                 },
                 subMessageKey: isDetected
                     ? 'clandestineAlerts.infiltrationDetectedSub'
                     : 'clandestineAlerts.infiltrationSuccessSub',
                 subMessageParams: {
-                    leader: leader.name
+                    leader: leader.name,
+                    leaderId: leader.id
                 },
                 targetFaction: playerFaction,
                 timestamp: Date.now()
@@ -268,13 +271,16 @@ export function createInfiltrationEvent(
             : 'clandestineAlerts.infiltrationSuccess',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         subMessageKey: wasDetected
             ? 'clandestineAlerts.infiltrationDetectedSub'
             : 'clandestineAlerts.infiltrationSuccessSub',
         subMessageParams: {
-            leader: leader.name
+            leader: leader.name,
+            leaderId: leader.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -296,7 +302,9 @@ export function createHuntNetworksEvent(
         messageKey: 'clandestineAlerts.huntNetworksActivated',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -324,13 +332,16 @@ export function createThresholdExceededEvent(
         messageKey: 'clandestineAlerts.thresholdExceeded',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         subMessageKey: isFemale
             ? 'clandestineAlerts.thresholdExceededSubFemale'
             : 'clandestineAlerts.thresholdExceededSub',
         subMessageParams: {
-            leader: leader.name
+            leader: leader.name,
+            leaderId: leader.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -344,6 +355,7 @@ export function createParanoidGovernorEvent(
     leader: Character,
     location: Location,
     governorName: string,
+    governorId: string,
     turn: number
 ): LeaderAlertEvent {
     return {
@@ -353,8 +365,11 @@ export function createParanoidGovernorEvent(
         messageKey: 'clandestineAlerts.paranoidGovernor',
         messageParams: {
             leader: leader.name,
+            leaderId: leader.id,
             location: location.name,
-            governor: governorName
+            locationId: location.id,
+            governor: governorName,
+            governorId: governorId
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -368,6 +383,7 @@ export function createCombinedParanoidHuntEvent(
     leader: Character,
     location: Location,
     governorName: string,
+    governorId: string,
     turn: number
 ): LeaderAlertEvent {
     return {
@@ -377,8 +393,11 @@ export function createCombinedParanoidHuntEvent(
         messageKey: 'clandestineAlerts.combinedParanoidHunt',
         messageParams: {
             leader: leader.name,
+            leaderId: leader.id,
             location: location.name,
-            governor: governorName
+            locationId: location.id,
+            governor: governorName,
+            governorId: governorId
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -400,12 +419,16 @@ export function createExecutionEvent(
         messageKey: 'clandestineAlerts.execution',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         subMessageKey: 'clandestineAlerts.executionSub',
         subMessageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now(),
@@ -429,8 +452,11 @@ export function createEscapeEvent(
         messageKey: 'clandestineAlerts.escape',
         messageParams: {
             leader: leader.name,
+            leaderId: leader.id,
             location: oldLocation.name,
-            destination: newLocation.name
+            locationId: oldLocation.id,
+            destination: newLocation.name,
+            destinationId: newLocation.id
         },
         subMessageKey: 'clandestineAlerts.escapeSub',
         subMessageParams: {},

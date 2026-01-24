@@ -90,13 +90,19 @@ export function executeAppointGovernor(
     // Update characters
     const updatedCharacters = characters.map(c => {
         // Remove GOVERNING status from any previous governor in this region
+        // FIX: Reset governors from ANY faction, not just playerFaction
+        // This handles cases where territory changed hands (e.g., insurrection/negotiation)
         if (c.id !== leaderId &&
             c.locationId === targetLocationId &&
-            c.status === CharacterStatus.GOVERNING &&
-            c.faction === playerFaction) {
+            c.status === CharacterStatus.GOVERNING) {
+            // If the displaced governor is from a different faction, they become UNDERCOVER
+            // If same faction, they become AVAILABLE (just demoted, not in enemy territory)
+            const isEnemyFaction = c.faction !== playerFaction;
             return {
                 ...c,
-                status: CharacterStatus.AVAILABLE
+                status: isEnemyFaction ? CharacterStatus.UNDERCOVER : CharacterStatus.AVAILABLE,
+                detectionLevel: isEnemyFaction ? 0 : c.detectionLevel,
+                activeClandestineActions: isEnemyFaction ? [] : c.activeClandestineActions
             };
         }
 
@@ -374,18 +380,19 @@ export function validateGovernorStatus(
     roads: Road[],
     turn: number
 ): GovernorValidationResult {
-    // 1. Valid case: Faction matches
+    // 1. Valid case: Faction matches - governor stays
     if (governor.faction === location.faction) {
         return { character: governor, isValid: true };
     }
 
-    // 2. Neutral case: Demote to AVAILABLE
+    // 2. Neutral case: Demote to AVAILABLE (stops governing, but not in enemy territory)
     if (location.faction === FactionId.NEUTRAL) {
         return {
             character: {
                 ...governor,
                 status: CharacterStatus.AVAILABLE,
-                activeGovernorPolicies: []
+                activeGovernorPolicies: [],
+                activeClandestineActions: [] // Clear any active actions
             },
             isValid: false,
             log: {
@@ -412,6 +419,7 @@ export function validateGovernorStatus(
                 status: CharacterStatus.DEAD,
                 locationId: location.id, // Dies here
                 activeGovernorPolicies: [],
+                activeClandestineActions: [],
                 detectionLevel: 0,
                 pendingDetectionEffects: undefined
             },
@@ -462,6 +470,7 @@ export function validateGovernorStatus(
                 status: CharacterStatus.AVAILABLE,
                 locationId: targetLocation.id,
                 activeGovernorPolicies: [],
+                activeClandestineActions: [],
                 detectionLevel: 0,
                 pendingDetectionEffects: undefined
             },
@@ -483,7 +492,8 @@ export function validateGovernorStatus(
         character: {
             ...governor,
             status: CharacterStatus.DEAD,
-            activeGovernorPolicies: []
+            activeGovernorPolicies: [],
+            activeClandestineActions: []
         },
         isValid: false
     };

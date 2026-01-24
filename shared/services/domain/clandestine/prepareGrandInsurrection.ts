@@ -78,7 +78,9 @@ export function processPrepareGrandInsurrection(
             visibleToFactions: allFactions,
             baseSeverity: LogSeverity.WARNING,
             criticalForFactions: location.faction !== FactionId.NEUTRAL ? [location.faction] : undefined,
-            highlightTarget: { type: 'LOCATION', id: location.id }
+            highlightTarget: { type: 'LOCATION', id: location.id },
+            i18nKey: 'insurrectionPreparing',
+            i18nParams: { leader: leader.id, location: location.id }
         };
 
         return {
@@ -198,7 +200,9 @@ export function processPrepareGrandInsurrection(
         turn,
         visibleToFactions: [], // All
         baseSeverity: LogSeverity.WARNING,
-        highlightTarget: { type: 'LOCATION', id: location.id }
+        highlightTarget: { type: 'LOCATION', id: location.id },
+        i18nKey: 'grandInsurrectionStart',
+        i18nParams: { faction: leader.faction, location: location.id, leader: leader.id }
     };
 
     return {
