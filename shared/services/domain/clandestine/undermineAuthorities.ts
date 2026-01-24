@@ -43,7 +43,6 @@ export function processUndermineAuthorities(
 
     if (Math.random() < 0.25) {
         warningLog = createClandestineSabotageWarningLog(
-            location.name,
             location.id,
             location.faction,
             turn
