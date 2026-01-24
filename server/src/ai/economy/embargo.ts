@@ -103,7 +103,7 @@ function handleConspiratorEmbargo(
         const embargoChance = Math.min(0.1 + (state.turn * 0.1), 0.8);
 
         if (windward.stability > 60 && Math.random() < embargoChance) {
-            applyEmbargo(windward, greatPlains, FactionId.CONSPIRATORS, logs, setNotification);
+            applyEmbargo(windward, greatPlains, FactionId.CONSPIRATORS, state.turn, logs, setNotification);
         }
     } else {
         // Lift embargo if stability is too low
@@ -141,7 +141,7 @@ function handleNobleEmbargo(
 
         // Check if embargo is economically advantageous
         if (isEmbargoAdvantageousForNobles(faction, locations)) {
-            applyEmbargo(windward, greatPlains, FactionId.NOBLES, logs, setNotification);
+            applyEmbargo(windward, greatPlains, FactionId.NOBLES, state.turn, logs, setNotification);
         }
     } else {
         // Lift embargo if stability is too low
@@ -190,6 +190,7 @@ function applyEmbargo(
     windward: Location,
     greatPlains: Location,
     faction: FactionId,
+    turn: number,
     logs: LogEntry[],
     setNotification: (notif: GameState['grainTradeNotification']) => void
 ): void {
@@ -197,8 +198,7 @@ function applyEmbargo(
     windward.stability -= 20;
     greatPlains.stability -= 20;
 
-    const msg = `Embargo applied on Grain Trade by ${FACTION_NAMES[faction]}!`;
-    logs.push(createEmbargoLog(msg, 1));
+    logs.push(createEmbargoLog(faction, turn));
 
     setNotification({
         type: 'EMBARGO',
