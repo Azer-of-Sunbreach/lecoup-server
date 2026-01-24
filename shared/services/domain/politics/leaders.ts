@@ -51,6 +51,7 @@ export const executeAttachLeader = (
 
 /**
  * Detach a leader from their army
+ * NOTE: If leader is GOVERNING, they retain that status (governor can command armies in their region)
  */
 export const executeDetachLeader = (
     state: GameState,
@@ -61,11 +62,16 @@ export const executeDetachLeader = (
         return { success: false, newState: {}, message: 'Leader not found' };
     }
 
+    // CORRECTIF 3: Preserve GOVERNING status when detaching
+    const newStatus = leader.status === CharacterStatus.GOVERNING
+        ? CharacterStatus.GOVERNING
+        : CharacterStatus.AVAILABLE;
+
     return {
         success: true,
         newState: {
             characters: state.characters.map(c =>
-                c.id === charId ? { ...c, armyId: null, status: CharacterStatus.AVAILABLE } : c
+                c.id === charId ? { ...c, armyId: null, status: newStatus } : c
             )
             // Detach log removed - player action doesn't need logging
         },
@@ -78,6 +84,10 @@ export const executeDetachLeader = (
  * NOTE: If leader is UNDERCOVER, they stay UNDERCOVER in enemy territory (unless another undercover leader is already there).
  * They become AVAILABLE only when entering friendly or neutral territory.
  * Their clandestine actions are cleared when movement starts.
+ * 
+ * EVOLUTION 6: Anti-exploit safeguards:
+ * 1. One exfiltration per turn limit (prevents back-and-forth reset exploit)
+ * 2. Linked location check (preserves detection when hopping between linked locations with same controller)
  */
 import { calculateLeaderTravelTime } from '../leaders/leaderPathfinding';
 
@@ -91,6 +101,13 @@ export const executeMoveLeader = (
         console.error('[executeMoveLeader] Character not found', charId);
         return { success: false, newState: {}, message: 'Leader not found' };
     }
+
+    // === EVOLUTION 6: One exfiltration per turn limit ===
+    if (char.lastExfiltrationTurn === state.turn) {
+        console.warn('[executeMoveLeader] Blocked: Leader already moved this turn', char.name);
+        return { success: false, newState: {}, message: 'Leader already moved this turn' };
+    }
+
     console.log('[executeMoveLeader] Moving', char.name, char.status, 'to', destId);
 
     const road = state.roads.find(r =>
@@ -101,9 +118,22 @@ export const executeMoveLeader = (
     const turns = calculateLeaderTravelTime(char.locationId || '', destId, state.locations, state.roads);
     const locId = turns === 0 ? destId : char.locationId;
 
+    const originLocation = state.locations.find(l => l.id === char.locationId);
     const destLocation = state.locations.find(l => l.id === destId);
     const destName = destLocation?.name || 'Unknown';
     const destFaction = destLocation?.faction;
+
+    // === EVOLUTION 6: Check if this is a linked location move with same controller ===
+    const isLinkedLocation = (
+        originLocation?.linkedLocationId === destId ||
+        destLocation?.linkedLocationId === char.locationId
+    );
+    const sameController = originLocation?.faction === destLocation?.faction;
+    const shouldPreserveDetection = isLinkedLocation && sameController;
+
+    if (shouldPreserveDetection) {
+        console.log('[executeMoveLeader] Linked location with same controller - preserving detection level');
+    }
 
     // Determine final status on arrival
     let finalStatus: CharacterStatus;
@@ -158,7 +188,13 @@ export const executeMoveLeader = (
                     // Clear clandestine actions when UNDERCOVER or GOVERNING leader starts moving
                     activeClandestineActions: (wasUndercover || wasGoverning) ? undefined : c.activeClandestineActions,
                     // Preserve budget when moving undercover
-                    clandestineBudget: wasUndercover ? c.clandestineBudget : c.clandestineBudget
+                    clandestineBudget: wasUndercover ? c.clandestineBudget : c.clandestineBudget,
+                    // EVOLUTION 6: Conditional detection reset
+                    // Reset if NOT linked-location-same-controller, otherwise preserve
+                    detectionLevel: shouldPreserveDetection ? c.detectionLevel : 0,
+                    pendingDetectionEffects: shouldPreserveDetection ? c.pendingDetectionEffects : undefined,
+                    // EVOLUTION 6: Track last exfiltration turn
+                    lastExfiltrationTurn: state.turn
                 } : c
             ),
             // Clear governor policies on departure location if was governing

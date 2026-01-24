@@ -9,7 +9,7 @@
  */
 
 import { Location, Army, Character, Road, LocationType, RuralCategory, FactionId, ManagementLevel, Convoy, NavalConvoy, GovernorPolicy, GOVERNOR_POLICY_COSTS } from '../../../types';
-import { FORTIFICATION_LEVELS, BONUS_HUNTING_ONLY, BONUS_FISHING_HUNTING, PORT_SEQUENCE, getAppeaseFoodCost } from '../../../data';
+import { FORTIFICATION_LEVELS, BONUS_HUNTING_ONLY, BONUS_FISHING_HUNTING, isPort, getAppeaseFoodCost } from '../../../data';
 
 
 // ============================================================================
@@ -146,11 +146,11 @@ export interface TerritorialStats {
 // ============================================================================
 
 const TAX_MODIFIERS: Record<ManagementLevel, number> = {
-    'VERY_LOW': -0.5,
-    'LOW': -0.5,
+    'VERY_LOW': -1,   // Two levels below NORMAL: -1 (was -0.5, bug fix)
+    'LOW': -0.5,      // One level below NORMAL
     'NORMAL': 0,
-    'HIGH': 0.5,  // Fixed: was 1, should be 0.5 as per spec
-    'VERY_HIGH': 1 // Fixed: was 2, should be 1 (0.5 * 2)
+    'HIGH': 0.5,      // One level above NORMAL
+    'VERY_HIGH': 1    // Two levels above NORMAL
 };
 
 const TRADE_TAX_FOOD_IMPACT: Record<ManagementLevel, number> = {
@@ -612,7 +612,7 @@ export function calculateTerritorialStats(
         c.faction === location.faction
     ).length;
 
-    const isPort = PORT_SEQUENCE.includes(location.id);
+    const isPortLocation = isPort(location.id);
 
     return {
         locationId: location.id,
@@ -632,8 +632,8 @@ export function calculateTerritorialStats(
         activeConvoys,
         activeNavalConvoys,
         canSendConvoy: isCity && activeConvoys < MAX_CONVOYS_PER_CITY,
-        canSendNavalConvoy: isCity && isPort && activeNavalConvoys < MAX_NAVAL_CONVOYS_PER_CITY,
-        isPort
+        canSendNavalConvoy: isCity && isPortLocation && activeNavalConvoys < MAX_NAVAL_CONVOYS_PER_CITY,
+        isPort: isPortLocation
     };
 }
 

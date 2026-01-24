@@ -4,12 +4,14 @@
  * Extracted from App.tsx handleNegotiate()
  */
 
-import { GameState, FactionId } from '../../../types';
+import { GameState, FactionId, LogEntry } from '../../../types';
+import { createNegotiationAttemptLog } from '../../logs/logFactory';
 
 export interface NegotiationResult {
     success: boolean;
     newState: Partial<GameState>;
     message: string;
+    log?: LogEntry; // Optional log entry for multiplayer notification
 }
 
 /**
@@ -41,7 +43,15 @@ export const executeNegotiate = (
         );
     }
 
-    const targetName = state.locations.find(l => l.id === locId)?.name || 'Unknown';
+    const target = state.locations.find(l => l.id === locId);
+    const targetName = target?.name || 'Unknown';
+
+    // Create multiplayer notification log (WARNING for other players)
+    const negotiationLog = createNegotiationAttemptLog(
+        locId,
+        faction,
+        state.turn
+    );
 
     return {
         success: true,
@@ -57,7 +67,7 @@ export const executeNegotiate = (
             pendingNegotiations: [
                 ...state.pendingNegotiations,
                 {
-                    factionId: faction, // FIX: Added missing factionId
+                    factionId: faction,
                     targetLocationId: locId,
                     goldOffer: gold,
                     foodOffer: food,
@@ -65,8 +75,8 @@ export const executeNegotiate = (
                     turnsRemaining: 0
                 }
             ]
-            // Negotiation log removed - player action doesn't need logging
         },
-        message: `Agent sent to negotiate with ${targetName}`
+        message: `Agent sent to negotiate with ${targetName}`,
+        log: negotiationLog // Return log for multiplayer broadcast
     };
 };

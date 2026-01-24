@@ -1,6 +1,6 @@
-
 import { GameState, FactionId, Convoy, NavalConvoy } from '../../types';
 import { getNavalTravelTime } from '../../constants';
+import { createConvoyDispatchedLog, createNavalConvoyDispatchedLog } from '../logs/logFactory';
 
 export const executeSendConvoy = (
     state: GameState,
@@ -55,8 +55,8 @@ export const executeSendConvoy = (
         newState: {
             ...state,
             locations: newLocations,
-            convoys: [...state.convoys, newConvoy]
-            // Convoy dispatch log removed - player action doesn't need logging
+            convoys: [...state.convoys, newConvoy],
+            logs: [...state.logs, createConvoyDispatchedLog(state.turn)]
         }
     };
 };
@@ -79,14 +79,28 @@ export const executeSendNavalConvoy = (
         console.log(`[NAVAL] Failed: Insufficient food at ${locationId}. Has ${loc.foodStock}, needs ${amount}`);
         return { success: false, newState: state, error: 'Not enough food' };
     }
-    if (!loc.isCoastal) return { success: false, newState: state, error: 'Location not coastal' };
+    // Check if location is coastal (or its linked rural area is)
+    let isSourceCoastal = loc.isCoastal;
+    if (!isSourceCoastal && loc.linkedLocationId) {
+        const rural = state.locations.find(l => l.id === loc.linkedLocationId);
+        if (rural && rural.isCoastal) isSourceCoastal = true;
+    }
+    if (!isSourceCoastal) return { success: false, newState: state, error: 'Location not coastal' };
 
     const destCity = state.locations.find(l => l.id === destinationId);
     if (!destCity) {
         console.log(`[NAVAL] Failed: Destination not found (${destinationId})`);
         return { success: false, newState: state, error: 'Destination not found' };
     }
-    if (!destCity.isCoastal) return { success: false, newState: state, error: 'Destination not coastal' };
+
+    // Check if destination is coastal
+    let isDestCoastal = destCity.isCoastal;
+    if (!isDestCoastal && destCity.linkedLocationId) {
+        const destRural = state.locations.find(l => l.id === destCity.linkedLocationId);
+        if (destRural && destRural.isCoastal) isDestCoastal = true;
+    }
+
+    if (!isDestCoastal) return { success: false, newState: state, error: 'Destination not coastal' };
 
     const days = getNavalTravelTime(locationId, destinationId);
 
@@ -108,8 +122,8 @@ export const executeSendNavalConvoy = (
         newState: {
             ...state,
             locations: newLocations,
-            navalConvoys: [...state.navalConvoys, newNavalConvoy]
-            // Naval convoy dispatch log removed - player action doesn't need logging
+            navalConvoys: [...state.navalConvoys, newNavalConvoy],
+            logs: [...state.logs, createNavalConvoyDispatchedLog(state.turn)]
         }
     };
 };

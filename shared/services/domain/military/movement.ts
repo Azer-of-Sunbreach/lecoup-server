@@ -166,7 +166,7 @@ export const executeArmyMove = (
                 }
             }
 
-            newLogs = [...newLogs, createLocationSecuredLog(destLoc.name, destLocId, destLoc.faction, playerFaction, state.turn)];
+            newLogs = [...newLogs, createLocationSecuredLog(destLocId, destLoc.faction, playerFaction, state.turn)];
         }
 
     } else {
@@ -220,7 +220,7 @@ export const executeArmyMove = (
         const destFaction = destLoc?.faction || FactionId.NEUTRAL;
         // Only add log if enemy is marching to player's territory
         const approachingLog = createForcesApproachingLog(
-            destName,
+            destLocId,
             destFaction,
             playerFaction,
             armyId,
