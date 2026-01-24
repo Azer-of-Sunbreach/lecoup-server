@@ -148,6 +148,17 @@ export function pullReinforcements(
 
         // Can we take this FULL army without violating garrison?
         if (currentTotal - army.strength >= minGarrison) {
+            // FRONTIER PROTECTION: Don't strip frontier locations below 1000
+            const wouldDropBelow1000 = (currentTotal - army.strength) < 1000;
+            const hasEnemyNeighbor = state.roads.some(r =>
+                (r.from === loc.id || r.to === loc.id) &&
+                state.locations.some(l => l.id === (r.from === loc.id ? r.to : r.from) && l.faction !== faction && l.faction !== FactionId.NEUTRAL)
+            );
+            if (wouldDropBelow1000 && hasEnemyNeighbor) {
+                if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Skipping ${army.locationId} - frontier protection`);
+                continue;
+            }
+
             const path = findSafePath(army.locationId!, targetId, state, faction);
             if (path && path.length > 0) {
                 if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Reinforcing ${targetId} from ${army.locationId} with ${army.strength} (Dist: ${cand.dist})`);

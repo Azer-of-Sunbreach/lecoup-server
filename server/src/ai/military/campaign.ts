@@ -416,7 +416,8 @@ function handleSiegeDecision(
     // FIX: Fortification bonus only applies if garrison >= 500 (as per game rules)
     const defBonus = hasDefenders ? (FORTIFICATION_LEVELS[targetLoc.fortificationLevel]?.bonus || 0) : 0;
     const effectiveDef = enemyGarrisonStr + defBonus;
-    const canAssault = strengthAtTarget > effectiveDef * 1.5;
+    // FIX 3B: Direct comparison - we need more strength than effective defense to assault
+    const canAssault = strengthAtTarget > effectiveDef;
 
     // FIX: Nobles CAN siege - only Neutral faction is excluded
     // Nobles just can't negotiate with neutrals (handled below)

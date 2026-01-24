@@ -26,6 +26,9 @@ export function handleIdleArmies(
     armies: Army[],
     assigned: Set<string>
 ) {
+    // FIX 3C: First handle armies stuck on roads
+    handleStuckRoadArmies(state, faction, armies, assigned);
+
     const idle = armies.filter(a => a.faction === faction && !assigned.has(a.id) && !a.isGarrisoned);
 
     // Sort idle armies by strength (biggest chunks first)
@@ -95,7 +98,7 @@ export function handleIdleArmies(
             for (const t of targets) {
                 if (army.locationId === t) continue;
                 const dist = getDistance(army.locationId, t, state.roads);
-                if (dist < minDist && dist < 15) {
+                if (dist <= 4 && dist < minDist) {
                     minDist = dist;
                     bestTarget = t;
                 }
@@ -108,6 +111,67 @@ export function handleIdleArmies(
                     moveArmiesTo([army], bestTarget, state, armies, assigned);
                 }
             }
+        }
+    }
+}
+
+/**
+ * FIX 3C: Handle armies stuck on road stages (garrisoned after failed attack/retreat).
+ * Decides whether to advance (forward) or retreat (reverse) based on enemy strength.
+ */
+function handleStuckRoadArmies(
+    state: GameState,
+    faction: FactionId,
+    armies: Army[],
+    assigned: Set<string>
+) {
+    const stuckOnRoad = armies.filter(a =>
+        a.faction === faction &&
+        a.locationType === 'ROAD' &&
+        a.isGarrisoned &&
+        !assigned.has(a.id)
+    );
+
+    for (const army of stuckOnRoad) {
+        const road = state.roads.find(r => r.id === army.roadId);
+        if (!road) continue;
+
+        // Determine destination based on current direction
+        const destId = army.destinationId || (army.direction === 'FORWARD' ? road.to : road.from);
+        const originId = army.direction === 'FORWARD' ? road.from : road.to;
+
+        // Calculate enemy strength at destination
+        const enemyAtDest = state.armies
+            .filter(a => a.locationId === destId && a.faction !== faction && a.faction !== FactionId.NEUTRAL)
+            .reduce((s, a) => s + a.strength, 0);
+
+        // Check destination location for fortification
+        const destLoc = state.locations.find(l => l.id === destId);
+        const fortBonus = destLoc && enemyAtDest >= 500 ? (destLoc.defense || 0) : 0;
+        const effectiveEnemyStr = enemyAtDest + fortBonus;
+
+        const idx = armies.findIndex(x => x.id === army.id);
+        if (idx === -1) continue;
+
+        if (army.strength < effectiveEnemyStr * 0.5) {
+            // HOPELESS - REVERSE (retreat to origin)
+            if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Road army ${army.id} RETREATING from ${destId} (${army.strength} vs ${effectiveEnemyStr})`);
+            const newDirection = army.direction === 'FORWARD' ? 'BACKWARD' : 'FORWARD';
+            armies[idx] = {
+                ...army,
+                direction: newDirection,
+                destinationId: originId,
+                isGarrisoned: false
+            };
+            assigned.add(army.id);
+        } else {
+            // CAN FIGHT - FORWARD (continue attack)
+            if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Road army ${army.id} ADVANCING to ${destId} (${army.strength} vs ${effectiveEnemyStr})`);
+            armies[idx] = {
+                ...army,
+                isGarrisoned: false
+            };
+            assigned.add(army.id);
         }
     }
 }
