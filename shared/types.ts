@@ -5,6 +5,12 @@ export enum FactionId {
   REPUBLICANS = 'REPUBLICANS',
   CONSPIRATORS = 'CONSPIRATORS',
   NOBLES = 'NOBLES',
+
+  // Valis Factions
+  LOYALISTS = 'LOYALISTS',
+  PRINCELY_ARMY = 'PRINCELY_ARMY',
+  CONFEDERATE_CITIES = 'CONFEDERATE_CITIES',
+
   NEUTRAL = 'NEUTRAL'
 }
 
@@ -100,7 +106,7 @@ export interface LogEntry {
 }
 
 // Extended to include new abilities from leader system refactoring
-export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND' | 'MAN_OF_CHURCH' | 'DAREDEVIL' | 'GHOST' | 'PARANOID';
+export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND' | 'MAN_OF_CHURCH' | 'DAREDEVIL' | 'GHOST' | 'PARANOID' | 'SMUGGLER' | 'ELITE_NETWORKS' | 'CONSCRIPTION' | 'AGITATIONAL_NETWORKS';
 
 // Re-export new leader types for easy access
 export * from './types/leaderTypes';
@@ -109,6 +115,10 @@ export * from './types/leaderTypes';
 import { GovernorPolicy } from './types/governorTypes';
 export * from './types/governorTypes';
 export * from './types/clandestineTypes';
+export * from './types/trackerTypes';
+
+// Republican Internal Factions - One-time choice for gameplay bonuses
+export type RepublicanInternalFaction = 'KNIGHTLY_COUP' | 'RABBLE_VICTORY' | 'MERCHANT_DOMINATION' | null;
 
 export interface Coordinates {
   x: number;
@@ -178,6 +188,13 @@ export interface Location {
   burnedFields?: number;
   burnedDistricts?: number;
 
+  // Granted Fief (Nobles recruitment mechanic)
+  // When a Noble leader is recruited, a fief is granted in a territory
+  // This reduces production by 30 (food for rural, gold for city) while the granting faction controls the territory
+  grantedFief?: {
+    grantedBy: FactionId;  // The faction that granted the fief (e.g., NOBLES)
+  };
+
   // --- FUTURE FEATURES (not currently used) ---
 
   // Detailed Demographics (Evolution 1)
@@ -190,11 +207,7 @@ export interface Location {
 
   // Per-Faction Resentment (Evolution 2)
   // Resentment level (0-100) towards each faction - for future political mechanics
-  resentment?: {
-    [FactionId.NOBLES]: number;
-    [FactionId.CONSPIRATORS]: number;
-    [FactionId.REPUBLICANS]: number;
-  };
+  resentment?: Partial<Record<FactionId, number>>;
 }
 
 export interface RoadStage {
@@ -322,7 +335,7 @@ export interface Character {
     insurrectionValue: number;
     ability: LeaderAbility[];
     // New fields from leader system refactoring
-    traits?: ('IRON_FIST' | 'FAINT_HEARTED' | 'SCORCHED_EARTH')[];
+    traits?: ('IRON_FIST' | 'FAINT_HEARTED' | 'SCORCHED_EARTH' | 'FREE_TRADER' | 'MAN_OF_ACTION')[];
     clandestineOps?: number;   // 1-5 scale (Inept to Exceptional)
     discretion?: number;       // 1-5 scale
     statesmanship?: number;    // 1-5 scale
@@ -383,6 +396,28 @@ export interface Character {
   // === Evolution 6: Anti-Exploit (2026-01-13) ===
   /** Last turn this leader was exfiltrated/moved. Prevents double-exfiltration exploit. */
   lastExfiltrationTurn?: number;
+
+  // === Evolution 1: Conscription Ability ===
+  /** Tracks if this leader has already provided a recruitment discount this turn */
+  usedConscriptionThisTurn?: boolean;
+
+  // === Evolution 2: SMUGGLER Mission System ===
+  /** True if leader is on a SMUGGLER support mission (cumulative with GOVERNOR role) */
+  isSmugglerMission?: boolean;
+  /** Target city ID for active SMUGGLER mission */
+  smugglerTargetCityId?: string;
+
+  // === Recruitable Leader System ===
+  /** True if this leader is available for mid-game recruitment (stored as DEAD in graveyard until recruited) */
+  isRecruitableLeader?: boolean;
+
+  // === Internal Factions System ===
+  /** Abilities disabled by Internal Factions choice (runtime only, not in base data) */
+  disabledAbilities?: LeaderAbility[];
+  /** Abilities granted by Internal Factions choice (runtime only, not in base data) */
+  grantedAbilities?: LeaderAbility[];
+  /** Stability modifier override (for Internal Factions effect, replaces stats.stabilityPerTurn for display/calc) */
+  stabilityModifierOverride?: number;
 }
 
 export interface NegotiationMission {
@@ -425,6 +460,7 @@ export interface FamineNotification {
 }
 
 export interface SiegeNotification {
+  targetId: string;
   targetName: string;
   attackerName: string;
 }
@@ -491,7 +527,16 @@ export interface FactionAIState {
   goals: AIGoal[]; // Kept for legacy/transition
   missions: AIMission[]; // NEW: Persistent missions
   savings: number;
+  leaderRecruitmentFund?: number; // Gold saved for leader recruitment (CONSPIRATORS)
+
+  // Republicans Internal Faction AI tracking
+  republicanInternalFaction?: {
+    savingsMode: 'KNIGHTLY_COUP' | 'MERCHANT_DOMINATION' | null;
+    savedGold: number;
+    decisionMade: boolean;
+  };
 }
+
 
 export interface LeaderEliminatedNotification {
   faction: FactionId;
@@ -502,6 +547,7 @@ export interface LeaderEliminatedNotification {
 
 export interface GameState {
   turn: number;
+  mapId?: string; // ID of the currently active map (e.g. 'larion', 'valis')
   playerFaction: FactionId; // The local player's faction
   currentPlayerFaction?: FactionId; // The faction currently playing (Multiplayer only)
   locations: Location[];
@@ -566,6 +612,12 @@ export interface GameState {
       gold: number;
     }
   };
+
+  // Republican internal faction choice (one-time per game)
+  chosenInternalFaction?: RepublicanInternalFaction;
+
+  // DevTool: Tracker state for monitoring faction metrics over time
+  trackerState?: import('./types/trackerTypes').TrackerState;
 }
 
 export const FACTION_COLORS = {
@@ -671,6 +723,7 @@ export interface GameLobby {
 /** Game actions that can be sent over network */
 export type GameAction =
   | { type: 'RECRUIT'; locationId: string; faction: FactionId }
+  | { type: 'CONSCRIPT'; locationId: string; faction: FactionId }
   | { type: 'MOVE_ARMY'; armyId: string; destinationId: string; faction: FactionId }
   | { type: 'SPLIT_ARMY'; armyId: string; amount: number; faction: FactionId }
   | { type: 'GARRISON'; armyId: string; faction: FactionId }
@@ -688,7 +741,16 @@ export type GameAction =
   | { type: 'MOVE_LEADER'; characterId: string; destinationId: string; faction: FactionId }
   | { type: 'RETREAT_ARMY'; armyId: string; faction: FactionId }
   | { type: 'COMBAT_CHOICE'; choice: 'FIGHT' | 'RETREAT' | 'RETREAT_CITY' | 'SIEGE'; siegeCost?: number; faction: FactionId }
-  | { type: 'END_TURN'; faction: FactionId };
+  | { type: 'END_TURN'; faction: FactionId }
+  // === NEW: Leader Recruitment Actions ===
+  | { type: 'RECRUIT_LEADER'; leaderId: string; destinationId?: string; faction: FactionId }
+  | { type: 'RECRUIT_NOBLES_LEADER'; leaderId: string; destinationId: string; fiefdomLocationId: string; faction: FactionId }
+  // === NEW: Undercover Mission Action ===
+  | { type: 'SEND_UNDERCOVER'; targetLocationId: string; leaderId: string; goldBudget: number; faction: FactionId }
+  // === NEW: Governor Policies Action ===
+  | { type: 'SET_GOVERNOR_POLICIES'; locationId: string; characterId: string; policies: string[]; faction: FactionId }
+  // === NEW: Internal Faction Choice (Republicans) ===
+  | { type: 'CHOOSE_INTERNAL_FACTION'; choice: 'KNIGHTLY_COUP' | 'RABBLE_VICTORY' | 'MERCHANT_DOMINATION'; faction: FactionId };
 
 export type GameMode = 'SOLO' | 'MULTIPLAYER';
 

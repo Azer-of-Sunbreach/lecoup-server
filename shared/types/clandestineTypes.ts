@@ -88,7 +88,7 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         id: ClandestineActionId.ATTACK_TAX_CONVOYS,
         name: 'Attack Tax Convoys',
         description: 'Intercept tax gold before it reaches the faction treasury.',
-        costPerTurn: 0,
+        costPerTurn: 10,
         detectionIncrease: 5,
         detectionType: 'per_turn',
         requiredOpsLevel: 2
@@ -97,7 +97,7 @@ export const CLANDESTINE_ACTIONS: Record<ClandestineActionId, ClandestineActionT
         id: ClandestineActionId.STEAL_FROM_GRANARIES,
         name: 'Steal from Granaries',
         description: 'Sabotage food stocks to cause unrest.',
-        costPerTurn: 0,
+        costPerTurn: 10,
         detectionIncrease: 5,
         detectionType: 'per_turn',
         requiredOpsLevel: 2

@@ -62,48 +62,63 @@ export const getInitialResources = (playerFaction: FactionId) => {
     };
 };
 
+import { MapRegistry } from '../maps/MapRegistry';
+import { MapId } from '../maps/types';
+
 /**
  * Create the initial game state for starting a new game
  */
-export const createInitialState = (): GameState => ({
-    turn: 1,
-    playerFaction: FactionId.REPUBLICANS,
-    locations: LARION_ALTERNATE_LOCATIONS,
-    characters: CHARACTERS,
-    armies: generateInitialArmies(),
-    convoys: [],
-    navalConvoys: [],
-    roads: LARION_ALTERNATE_ROADS,
-    resources: {
-        [FactionId.REPUBLICANS]: { gold: INITIAL_PLAYER_RESOURCES.REPUBLICANS },
-        [FactionId.CONSPIRATORS]: { gold: INITIAL_PLAYER_RESOURCES.CONSPIRATORS },
-        [FactionId.NOBLES]: { gold: INITIAL_PLAYER_RESOURCES.NOBLES },
-        [FactionId.NEUTRAL]: { gold: 0 },
-    },
-    pendingNegotiations: [],
-    logs: [
-        { id: 'init_1', type: LogType.GAME_START, message: "The coup has begun. Count Rivenberg has claimed the regency for himself.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
-        { id: 'init_2', type: LogType.GAME_START, message: "Baron Lekal has called on the great Dukes to defend their feudal rights.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
-        { id: 'init_3', type: LogType.GAME_START, message: "Sir Azer and the Republicans took control of Sunbreach.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
-        { id: 'init_4', type: LogType.GAME_START, message: "Civil war engulfs Larion.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO }
-    ],
-    stats: { deathToll: 0 },
-    selectedType: null,
-    selectedId: null,
-    selectedStageIndex: null,
-    selectedLocationId: null,
-    isProcessing: false,
-    combatQueue: [],
-    combatState: null,
-    showLeadersModal: false,
-    showStartScreen: true,
-    showStatsModal: false,
-    showFactionModal: false,
-    logsExpanded: true,
-    grainTradeNotification: null,
-    insurrectionNotification: null,
-    famineNotification: null,
-    siegeNotification: null,
-    leaderEliminatedNotification: null,
-    hasScannedBattles: false
-});
+export const createInitialState = (playerFaction: FactionId, mapId: MapId = 'larion_alternate'): GameState => {
+    // Get map definition rules
+    const mapDef = MapRegistry.get(mapId);
+    const initialCharacters = mapDef.rules ? mapDef.rules.getInitialCharacters() : [];
+
+    return {
+        turn: 1,
+        // (NEW) Store mapId in state so economy calculator knows which rules to use
+        mapId: mapId,
+        playerFaction: playerFaction,
+        locations: JSON.parse(JSON.stringify(LARION_ALTERNATE_LOCATIONS)), // Deep copy to prevent mutation persistence
+        characters: JSON.parse(JSON.stringify(initialCharacters)),
+
+        armies: generateInitialArmies(),
+        convoys: [],
+        navalConvoys: [],
+        roads: JSON.parse(JSON.stringify(LARION_ALTERNATE_ROADS)),
+        resources: {
+            [FactionId.REPUBLICANS]: { gold: INITIAL_PLAYER_RESOURCES.REPUBLICANS },
+            [FactionId.CONSPIRATORS]: { gold: INITIAL_PLAYER_RESOURCES.CONSPIRATORS },
+            [FactionId.NOBLES]: { gold: INITIAL_PLAYER_RESOURCES.NOBLES },
+            [FactionId.LOYALISTS]: { gold: 1000 },
+            [FactionId.PRINCELY_ARMY]: { gold: 1000 },
+            [FactionId.CONFEDERATE_CITIES]: { gold: 1000 },
+            [FactionId.NEUTRAL]: { gold: 0 },
+        },
+        pendingNegotiations: [],
+        logs: [
+            { id: 'init_1', type: LogType.GAME_START, message: "The coup has begun. Count Rivenberg has claimed the regency for himself.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
+            { id: 'init_2', type: LogType.GAME_START, message: "Baron Lekal has called on the great Dukes to defend their feudal rights.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
+            { id: 'init_3', type: LogType.GAME_START, message: "Sir Azer and the Republicans took control of Sunbreach.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO },
+            { id: 'init_4', type: LogType.GAME_START, message: "Civil war engulfs Larion.", turn: 1, visibleToFactions: [], baseSeverity: LogSeverity.INFO }
+        ],
+        stats: { deathToll: 0 },
+        selectedType: null,
+        selectedId: null,
+        selectedStageIndex: null,
+        selectedLocationId: null,
+        isProcessing: false,
+        combatQueue: [],
+        combatState: null,
+        showLeadersModal: false,
+        showStartScreen: true,
+        showStatsModal: false,
+        showFactionModal: false,
+        logsExpanded: true,
+        grainTradeNotification: null,
+        insurrectionNotification: null,
+        famineNotification: null,
+        siegeNotification: null,
+        leaderEliminatedNotification: null,
+        hasScannedBattles: false
+    };
+};

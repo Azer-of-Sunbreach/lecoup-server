@@ -228,22 +228,22 @@ export const NEW_LOCATIONS: Location[] = [
     },
     {
         id: 'fairemere_viscounty', name: 'Fairemere Viscounty', type: 'RURAL', linkedLocationId: 'Highwall', faction: FactionId.NOBLES,
-        population: 150000, ruralCategory: RuralCategory.INHOSPITABLE, isCoastal: true, foodCollectionLevel: 'LOW',
+        population: 230000, ruralCategory: RuralCategory.INHOSPITABLE, isCoastal: true, foodCollectionLevel: 'LOW',
         goldIncome: 0, foodIncome: 0, foodStock: 0, stability: 50, defense: 0, fortificationLevel: 0,
         position: { x: 887, y: 465 },
         backgroundPosition: { x: 887, y: 465 },
         actionsTaken: { seizeGold: 0, seizeFood: 0, recruit: 0, incite: 0 },
-        demographics: { nobles: 3650, wealthyCommoners: 6200, labouringFolks: 137150 },
+        demographics: { nobles: 4600, wealthyCommoners: 11500, labouringFolks: 213900 },
         resentment: { [FactionId.NOBLES]: 65, [FactionId.CONSPIRATORS]: 15, [FactionId.REPUBLICANS]: 15 }
     },
     {
         id: 'cathair', name: 'Cathair', type: 'CITY', linkedLocationId: 'fairemere_viscounty', faction: FactionId.NOBLES,
-        population: 12000, taxLevel: 'NORMAL', tradeTaxLevel: 'NORMAL',
-        goldIncome: 0, foodIncome: 0, foodStock: 100, stability: 50, defense: 4000, fortificationLevel: 3,
+        population: 25000, taxLevel: 'LOW', tradeTaxLevel: 'LOW',
+        goldIncome: 0, foodIncome: 0, foodStock: 150, stability: 50, defense: 4000, fortificationLevel: 3,
         position: { x: 923, y: 424 },
         backgroundPosition: { x: 923, y: 424 },
         actionsTaken: { seizeGold: 0, seizeFood: 0, recruit: 0, incite: 0 },
-        demographics: { nobles: 200, wealthyCommoners: 660, labouringFolks: 11140 },
+        demographics: { nobles: 500, wealthyCommoners: 1500, labouringFolks: 23000 },
         resentment: { [FactionId.NOBLES]: 65, [FactionId.CONSPIRATORS]: 15, [FactionId.REPUBLICANS]: 15 }
     }
 ];
