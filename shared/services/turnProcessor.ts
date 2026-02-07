@@ -103,7 +103,11 @@ export const processTurn = async (
             actionsTaken: { recruit: 0, seizeGold: 0, seizeFood: 0, incite: 0 },
             hasBeenSiegedThisTurn: false
         }));
-        state.siegeNotification = null; // Clear siege notification from previous turn
+        // Clear siege notification only if it's from a previous turn
+        // (Keep notification set during current AI turn in Phase 1)
+        if (state.siegeNotification && (state.siegeNotification as any).turn !== state.turn) {
+            state.siegeNotification = null;
+        }
         state.roads = state.roads.map(r => ({
             ...r,
             stages: r.stages.map(s => ({ ...s, hasBeenSiegedThisTurn: false }))
