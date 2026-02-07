@@ -1,6 +1,9 @@
-export * from './types';
-export { analyzeTheaters } from './theaters';
-export { generateDefendMissions } from './defenseMissions';
-export { generateCampaignMissions } from './campaignMissions';
-export { generateDiplomacyMissions } from './diplomacyMissions';
-export { generateRoadDefenseMissions } from './roadDefense';
+/**
+ * AI Strategy Module
+ *
+ * Shared AI strategic decision-making logic.
+ *
+ * @module shared/services/ai/strategy
+ */
+export { detectInsurrectionThreats, convertToAlerts, getInsurrectionAlerts, getCurrentGarrison, analyzeGarrisonDeficits, groupThreatsByPair, allocateGarrison } from './insurrectionDefense';
+export type { InsurrectionThreat, InsurrectionThreatType, InsurrectionAlert } from './insurrectionDefense';

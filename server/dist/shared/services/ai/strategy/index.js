@@ -1,31 +1,18 @@
 "use strict";
-// AI Strategy Module Index - Public exports
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __exportStar = (this && this.__exportStar) || function(m, exports) {
-    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
-};
+/**
+ * AI Strategy Module
+ *
+ * Shared AI strategic decision-making logic.
+ *
+ * @module shared/services/ai/strategy
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateRoadDefenseMissions = exports.generateDiplomacyMissions = exports.generateCampaignMissions = exports.generateDefendMissions = exports.analyzeTheaters = void 0;
-__exportStar(require("./types"), exports);
-// Theater analysis
-var theaters_1 = require("./theaters");
-Object.defineProperty(exports, "analyzeTheaters", { enumerable: true, get: function () { return theaters_1.analyzeTheaters; } });
-// Mission generators
-var defenseMissions_1 = require("./defenseMissions");
-Object.defineProperty(exports, "generateDefendMissions", { enumerable: true, get: function () { return defenseMissions_1.generateDefendMissions; } });
-var campaignMissions_1 = require("./campaignMissions");
-Object.defineProperty(exports, "generateCampaignMissions", { enumerable: true, get: function () { return campaignMissions_1.generateCampaignMissions; } });
-var diplomacyMissions_1 = require("./diplomacyMissions");
-Object.defineProperty(exports, "generateDiplomacyMissions", { enumerable: true, get: function () { return diplomacyMissions_1.generateDiplomacyMissions; } });
-var roadDefense_1 = require("./roadDefense");
-Object.defineProperty(exports, "generateRoadDefenseMissions", { enumerable: true, get: function () { return roadDefense_1.generateRoadDefenseMissions; } });
+exports.allocateGarrison = exports.groupThreatsByPair = exports.analyzeGarrisonDeficits = exports.getCurrentGarrison = exports.getInsurrectionAlerts = exports.convertToAlerts = exports.detectInsurrectionThreats = void 0;
+var insurrectionDefense_1 = require("./insurrectionDefense");
+Object.defineProperty(exports, "detectInsurrectionThreats", { enumerable: true, get: function () { return insurrectionDefense_1.detectInsurrectionThreats; } });
+Object.defineProperty(exports, "convertToAlerts", { enumerable: true, get: function () { return insurrectionDefense_1.convertToAlerts; } });
+Object.defineProperty(exports, "getInsurrectionAlerts", { enumerable: true, get: function () { return insurrectionDefense_1.getInsurrectionAlerts; } });
+Object.defineProperty(exports, "getCurrentGarrison", { enumerable: true, get: function () { return insurrectionDefense_1.getCurrentGarrison; } });
+Object.defineProperty(exports, "analyzeGarrisonDeficits", { enumerable: true, get: function () { return insurrectionDefense_1.analyzeGarrisonDeficits; } });
+Object.defineProperty(exports, "groupThreatsByPair", { enumerable: true, get: function () { return insurrectionDefense_1.groupThreatsByPair; } });
+Object.defineProperty(exports, "allocateGarrison", { enumerable: true, get: function () { return insurrectionDefense_1.allocateGarrison; } });

@@ -1,29 +1,48 @@
-import { GameState, FactionId, Location, ManagementLevel } from '../../../types';
-import { AIBudget } from '../types';
 /**
- * Tax/Collection levels ordered from lowest to highest
+ * AI Economy Types
+ *
+ * Shared types for AI economic decision-making.
+ *
+ * @module shared/services/ai/economy
  */
-export declare const TAX_LEVELS: ManagementLevel[];
 /**
- * Result of economy management
+ * Alert for insurrection threats, used by recruitment module.
+ * Simplified from InsurrectionThreat for cross-module use.
  */
-export interface EconomyResult {
-    locations: Location[];
-    resources: GameState['resources'];
-    convoys: GameState['convoys'];
-    navalConvoys: GameState['navalConvoys'];
-    armies: GameState['armies'];
-    roads: GameState['roads'];
-    logs: string[];
-    grainTradeNotification?: GameState['grainTradeNotification'];
+export interface InsurrectionAlert {
+    locationId: string;
+    turnsUntilThreat: number;
+    estimatedInsurgents: number;
+    requiredGarrison: number;
+    priority: number;
+}
+export type RecruitmentReason = 'INSURRECTION_ADJACENT' | 'INSURRECTION_DIRECT' | 'MASSING' | 'THREAT' | 'INCOME';
+export interface RecruitmentTarget {
+    locationId: string;
+    locationName: string;
+    priority: number;
+    reason: RecruitmentReason;
+    linkedThreatenedLocationId?: string;
+    isConscription: boolean;
+    conscriptionLeaderId?: string;
+}
+export interface RecruitmentResult {
+    remainingGold: number;
+    updatedCharacters: import('../../../types').Character[];
+    recruitmentsPerformed: number;
+    conscriptionsPerformed: number;
 }
 /**
- * Context for economic decisions
+ * Minimal budget interface for recruitment.
+ * Compatible with both Application and Server AIBudget types.
  */
-export interface EconomyContext {
-    state: GameState;
-    faction: FactionId;
-    budget: AIBudget;
-    updates: Partial<GameState>;
-    currentGold: number;
+export interface RecruitmentBudgetInfo {
+    total: number;
+}
+/**
+ * Minimal personality interface for recruitment.
+ * Compatible with both Application and Server FactionPersonality types.
+ */
+export interface RecruitmentPersonalityInfo {
+    aggressiveness: number;
 }
