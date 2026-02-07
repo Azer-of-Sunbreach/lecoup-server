@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executeReverseConvoy = exports.executeSendNavalConvoy = exports.executeSendConvoy = void 0;
 const constants_1 = require("../../constants");
+const logFactory_1 = require("../logs/logFactory");
 const executeSendConvoy = (state, locationId, amount, destinationId, faction) => {
     const loc = state.locations.find(l => l.id === locationId);
     if (!loc)
@@ -45,8 +46,8 @@ const executeSendConvoy = (state, locationId, amount, destinationId, faction) =>
         newState: {
             ...state,
             locations: newLocations,
-            convoys: [...state.convoys, newConvoy]
-            // Convoy dispatch log removed - player action doesn't need logging
+            convoys: [...state.convoys, newConvoy],
+            logs: [...state.logs, (0, logFactory_1.createConvoyDispatchedLog)(state.turn)]
         }
     };
 };
@@ -63,14 +64,28 @@ const executeSendNavalConvoy = (state, locationId, amount, destinationId, factio
         console.log(`[NAVAL] Failed: Insufficient food at ${locationId}. Has ${loc.foodStock}, needs ${amount}`);
         return { success: false, newState: state, error: 'Not enough food' };
     }
-    if (!loc.isCoastal)
+    // Check if location is coastal (or its linked rural area is)
+    let isSourceCoastal = loc.isCoastal;
+    if (!isSourceCoastal && loc.linkedLocationId) {
+        const rural = state.locations.find(l => l.id === loc.linkedLocationId);
+        if (rural && rural.isCoastal)
+            isSourceCoastal = true;
+    }
+    if (!isSourceCoastal)
         return { success: false, newState: state, error: 'Location not coastal' };
     const destCity = state.locations.find(l => l.id === destinationId);
     if (!destCity) {
         console.log(`[NAVAL] Failed: Destination not found (${destinationId})`);
         return { success: false, newState: state, error: 'Destination not found' };
     }
-    if (!destCity.isCoastal)
+    // Check if destination is coastal
+    let isDestCoastal = destCity.isCoastal;
+    if (!isDestCoastal && destCity.linkedLocationId) {
+        const destRural = state.locations.find(l => l.id === destCity.linkedLocationId);
+        if (destRural && destRural.isCoastal)
+            isDestCoastal = true;
+    }
+    if (!isDestCoastal)
         return { success: false, newState: state, error: 'Destination not coastal' };
     const days = (0, constants_1.getNavalTravelTime)(locationId, destinationId);
     const newNavalConvoy = {
@@ -87,8 +102,8 @@ const executeSendNavalConvoy = (state, locationId, amount, destinationId, factio
         newState: {
             ...state,
             locations: newLocations,
-            navalConvoys: [...state.navalConvoys, newNavalConvoy]
-            // Naval convoy dispatch log removed - player action doesn't need logging
+            navalConvoys: [...state.navalConvoys, newNavalConvoy],
+            logs: [...state.logs, (0, logFactory_1.createNavalConvoyDispatchedLog)(state.turn)]
         }
     };
 };

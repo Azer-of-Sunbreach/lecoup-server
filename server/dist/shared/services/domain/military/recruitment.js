@@ -5,30 +5,41 @@
  * Extracted from useGameEngine.ts recruit()
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.executeRecruitment = exports.canRecruit = void 0;
+exports.executeRecruitment = exports.canRecruit = exports.calculateRecruitCost = void 0;
 const data_1 = require("../../../data");
 const economy_1 = require("../../../utils/economy");
+/**
+ * Get the recruitment cost at a location (always standard cost now).
+ * CONSCRIPTION discount has been moved to separate conscription system.
+ */
+const calculateRecruitCost = (_locationId, _faction, _characters) => {
+    return {
+        cost: data_1.RECRUIT_COST
+    };
+};
+exports.calculateRecruitCost = calculateRecruitCost;
 /**
  * Check if recruitment is possible at a given location
  */
 const canRecruit = (state, locId, faction) => {
     const loc = state.locations.find(l => l.id === locId);
     if (!loc) {
-        return { canRecruit: false, reason: 'Location not found' };
+        return { canRecruit: false, reason: 'Location not found', cost: data_1.RECRUIT_COST };
     }
     if (loc.faction !== faction) {
-        return { canRecruit: false, reason: 'Location not controlled by faction' };
+        return { canRecruit: false, reason: 'Location not controlled by faction', cost: data_1.RECRUIT_COST };
     }
     if (loc.population < 2000) {
-        return { canRecruit: false, reason: 'Insufficient population' };
+        return { canRecruit: false, reason: 'Insufficient population', cost: data_1.RECRUIT_COST };
     }
     if (loc.actionsTaken && loc.actionsTaken.recruit >= 4) {
-        return { canRecruit: false, reason: 'Maximum recruits this turn reached' };
+        return { canRecruit: false, reason: 'Maximum recruits this turn reached', cost: data_1.RECRUIT_COST };
     }
-    if (state.resources[faction].gold < data_1.RECRUIT_COST) {
-        return { canRecruit: false, reason: 'Insufficient gold' };
+    const { cost } = (0, exports.calculateRecruitCost)(locId, faction, state.characters);
+    if (state.resources[faction].gold < cost) {
+        return { canRecruit: false, reason: 'Insufficient gold', cost };
     }
-    return { canRecruit: true };
+    return { canRecruit: true, cost };
 };
 exports.canRecruit = canRecruit;
 /**
@@ -45,6 +56,7 @@ const executeRecruitment = (state, locId, faction) => {
         };
     }
     const loc = state.locations.find(l => l.id === locId);
+    const { cost } = (0, exports.calculateRecruitCost)(locId, faction, state.characters);
     // Find eligible armies to reinforce
     const eligibleArmies = state.armies.filter(a => a.locationId === locId &&
         a.faction === faction &&
@@ -97,13 +109,13 @@ const executeRecruitment = (state, locId, faction) => {
         }
         : l);
     // Recalculate economy
-    newLocations = (0, economy_1.calculateEconomyAndFood)(newLocations, newArmies, state.characters, state.roads);
+    newLocations = (0, economy_1.calculateEconomyAndFood)(state, newLocations, newArmies, state.characters, state.roads);
     // Update resources
     const newResources = {
         ...state.resources,
         [faction]: {
             ...state.resources[faction],
-            gold: state.resources[faction].gold - data_1.RECRUIT_COST
+            gold: state.resources[faction].gold - cost
         }
     };
     return {
@@ -112,7 +124,6 @@ const executeRecruitment = (state, locId, faction) => {
             locations: newLocations,
             armies: newArmies,
             resources: newResources
-            // Recruitment log removed - player action doesn't need logging
         },
         message: `Recruited new regiment in ${loc.name}.`
     };

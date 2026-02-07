@@ -18,6 +18,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.executeIncite = void 0;
 const types_1 = require("../../../types");
 const logFactory_1 = require("../../logs/logFactory");
+const insurrectionFormulas_1 = require("../clandestine/insurrectionFormulas");
 /**
  * Execute insurrection initiation
  *
@@ -70,7 +71,7 @@ const executeIncite = (state, locId, charId, goldAmount, faction) => {
             },
             logs: [
                 ...state.logs,
-                (0, logFactory_1.createInsurrectionPreparationLog)(character.name, loc.name, loc.id, loc.faction, state.turn)
+                (0, logFactory_1.createInsurrectionPreparationLog)(character.id, loc.id, loc.faction, (0, insurrectionFormulas_1.estimateGrandInsurgents)(goldAmount, loc.population, loc.stability, character.stats.clandestineOps || 1, loc.resentment?.[loc.faction] || 0, loc.resentment?.[faction] || 0, character.stats.ability?.includes('FIREBRAND') || false), state.turn)
             ]
         },
         message: `${character.name} is preparing an insurrection in ${loc.name}`

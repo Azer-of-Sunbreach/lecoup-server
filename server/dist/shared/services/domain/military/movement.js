@@ -128,7 +128,7 @@ const executeArmyMove = (state, armyId, destLocId, playerFaction) => {
                     }
                 }
             }
-            newLogs = [...newLogs, (0, logFactory_1.createLocationSecuredLog)(destLoc.name, destLocId, destLoc.faction, playerFaction, state.turn)];
+            newLogs = [...newLogs, (0, logFactory_1.createLocationSecuredLog)(destLocId, destLoc.faction, playerFaction, state.turn)];
         }
     }
     else {
@@ -172,13 +172,13 @@ const executeArmyMove = (state, armyId, destLocId, playerFaction) => {
         const destName = destLoc?.name || 'Unknown';
         const destFaction = destLoc?.faction || types_1.FactionId.NEUTRAL;
         // Only add log if enemy is marching to player's territory
-        const approachingLog = (0, logFactory_1.createForcesApproachingLog)(destName, destFaction, playerFaction, armyId, state.turn);
+        const approachingLog = (0, logFactory_1.createForcesApproachingLog)(destLocId, destFaction, playerFaction, armyId, state.turn);
         if (approachingLog) {
             newLogs = [...newLogs, approachingLog];
         }
     }
     // Recalculate Economy
-    updatedLocs = (0, economy_1.calculateEconomyAndFood)(updatedLocs, updatedArmies, updatedChars, state.roads);
+    updatedLocs = (0, economy_1.calculateEconomyAndFood)(state, updatedLocs, updatedArmies, updatedChars, state.roads);
     return {
         success: true,
         newState: {

@@ -7,6 +7,7 @@
  * - Food collection: ±20 per level change
  */
 import { Location, ManagementLevel } from '../../../types';
+export declare const LEVEL_VALUES: Record<ManagementLevel, number>;
 export type TaxType = 'PERSONAL' | 'TRADE' | 'FOOD_COLLECTION';
 /**
  * Apply resentment changes resulting from a change in tax/management level

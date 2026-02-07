@@ -27,7 +27,7 @@ const executeNegotiate = (state, locId, gold, food, foodSourceIds, faction) => {
     const target = state.locations.find(l => l.id === locId);
     const targetName = target?.name || 'Unknown';
     // Create multiplayer notification log (WARNING for other players)
-    const negotiationLog = (0, logFactory_1.createNegotiationAttemptLog)(targetName, locId, faction, state.turn);
+    const negotiationLog = (0, logFactory_1.createNegotiationAttemptLog)(locId, faction, state.turn);
     return {
         success: true,
         newState: {

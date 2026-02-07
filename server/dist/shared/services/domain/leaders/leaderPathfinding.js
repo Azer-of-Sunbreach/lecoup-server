@@ -19,7 +19,6 @@ const gameConstants_1 = require("../../../data/gameConstants");
 const ports_1 = require("../../../data/ports");
 const infiltrationRisk_1 = require("./infiltrationRisk");
 const logFactory_1 = require("../../logs/logFactory");
-const types_2 = require("../../../types");
 const clandestineAlertService_1 = require("../clandestine/clandestineAlertService");
 // ============================================================================
 // MAIN FUNCTION
@@ -250,7 +249,7 @@ function processUndercoverMissionTravel(characters, locations, armies, turn) {
             // ... (logging logic) ...
             const destination = locationMap.get(mission.destinationId);
             if (destination) {
-                logs.push((0, logFactory_1.createLeaderDepartureSpottedLog)(c.name, types_2.FACTION_NAMES[c.faction], sourceLocation.name, sourceLocation.id, destination.name, turn, sourceLocation.faction));
+                logs.push((0, logFactory_1.createLeaderDepartureSpottedLog)(c.id, c.faction, sourceLocation.id, destination.id, turn, sourceLocation.faction));
             }
         }
         // START OF TURN CHECK
@@ -301,8 +300,6 @@ function processUndercoverMissionTravel(characters, locations, armies, turn) {
             const isHuntNetworkActive = destination.governorPolicies?.[types_1.GovernorPolicy.HUNT_NETWORKS] === true;
             // Calculate Risk (includes Hunt Networks modifier if active)
             const risk = (0, infiltrationRisk_1.calculateTotalInfiltrationRisk)(destination, armies, c, governor, isHuntNetworkActive);
-            // LOG DEBUG RISK (shows final risk after all modifiers including Hunt Networks)
-            logs.push((0, logFactory_1.createInfiltrationRiskDebugLog)(c.name, destination.name, risk, turn, c.faction));
             // Roll risk (0.0 - 1.0)
             const roll = Math.random();
             if (roll < risk) {
@@ -319,10 +316,10 @@ function processUndercoverMissionTravel(characters, locations, armies, turn) {
         if (!isSuccess) {
             // DETECTED - Leader arrives but enemy knows about them
             // 1. Log for defender (Spotted enemy agent)
-            logs.push((0, logFactory_1.createInfiltrationDetectedLog)(c.name, factionName, destination.name, destination.id, turn, destination.faction, true, // Owner message
+            logs.push((0, logFactory_1.createInfiltrationDetectedLog)(c.id, c.faction, destination.id, turn, destination.faction, true, // Owner message
             pronounPossessive));
             // 2. Log for sender (Your agent was spotted)
-            logs.push((0, logFactory_1.createInfiltrationDetectedLog)(c.name, factionName, destination.name, destination.id, turn, c.faction, false, // Sender message
+            logs.push((0, logFactory_1.createInfiltrationDetectedLog)(c.id, c.faction, destination.id, turn, c.faction, false, // Sender message
             pronounPossessive));
             // Create infiltration event for UI
             const infiltrationEvent = (0, clandestineAlertService_1.createInfiltrationEvent)(c, destination, true, // wasDetected
@@ -346,7 +343,7 @@ function processUndercoverMissionTravel(characters, locations, armies, turn) {
             // SUCCESS - Undetected infiltration
             // Log for sender only (Destination faction doesn't know)
             if (c.faction !== destination.faction) {
-                logs.push((0, logFactory_1.createInfiltrationSuccessLog)(c.name, destination.name, destination.id, turn, c.faction));
+                logs.push((0, logFactory_1.createInfiltrationSuccessLog)(c.id, destination.id, turn, c.faction));
             }
             // Create infiltration event for UI
             const infiltrationEvent = (0, clandestineAlertService_1.createInfiltrationEvent)(c, destination, false, // wasDetected

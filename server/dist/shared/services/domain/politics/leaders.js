@@ -69,6 +69,7 @@ exports.executeDetachLeader = executeDetachLeader;
  * 2. Linked location check (preserves detection when hopping between linked locations with same controller)
  */
 const leaderPathfinding_1 = require("../leaders/leaderPathfinding");
+const freeTrader_1 = require("../economy/freeTrader");
 const executeMoveLeader = (state, charId, destId) => {
     const char = state.characters.find(c => c.id === charId);
     if (!char) {
@@ -130,6 +131,19 @@ const executeMoveLeader = (state, charId, destId) => {
             ? { ...loc, governorPolicies: {} }
             : loc);
     }
+    // EVOLUTION: Free Trader Logic - Immediate Effect
+    // If arriving immediately, enforce tax limits at destination with the new leader present
+    let ftMessagePart = "";
+    if (turns === 0 && destLocation) {
+        // Simulate character at destination to check limits
+        const tempCharacters = state.characters.map(c => c.id === charId ? { ...c, locationId: destId, status: finalStatus } : c);
+        const ftResult = (0, freeTrader_1.enforceFreeTraderLimits)(destLocation, tempCharacters);
+        if (ftResult.modified) {
+            updatedLocations = updatedLocations.map(l => l.id === destLocation.id ? ftResult.location : l);
+            ftMessagePart = " (Taxes adjusted due to Free Trader)";
+            console.log(`[executeMoveLeader] Free Trader effect applied in ${destLocation.name}: ${ftResult.modifications.join(', ')}`);
+        }
+    }
     return {
         success: true,
         newState: {
@@ -155,7 +169,7 @@ const executeMoveLeader = (state, charId, destId) => {
             // Clear governor policies on departure location if was governing
             locations: updatedLocations,
         },
-        message: `${char.name} ${turns === 0 ? 'relocated' : 'travelling'} to ${destName}`
+        message: `${char.name} ${turns === 0 ? 'relocated' : 'travelling'} to ${destName}${ftMessagePart}`
     };
 };
 exports.executeMoveLeader = executeMoveLeader;

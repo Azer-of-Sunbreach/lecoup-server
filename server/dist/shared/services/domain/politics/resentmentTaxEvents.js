@@ -8,6 +8,7 @@
  * - Food collection: ±20 per level change
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.LEVEL_VALUES = void 0;
 exports.applyTaxChangeResentment = applyTaxChangeResentment;
 const types_1 = require("../../../types");
 const resentment_1 = require("./resentment");
@@ -16,7 +17,7 @@ const PERSONAL_TAX_CHANGE_DELTA = 15;
 const TRADE_TAX_CHANGE_DELTA = 5;
 const FOOD_COLLECTION_CHANGE_DELTA = 20;
 // Mapping of levels to numeric values for delta calculation
-const LEVEL_VALUES = {
+exports.LEVEL_VALUES = {
     'VERY_LOW': 0,
     'LOW': 1,
     'NORMAL': 2,
@@ -36,8 +37,8 @@ function applyTaxChangeResentment(location, oldLevel, newLevel, taxType) {
     if (location.faction === types_1.FactionId.NEUTRAL) {
         return location;
     }
-    const oldVal = LEVEL_VALUES[oldLevel];
-    const newVal = LEVEL_VALUES[newLevel];
+    const oldVal = exports.LEVEL_VALUES[oldLevel];
+    const newVal = exports.LEVEL_VALUES[newLevel];
     // Calculate level difference (positive if increasing tax, negative if decreasing)
     const levelsDiff = newVal - oldVal;
     // Calculate base resentment change

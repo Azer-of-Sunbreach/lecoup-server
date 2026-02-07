@@ -8,6 +8,7 @@
  * - All formulas extracted from specifications
  */
 import { Location, Army, Character, Road, FactionId, Convoy, NavalConvoy } from '../../../types';
+export declare const getAppeaseFoodCost: (population: number) => number;
 /**
  * Revenue breakdown for cities
  */
@@ -21,6 +22,7 @@ export interface RevenueStats {
     burnedDistricts: number;
     improvedEconomyBonus: number;
     governorActionsCost: number;
+    grantedFiefCost: number;
     total: number;
 }
 /**
@@ -36,6 +38,8 @@ export interface RuralFoodStats {
     embargoBonus: number;
     burnedFields: number;
     improvedEconomyBonus: number;
+    governorFoodCost: number;
+    grantedFiefCost: number;
     netProduction: number;
     linkedCityConsumption: number;
     linkedCityStocks: number;
@@ -50,6 +54,7 @@ export interface CityFoodStats {
     rationingBonus: number;
     foodImports: number;
     embargoMalus: number;
+    smugglingBonus: number;
     ruralSupply: number;
     total: number;
     currentStocks: number;
@@ -150,8 +155,8 @@ export declare function calculateFactionRevenue(factionId: FactionId, locations:
 /**
  * Check if tax level can be changed
  */
-export declare function canChangeTaxLevel(location: Location, taxType: 'PERSONAL' | 'TRADE', direction: 'UP' | 'DOWN'): boolean;
+export declare function canChangeTaxLevel(location: Location, taxType: 'PERSONAL' | 'TRADE', direction: 'UP' | 'DOWN', characters?: Character[]): boolean;
 /**
  * Check if food collection level can be changed
  */
-export declare function canChangeFoodCollection(location: Location, direction: 'UP' | 'DOWN'): boolean;
+export declare function canChangeFoodCollection(location: Location, direction: 'UP' | 'DOWN', characters?: Character[]): boolean;
