@@ -46,5 +46,8 @@ export const AI_PROFILES: Record<FactionId, FactionPersonality> = {
         preferredTargets: [],
         canUseGrainEmbargo: false,
         useFortifications: false,
-    }
+    },
+    [FactionId.LOYALISTS]: { name: 'Loyalists', aggressiveness: 0, defensiveness: 0, subversiveness: 0, expansionism: 0, riskTolerance: 0, preferredTargets: [], canUseGrainEmbargo: false, useFortifications: false },
+    [FactionId.PRINCELY_ARMY]: { name: 'Princely Army', aggressiveness: 0, defensiveness: 0, subversiveness: 0, expansionism: 0, riskTolerance: 0, preferredTargets: [], canUseGrainEmbargo: false, useFortifications: false },
+    [FactionId.CONFEDERATE_CITIES]: { name: 'Confederate Cities', aggressiveness: 0, defensiveness: 0, subversiveness: 0, expansionism: 0, riskTolerance: 0, preferredTargets: [], canUseGrainEmbargo: false, useFortifications: false }
 };

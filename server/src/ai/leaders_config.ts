@@ -1,3 +1,13 @@
+/**
+ * @deprecated This file is OBSOLETE. Use shared/services/ai/leaders_config.ts instead.
+ * This local copy is missing recent updates including:
+ * - governorQuality property
+ * - AGENT role (renamed from INSURRECTION)
+ * - GOVERNOR role
+ * - New utility functions
+ * 
+ * This file is kept for backward compatibility only and will be removed in a future version.
+ */
 
 import { FactionId } from '../../../shared/types';
 

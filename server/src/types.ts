@@ -5,7 +5,12 @@ export enum FactionId {
     REPUBLICANS = 'REPUBLICANS',
     CONSPIRATORS = 'CONSPIRATORS',
     NOBLES = 'NOBLES',
-    NEUTRAL = 'NEUTRAL'
+    NEUTRAL = 'NEUTRAL',
+
+    // Valis Factions (Future support)
+    LOYALISTS = 'LOYALISTS',
+    PRINCELY_ARMY = 'PRINCELY_ARMY',
+    CONFEDERATE_CITIES = 'CONFEDERATE_CITIES'
 }
 
 export interface PlayerInfo {

@@ -6,6 +6,7 @@ import { IDLE_DEPLOYMENT_TARGETS } from './types';
 import { getMinGarrison } from './garrison';
 import { moveArmiesTo } from './movement';
 import { DEBUG_AI } from '../../../../shared/data/gameConstants';
+import { getSameTurnConvergingStrength, getArmyDestinationId } from './convergingForces';
 
 /**
  * Handle idle armies that are not assigned to any mission.
@@ -26,6 +27,9 @@ export function handleIdleArmies(
     armies: Army[],
     assigned: Set<string>
 ) {
+    // EVOLUTION 3: Check moving armies BEFORE they advance into suicide positions
+    checkMovingArmiesForSuicide(state, faction, armies, assigned);
+
     // FIX 3C: First handle armies stuck on roads
     handleStuckRoadArmies(state, faction, armies, assigned);
 
@@ -116,6 +120,116 @@ export function handleIdleArmies(
 }
 
 /**
+ * EVOLUTION 3: Check actively MOVING armies (not garrisoned) on roads.
+ * If they are about to advance into a suicide position, STOP them by setting isGarrisoned.
+ * This prevents resolveMovements from advancing them into certain death.
+ */
+function checkMovingArmiesForSuicide(
+    state: GameState,
+    faction: FactionId,
+    armies: Army[],
+    assigned: Set<string>
+) {
+    const movingOnRoad = armies.filter(a =>
+        a.faction === faction &&
+        a.locationType === 'ROAD' &&
+        !a.isGarrisoned &&
+        !a.isSpent &&
+        !assigned.has(a.id)
+    );
+
+    for (const army of movingOnRoad) {
+        const road = state.roads.find(r => r.id === army.roadId);
+        if (!road) continue;
+
+        // Calculate next stage in current direction
+        const directionDelta = army.direction === 'FORWARD' ? 1 : -1;
+        const nextStageIndex = army.stageIndex + directionDelta;
+
+        let effectiveEnemyStr = 0;
+        let defenseDescription = '';
+
+        // CASE 1: Next stage is still on the road
+        if (nextStageIndex >= 0 && nextStageIndex < road.stages.length) {
+            const nextStage = road.stages[nextStageIndex];
+
+            // Check for enemy presence on next stage
+            const enemyOnNextStage = state.armies.filter(a =>
+                a.faction !== faction &&
+                a.faction !== FactionId.NEUTRAL &&
+                a.locationType === 'ROAD' &&
+                a.roadId === army.roadId &&
+                a.stageIndex === nextStageIndex
+            );
+            const enemyTroops = enemyOnNextStage.reduce((s, a) => s + a.strength, 0);
+
+            // Get stage defense (fortification + natural defense)
+            const fortBonus = nextStage.fortificationLevel
+                ? [0, 500, 1500, 4000, 10000][nextStage.fortificationLevel] || 0
+                : 0;
+            const natBonus = nextStage.naturalDefense || 0;
+            const stageDefense = fortBonus + natBonus;
+
+            // Only apply defense if enemy troops are present (min 100 for road stages)
+            effectiveEnemyStr = enemyTroops >= 100 ? enemyTroops + stageDefense : 0;
+            defenseDescription = `stage ${nextStageIndex} (troops:${enemyTroops} + defense:${stageDefense})`;
+        }
+        // CASE 2: Next stage is the destination location
+        else {
+            const destId = army.direction === 'FORWARD' ? road.to : road.from;
+            const destLoc = state.locations.find(l => l.id === destId);
+            const enemyAtDest = state.armies
+                .filter(a => a.locationId === destId && a.faction !== faction && a.faction !== FactionId.NEUTRAL)
+                .reduce((s, a) => s + a.strength, 0);
+
+            const fortBonus = destLoc && enemyAtDest >= 500 ? (destLoc.defense || 0) : 0;
+            effectiveEnemyStr = enemyAtDest > 0 ? enemyAtDest + fortBonus : 0;
+            defenseDescription = `${destId} (troops:${enemyAtDest} + fort:${fortBonus})`;
+        }
+
+        // SUICIDE CHECK: Would advancing be suicide?
+        // NEW: Use combined converging strength instead of individual army strength
+        if (effectiveEnemyStr > 0) {
+            // Get destination for convergence calculation
+            const destId = army.direction === 'FORWARD' ? road.to : road.from;
+            
+            // Calculate combined strength of all armies arriving the same turn
+            const combinedStrength = getSameTurnConvergingStrength(army, destId, faction, state);
+            
+            // Check if combined forces can win
+            const canCombinedWin = combinedStrength > effectiveEnemyStr;
+            
+            // Legacy individual checks (for logging purposes)
+            const individualSuicide = effectiveEnemyStr > army.strength * 1.5;
+            const individualNoImpact = (effectiveEnemyStr - 500) > army.strength;
+
+            if (!canCombinedWin && (individualSuicide || individualNoImpact)) {
+                if (DEBUG_AI) {
+                    console.log(`[AI MILITARY ${faction}] Moving army ${army.id} HALTED - SUICIDE PREVENTION`);
+                    console.log(`  Our strength: ${army.strength} (combined arriving same turn: ${combinedStrength}) vs ${defenseDescription} = ${effectiveEnemyStr}`);
+                }
+
+                // HALT: Set to garrisoned to prevent resolveMovements from advancing
+                const idx = armies.findIndex(x => x.id === army.id);
+                if (idx !== -1) {
+                    armies[idx] = {
+                        ...army,
+                        isGarrisoned: true
+                    };
+                    assigned.add(army.id);
+                }
+            } else if (canCombinedWin && (individualSuicide || individualNoImpact)) {
+                // Combined forces CAN win - let the army advance
+                if (DEBUG_AI) {
+                    console.log(`[AI MILITARY ${faction}] Moving army ${army.id} ADVANCING - COMBINED FORCES SUFFICIENT`);
+                    console.log(`  Our strength: ${army.strength} (combined arriving same turn: ${combinedStrength}) vs ${defenseDescription} = ${effectiveEnemyStr}`);
+                }
+            }
+        }
+    }
+}
+
+/**
  * FIX 3C: Handle armies stuck on road stages (garrisoned after failed attack/retreat).
  * Decides whether to advance (forward) or retreat (reverse) based on enemy strength.
  */
@@ -153,9 +267,22 @@ function handleStuckRoadArmies(
         const idx = armies.findIndex(x => x.id === army.id);
         if (idx === -1) continue;
 
-        if (army.strength < effectiveEnemyStr * 0.5) {
-            // HOPELESS - REVERSE (retreat to origin)
-            if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Road army ${army.id} RETREATING from ${destId} (${army.strength} vs ${effectiveEnemyStr})`);
+        // NEW: Calculate combined strength of all armies arriving the same turn
+        const combinedStrength = getSameTurnConvergingStrength(army, destId, faction, state);
+        
+        // Check if combined forces can win
+        const canCombinedWin = combinedStrength > effectiveEnemyStr;
+
+        // Legacy individual checks (for logging/fallback)
+        const individualSuicide = effectiveEnemyStr > army.strength * 1.5;
+        const individualNoImpact = effectiveEnemyStr > 0 && (effectiveEnemyStr - 500) > army.strength;
+
+        if (!canCombinedWin && (individualSuicide || individualNoImpact)) {
+            // HOPELESS even with combined forces - REVERSE (retreat to origin)
+            if (DEBUG_AI) {
+                console.log(`[AI MILITARY ${faction}] Road army ${army.id} RETREATING - SUICIDE PREVENTION`);
+                console.log(`  Our strength: ${army.strength} (combined arriving same turn: ${combinedStrength}) vs ${destId} = ${effectiveEnemyStr}`);
+            }
             const newDirection = army.direction === 'FORWARD' ? 'BACKWARD' : 'FORWARD';
             armies[idx] = {
                 ...army,
@@ -164,9 +291,25 @@ function handleStuckRoadArmies(
                 isGarrisoned: false
             };
             assigned.add(army.id);
+        } else if (canCombinedWin) {
+            // Combined forces CAN win - ADVANCE!
+            if (DEBUG_AI) {
+                console.log(`[AI MILITARY ${faction}] Road army ${army.id} ADVANCING - COMBINED FORCES SUFFICIENT`);
+                console.log(`  Our strength: ${army.strength} (combined arriving same turn: ${combinedStrength}) vs ${destId} = ${effectiveEnemyStr}`);
+            }
+            armies[idx] = {
+                ...army,
+                isGarrisoned: false
+            };
+            assigned.add(army.id);
+        } else if (effectiveEnemyStr > 0 && combinedStrength < effectiveEnemyStr * 0.7) {
+            // RISKY - combined forces not quite enough yet, wait for more reinforcements
+            if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Road army ${army.id} HOLDING - waiting for reinforcements (combined: ${combinedStrength} vs ${effectiveEnemyStr})`);
+            // Keep garrisoned, don't advance
+            assigned.add(army.id);
         } else {
             // CAN FIGHT - FORWARD (continue attack)
-            if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Road army ${army.id} ADVANCING to ${destId} (${army.strength} vs ${effectiveEnemyStr})`);
+            if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] Road army ${army.id} ADVANCING to ${destId} (combined: ${combinedStrength} vs ${effectiveEnemyStr})`);
             armies[idx] = {
                 ...army,
                 isGarrisoned: false

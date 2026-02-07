@@ -3,6 +3,7 @@
 
 import { GameState, FactionId, LocationType } from '../../../shared/types';
 import { AIBudget, FactionPersonality } from './types';
+import { getInsurrectionAlerts, InsurrectionAlert } from '../../../shared/services/ai/strategy';
 
 // Import from new modular structure
 import {
@@ -35,13 +36,15 @@ import {
  * @param faction - Faction to process
  * @param profile - Faction personality
  * @param budget - AI budget allocation
+ * @param externalInsurrectionAlerts - Optional pre-computed alerts (avoids double calculation)
  * @returns Partial state update
  */
 export const manageEconomy = (
     state: GameState,
     faction: FactionId,
     profile: FactionPersonality,
-    budget: AIBudget
+    budget: AIBudget,
+    externalInsurrectionAlerts?: InsurrectionAlert[]
 ): Partial<GameState> => {
     let updates: Partial<GameState> = {
         locations: [...state.locations],
@@ -50,6 +53,7 @@ export const manageEconomy = (
         navalConvoys: [...state.navalConvoys],
         armies: [...state.armies],
         roads: [...state.roads],
+        characters: [...state.characters],
         logs: [...state.logs]
     };
 
@@ -108,17 +112,26 @@ export const manageEconomy = (
     updates.convoys = logisticsResult.convoys;
     updates.navalConvoys = logisticsResult.navalConvoys;
 
-    // 5. RECRUITMENT - Track amount spent
+    // 5. RECRUITMENT - Track amount spent (now with CONSCRIPTION + insurrection defense)
     const goldBeforeRecruitment = treasuryGold - spentGold;
-    const goldAfterRecruitment = handleRecruitment(
+    
+    // Use pre-computed alerts if provided, otherwise detect internally
+    const insurrectionAlerts = externalInsurrectionAlerts ?? getInsurrectionAlerts(state, faction);
+    
+    const recruitmentResult = handleRecruitment(
         faction,
         updates.locations!,
         updates.armies!,
+        updates.roads!,
         budget,
         profile,
         state.turn,
-        goldBeforeRecruitment
+        goldBeforeRecruitment,
+        insurrectionAlerts,
+        updates.characters!
     );
+    const goldAfterRecruitment = recruitmentResult.remainingGold;
+    updates.characters = recruitmentResult.updatedCharacters;
     spentGold += (goldBeforeRecruitment - goldAfterRecruitment);
 
     // 6. FORTIFICATIONS - Track amount spent

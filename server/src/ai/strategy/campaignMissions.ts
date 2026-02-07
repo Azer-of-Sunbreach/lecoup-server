@@ -24,10 +24,10 @@ export function generateCampaignMissions(
     activeMissions: AIMission[]
 ): void {
     for (const theater of theaters) {
-        // Find adjacent enemy targets (not neutral)
+        // Find adjacent enemy targets (including neutral - they control valuable territory)
         const potentialTargets = theater.borderLocationIds
             .map(id => state.locations.find(l => l.id === id)!)
-            .filter(l => l && l.faction !== faction && l.faction !== 'NEUTRAL');
+            .filter(l => l && l.faction !== faction);
 
         console.log(`[AI STRATEGY ${faction}] Theater ${theater.id}: ${potentialTargets.length} potential targets, Army: ${theater.armyStrength}, Threat: ${theater.threatLevel}`);
 
@@ -241,7 +241,7 @@ function createFallbackCampaign(
             const neighborId = road.from === owned.id ? road.to : road.from;
             const neighbor = state.locations.find(l => l.id === neighborId);
 
-            if (neighbor && neighbor.faction !== faction && neighbor.faction !== 'NEUTRAL') {
+            if (neighbor && neighbor.faction !== faction) {
                 console.log(`[AI STRATEGY ${faction}] FALLBACK: ${owned.id} -> ${neighborId}`);
 
                 activeMissions.push({

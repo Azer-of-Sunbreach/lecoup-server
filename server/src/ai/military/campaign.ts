@@ -543,7 +543,8 @@ function executeSiege(
     if (isPlayerTarget) {
         state.siegeNotification = {
             targetName: targetLoc.name,
-            attackerName: faction
+            attackerName: faction,
+            targetId: targetId
         };
     }
 

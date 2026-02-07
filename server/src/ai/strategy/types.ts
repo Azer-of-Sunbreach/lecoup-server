@@ -15,7 +15,10 @@ export const STRATEGIC_LOCATIONS: Record<FactionId, string[]> = {
     [FactionId.REPUBLICANS]: ['sunbreach', 'sunbreach_lands'],
     [FactionId.CONSPIRATORS]: ['stormbay', 'order_lands', 'great_plains', 'windward'],
     [FactionId.NOBLES]: ['port_de_sable', 'northern_barony'],
-    [FactionId.NEUTRAL]: []
+    [FactionId.NEUTRAL]: [],
+    [FactionId.LOYALISTS]: [],
+    [FactionId.PRINCELY_ARMY]: [],
+    [FactionId.CONFEDERATE_CITIES]: []
 };
 
 /**
@@ -25,7 +28,10 @@ export const INSURRECTION_PRIORITIES: Record<FactionId, string[]> = {
     [FactionId.NOBLES]: ['sunbreach_lands', 'hornvale_viscounty', 'sunbreach'],
     [FactionId.CONSPIRATORS]: ['sunbreach_lands', 'northern_barony', 'thane_duchy'],
     [FactionId.REPUBLICANS]: ['northern_barony', 'esmarch_duchy', 'larion_islands'],
-    [FactionId.NEUTRAL]: []
+    [FactionId.NEUTRAL]: [],
+    [FactionId.LOYALISTS]: [],
+    [FactionId.PRINCELY_ARMY]: [],
+    [FactionId.CONFEDERATE_CITIES]: []
 };
 
 /**

@@ -43,7 +43,10 @@ export const ROAD_DEFENSE_TARGETS: Record<FactionId, RoadDefenseTarget[]> = {
         // Lys Castelleny - fallback if Northern Forests impossible
         { stageId: 'lys_castelleny', roadId: 'road_great_plains_northern_barony', priority: 40, hasNaturalDefense: false }
     ],
-    [FactionId.NEUTRAL]: []
+    [FactionId.NEUTRAL]: [],
+    [FactionId.LOYALISTS]: [],
+    [FactionId.PRINCELY_ARMY]: [],
+    [FactionId.CONFEDERATE_CITIES]: []
 };
 
 /**

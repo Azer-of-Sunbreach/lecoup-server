@@ -6,15 +6,30 @@ import { executeRepublicanEarlyGame } from './strategy/republicanEarlyGame';
 import { manageEconomy } from './economy';
 import { manageDiplomacy } from './diplomacy';
 import { manageMilitary } from './military';
-import { manageLeaders } from './leaders';
 import { AIBudget } from './types';
 import { applyBalancedRecruitmentOverride, allocateSiegeBudget } from './economy/budget';
+// Siege Priority (shared)
+import { findBestSiegeOpportunity, reserveSiegeBudget } from '../../../shared/services/ai/military';
 import { distributeClandestineBudget } from '../../../shared/services/ai/budgetDistributor';
 
-import { processLeaderAI } from '../../../shared/services/ai/leaders';
+import { manageLeadersUnified } from '../../../shared/services/ai/leaders';
+// AI Leader Recruitment (CONSPIRATORS)
+import { calculateRecruitmentBudgetReservation, processAIRecruitment, ENABLE_RECRUITMENT_LOGS } from '../../../shared/services/ai/leaders/recruitment';
+// AI Leader Recruitment (NOBLES)
+import { processAINoblesRecruitment, applyNoblesRecruitmentResults } from '../../../shared/services/ai/leaders/recruitment';
+// Insurrection Defense (shared)
+import { detectInsurrectionThreats, convertToAlerts, dispatchEmergencyReinforcements } from '../../../shared/services/ai/strategy';
+// Stability Management (shared)
+import { enforceHighTaxLimits, detectEmergency } from '../../../shared/services/ai/economy/stabilityManagement';
+// Republicans Internal Factions (shared)
+import {
+    processRepublicanInternalFaction,
+    applyInternalFactionResult,
+    INTERNAL_FACTION_MIN_TURN
+} from '../../../shared/services/ai/leaders/recruitment/AIRepublicansInternalFactions';
 
-// Flags controlled by feature flags or config
-const USE_NEW_LEADER_AI = true;
+// Note: Legacy processLeaderAI has been replaced by unified manageLeadersUnified
+// which is shared between solo (Application) and multiplayer (Server) modes.
 
 /**
  * Process AI turn for a SINGLE faction (used in multiplayer)
@@ -93,7 +108,17 @@ function processAITurnForFaction(gameState: GameState, faction: FactionId, profi
     const goals: any[] = [];
 
     // 2. BUDGETING
+    // 2a. SIEGE PRIORITY - Reserve budget for siege BEFORE other allocations
+    const siegeOpportunity = findBestSiegeOpportunity(state, faction);
+    let siegeReservedBudget = 0;
+    if (siegeOpportunity && siegeOpportunity.action !== 'SKIP') {
+        siegeReservedBudget = reserveSiegeBudget(siegeOpportunity);
+        console.log(`[AI SIEGE PRIORITY ${faction}] Reserved ${siegeReservedBudget} gold for ${siegeOpportunity.cityName} (action: ${siegeOpportunity.action})`);
+    }
+
     const totalGold = state.resources[faction].gold;
+    const goldAfterSiegeReserve = totalGold - siegeReservedBudget;
+    
     // Determine emergency state
     const isUnderThreat = theaters.some(t => t.threatLevel > t.armyStrength);
 
@@ -101,8 +126,8 @@ function processAITurnForFaction(gameState: GameState, faction: FactionId, profi
     let reserveRatio = isUnderThreat ? 0.1 : (profile.subversiveness > 0.6 ? 0.1 : 0.15);
     if (faction === FactionId.NOBLES && state.turn < 5) reserveRatio = 0.1;
 
-    const reserved = Math.floor(totalGold * reserveRatio);
-    const available = totalGold - reserved;
+    const reserved = Math.floor(goldAfterSiegeReserve * reserveRatio);
+    const available = goldAfterSiegeReserve - reserved;
 
     // Allocation (Integers only)
     const diploWeight = profile.subversiveness > 0.3 ? 0.5 : 0.1;
@@ -127,14 +152,75 @@ function processAITurnForFaction(gameState: GameState, faction: FactionId, profi
     applyBalancedRecruitmentOverride(faction, state, budget, state.armies);
     allocateSiegeBudget(faction, state, budget);
 
+    // 2c. LEADER RECRUITMENT BUDGET (CONSPIRATORS only)
+    // Reserve gold for leader recruitment fund BEFORE other allocations
+    let leaderRecruitmentReserve = 0;
+    let leaderRecruitmentSeizeGoldLocation: string | undefined;
+    if (faction === FactionId.CONSPIRATORS) {
+        const recruitBudget = calculateRecruitmentBudgetReservation(state, faction);
+        leaderRecruitmentReserve = recruitBudget.amountToReserve;
+        leaderRecruitmentSeizeGoldLocation = recruitBudget.seizeGoldLocationId;
+        if (leaderRecruitmentReserve > 0) {
+            // Deduct from recruitment budget (military recruitment)
+            const deductFromRecruitment = Math.min(leaderRecruitmentReserve, budget.allocations.recruitment);
+            budget.allocations.recruitment -= deductFromRecruitment;
+            if (ENABLE_RECRUITMENT_LOGS) {
+                console.log(`[AI LEADER RECRUIT ${faction}] Reserved ${leaderRecruitmentReserve}g for leader fund (${recruitBudget.reasoning})`);
+            }
+        }
+    }
+
     // REPUBLICAN EARLY GAME SCRIPT (Turns 1-2)
     if (faction === FactionId.REPUBLICANS && state.turn <= 2) {
         const earlyResult = executeRepublicanEarlyGame(state, faction, budget);
         state = { ...state, ...earlyResult };
     }
 
+    // 2c-bis. REPUBLICANS INTERNAL FACTION DECISION (Turn 6+)
+    if (faction === FactionId.REPUBLICANS && state.turn >= INTERNAL_FACTION_MIN_TURN && !state.chosenInternalFaction) {
+        console.log(`[AI ${faction}] Processing Internal Faction decision...`);
+        const internalFactionResult = processRepublicanInternalFaction(state, faction, state.turn);
+
+        if (internalFactionResult.choiceMade) {
+            state = applyInternalFactionResult(state, internalFactionResult);
+            console.log(`[AI ${faction}] Chose Internal Faction: ${internalFactionResult.chosenOption} (cost: ${internalFactionResult.goldCost}g)`);
+        } else if (internalFactionResult.inSavingsMode) {
+            console.log(`[AI ${faction}] Saving for ${internalFactionResult.savingsTarget} (${internalFactionResult.savedGold}g saved)`);
+        }
+    }
+
+    // 2d. STABILITY MANAGEMENT
+    // Enforce HIGH tax limits for locations without leaders (prevents stability drain)
+    const modifiedLocations = enforceHighTaxLimits(faction, state.locations, state.characters);
+    if (modifiedLocations.length > 0) {
+        console.log(`[AI ${faction}] Auto-reduced VERY_HIGH to HIGH in: ${modifiedLocations.join(', ')}`);
+    }
+
+    // 2e. INSURRECTION THREAT DETECTION
+    // Detect insurrection threats for logging/awareness (used by leader AI for prioritization)
+    const insurrectionThreats = detectInsurrectionThreats(state, faction);
+    const insurrectionAlerts = convertToAlerts(insurrectionThreats);
+    if (insurrectionThreats.length > 0) {
+        const imminentThreats = insurrectionAlerts.filter(a => a.turnsUntilThreat <= 1);
+        if (imminentThreats.length > 0) {
+            // Get location names for logging
+            const threatNames = imminentThreats.map(t => {
+                const loc = state.locations.find(l => l.id === t.locationId);
+                return loc?.name || t.locationId;
+            });
+            console.log(`[AI ${faction}] IMMINENT INSURRECTION THREATS: ${threatNames.join(', ')}`);
+        }
+    }
+
+    // 2f. EMERGENCY DETECTION (affects stability thresholds)
+    const hasEmergency = detectEmergency(faction, state.locations, state.armies);
+    if (hasEmergency) {
+        console.log(`[AI ${faction}] Emergency mode detected - lowered stability thresholds`);
+    }
+
     // 3. ECONOMY & LOGISTICS (Mutates State)
-    const ecoResult = manageEconomy(state, faction, profile, budget);
+    // Pass insurrection alerts for priority recruitment
+    const ecoResult = manageEconomy(state, faction, profile, budget, insurrectionAlerts);
     state = { ...state, ...ecoResult };
 
     // FIX: Guarantee minimum diplomacy budget for Clandestine Operations
@@ -153,68 +239,77 @@ function processAITurnForFaction(gameState: GameState, faction: FactionId, profi
     }
 
     // 4. DIPLOMACY (Insurrections & Negotiations)
-    // If using New Leader AI, we disable legacy insurrections in manageDiplomacy
-    const dipResult = manageDiplomacy(state, faction, goals, profile, budget, USE_NEW_LEADER_AI);
+    // Legacy insurrections are disabled since we use unified leader AI
+    const dipResult = manageDiplomacy(state, faction, goals, profile, budget, true);
 
     state = { ...state, ...dipResult };
 
     // 5. MILITARY MOVEMENT
     state.armies = manageMilitary(state, faction, profile);
 
+    // 5.5 EMERGENCY DISPATCH (Phase 2) - Move existing armies to threatened locations
+    // Must run AFTER manageMilitary to avoid being overwritten by army object recreation
+    if (insurrectionThreats.length > 0) {
+        dispatchEmergencyReinforcements(state, faction, insurrectionThreats, state.armies);
+    }
+
     // 6. LEADER MANAGEMENT
-    // Use new AI system if enabled, otherwise fallback to legacy
-    if (USE_NEW_LEADER_AI) {
+    // Use unified IPG-based leader management (same as Application/solo mode)
+    {
         // Distribute allocated diplomacy budget to leaders as clandestine budget
         const budgetResult = distributeClandestineBudget(state, faction, budget);
         state = { ...state, ...budgetResult };
 
-        const leaderResult = processLeaderAI(state, faction, state.turn);
+        // Calculate clandestine budget from diplomacy allocation
+        const clandestineBudget = budget.allocations.diplomacy;
 
-        // Merge updated characters
-        if (leaderResult.updatedCharacters) {
-            state.characters = leaderResult.updatedCharacters;
+        // Use unified leader manager (shared between solo and multiplayer)
+        const leaderResult = manageLeadersUnified(state, faction, clandestineBudget, state.turn);
+
+        // Merge results
+        if (leaderResult.characters) {
+            state.characters = leaderResult.characters;
         }
+        if (leaderResult.locations) {
+            state.locations = leaderResult.locations;
+        }
+        if (leaderResult.resources) {
+            state.resources = leaderResult.resources;
+        }
+        if (leaderResult.chosenInternalFaction) {
+            state.chosenInternalFaction = leaderResult.chosenInternalFaction as any;
+        }
+    }
 
-        // Log debug info and persist important logs to state
-        if (leaderResult.logs && leaderResult.logs.length > 0) {
-            console.log(`[AI LEADER ${faction}] \n` + leaderResult.logs.join('\n'));
+    // 7. LEADER RECRUITMENT (CONSPIRATORS only)
+    // Process recruitment fund and recruit if ready
+    if (faction === FactionId.CONSPIRATORS) {
+        const recruitResult = processAIRecruitment(
+            state,
+            faction,
+            leaderRecruitmentReserve,
+            leaderRecruitmentSeizeGoldLocation
+        );
+        state = { ...state, ...recruitResult.updatedState };
+        recruitResult.logs.forEach(log => {
+                if (ENABLE_RECRUITMENT_LOGS || log.includes('SUCCESS')) {
+                    console.log(log);
+                }
+            });
+    }
 
-            // Convert string logs to LogEntry for in-game display (optional, but good for debugging)
-            // Only add if they seem important (not just movement spam usually)
-            // For now, we add them as INFO logs visible only to the AI faction (or debug)
-            // Note: In single player, player is not this faction, so they won't see them unless we make them public.
-            // Let's make them visible to everyone for now if they are important actions.
-
-            const newLogs = leaderResult.logs
-                .filter(log => {
-                    const msg = typeof log === 'string' ? log : (log as any).message || '';
-                    return msg.includes('Agent Actions') || msg.includes('Governor Policies') || msg.includes('Commander Orders');
-                })
-                .map((log, index) => {
-                    const msg = typeof log === 'string' ? log : (log as any).message || '';
-                    return {
-                        id: `ai-log-${faction}-${state.turn}-${Date.now()}-${index}`,
-                        type: 'LEADER' as any,
-                        message: msg,
-                        turn: state.turn,
-                        visibleToFactions: [],
-                        baseSeverity: 'INFO' as any
-                    };
-                });
-
-            if (newLogs.length > 0) {
-                // state.logs = [...state.logs, ...newLogs]; // Append to existing logs
-                // Actually, let's NOT pollute the player log with debug info unless requested.
-                // The user incorrectly stated "menu of logs no longer saves logs". 
-                // This usually implies existing logs were WIPED.
-                // Ensure we are preserving `state.logs` from input `gameState`.
-                // In processAITurnForFaction: `let state = { ...gameState };` -> preserves logs.
-                // In diplomacy.ts: `logs: [...state.logs]` -> preserves logs.
+    // 8. LEADER RECRUITMENT (NOBLES only)
+    // NOBLES grant fiefs instead of paying gold
+    if (faction === FactionId.NOBLES) {
+        const noblesRecruitResult = processAINoblesRecruitment(state);
+        if (noblesRecruitResult.leaderRecruited) {
+            state = applyNoblesRecruitmentResults(state, noblesRecruitResult);
+        }
+        noblesRecruitResult.logs.forEach(log => {
+            if (ENABLE_RECRUITMENT_LOGS || log.includes('SUCCESS')) {
+                console.log(log);
             }
-        }
-    } else {
-        const leaderResult = manageLeaders(state, faction);
-        state = { ...state, ...leaderResult };
+        });
     }
 
     return state;

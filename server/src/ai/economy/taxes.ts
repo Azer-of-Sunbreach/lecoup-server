@@ -16,6 +16,9 @@ const STABILITY_THRESHOLDS: Record<FactionId, { normal: number; emergency: numbe
     [FactionId.REPUBLICANS]: { normal: 50, emergency: 40 },
     [FactionId.NOBLES]: { normal: 50, emergency: 40 },
     [FactionId.NEUTRAL]: { normal: 50, emergency: 40 },
+    [FactionId.LOYALISTS]: { normal: 50, emergency: 40 },
+    [FactionId.PRINCELY_ARMY]: { normal: 50, emergency: 40 },
+    [FactionId.CONFEDERATE_CITIES]: { normal: 50, emergency: 40 }
 };
 
 function getMinimumStabilityThreshold(faction: FactionId, hasEmergency: boolean = false): number {

@@ -3,7 +3,7 @@ import { GameState, FactionId, CharacterStatus, Character, LocationType, AIMissi
 import { AIGoal, AIBudget, FactionPersonality } from './types';
 import { COST_INCITE, PORT_SEQUENCE } from '../../../shared/constants';
 import { getDistance } from './utils';
-import { getLeaderProfile, hasCommanderRole } from './leaders_config';
+import { getLeaderProfile, hasCommanderRole } from '../../../shared/services/ai/leaders_config';
 import { createInsurrectionPreparationLog } from '../../../shared/services/logs/logFactory';
 
 // Helper to determine how valuable a leader is to keep on the field
@@ -269,6 +269,7 @@ function handleInsurrection(
         spy.id,
         mission.targetId,
         targetLoc.faction,
+        0, // estimatedCount
         state.turn
     ));
     mission.status = 'ACTIVE';

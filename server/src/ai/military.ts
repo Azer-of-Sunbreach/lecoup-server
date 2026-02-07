@@ -13,6 +13,9 @@ import { handleRoadDefense } from './military/roadDefense';
 import { handleIdleArmies } from './military/idleHandler';
 import { handleEnRouteReversals } from './military/reversalHandler';
 
+// Siege sortie (breaking enemy sieges of our cities)
+import { processSiegeSorties } from '../../../shared/services/ai/military';
+
 /**
  * Main military management function for AI factions.
  * 
@@ -41,6 +44,32 @@ export const manageMilitary = (
     // 0. CHECK FOR URGENT REVERSALS (Home base capture)
     // This modifies newArmies in place if reversals occur
     handleEnRouteReversals(state, faction, newArmies);
+
+    // 0.5. SIEGE SORTIE - Break enemy sieges of our cities
+    // This runs BEFORE missions so that sortie decisions take priority when cities are starving
+    const sortieResult = processSiegeSorties(state, faction);
+    if (sortieResult.opportunities.length > 0) {
+        // Update armies with sortie results
+        newArmies = sortieResult.updatedArmies;
+        
+        // Mark sortie armies as assigned
+        for (const opp of sortieResult.opportunities) {
+            if (opp.canBreakSiege) {
+                // Find the main army that was ordered to sortie
+                const sortieArmy = newArmies.find(a =>
+                    a.faction === faction &&
+                    a.destinationId === opp.ruralId
+                );
+                if (sortieArmy) {
+                    assignedArmyIds.add(sortieArmy.id);
+                }
+            }
+        }
+
+        for (const log of sortieResult.logs) {
+            if (DEBUG_AI) console.log(`[AI MILITARY ${faction}] ${log}`);
+        }
+    }
 
     const campaignMissions = missions.filter(m => m.type === 'CAMPAIGN');
     if (DEBUG_AI) {
