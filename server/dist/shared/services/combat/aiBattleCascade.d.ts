@@ -1,4 +1,5 @@
 import { Army, Character, Location, Road, CombatState, FactionId, GameStats } from '../../types';
+import { StructuredLogData } from './types';
 export interface CascadeResult {
     armies: Army[];
     locations: Location[];
@@ -6,6 +7,7 @@ export interface CascadeResult {
     characters: Character[];
     stats: GameStats;
     logMessages: string[];
+    logEntries?: StructuredLogData[];
 }
 /**
  * Auto-resolve all AI vs AI battles (neither faction is player)

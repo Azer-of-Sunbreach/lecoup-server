@@ -16,6 +16,7 @@ const processLeaderSurvival = (armyIds, isAttacker, characters, context) => {
     const { combat, attackerWon, locations } = context;
     let updatedCharacters = [...characters];
     const logMessages = [];
+    const logEntries = [];
     armyIds.forEach(armyId => {
         const leaders = updatedCharacters.filter(c => c.armyId === armyId);
         leaders.forEach(leader => {
@@ -29,6 +30,10 @@ const processLeaderSurvival = (armyIds, isAttacker, characters, context) => {
                         ? { ...c, status: types_1.CharacterStatus.AVAILABLE, armyId: null, locationId: target.id }
                         : c);
                     logMessages.push(`${leader.name} escaped to ${target.name}.`);
+                    logEntries.push({
+                        key: 'leaderEscaped',
+                        params: { leader: leader.name, location: target.name }
+                    });
                 }
                 else {
                     // No escape locations - leader dies
@@ -36,6 +41,10 @@ const processLeaderSurvival = (armyIds, isAttacker, characters, context) => {
                         ? { ...c, status: types_1.CharacterStatus.DEAD }
                         : c);
                     logMessages.push(`${leader.name} fell (no escape).`);
+                    logEntries.push({
+                        key: 'leaderDied',
+                        params: { leader: leader.name }
+                    });
                 }
             }
             else {
@@ -44,10 +53,14 @@ const processLeaderSurvival = (armyIds, isAttacker, characters, context) => {
                     ? { ...c, status: types_1.CharacterStatus.DEAD }
                     : c);
                 logMessages.push(`${leader.name} fell in battle.`);
+                logEntries.push({
+                    key: 'leaderDiedInBattle',
+                    params: { leader: leader.name }
+                });
             }
         });
     });
-    return { updatedCharacters, logMessages };
+    return { updatedCharacters, logMessages, logEntries };
 };
 exports.processLeaderSurvival = processLeaderSurvival;
 /**

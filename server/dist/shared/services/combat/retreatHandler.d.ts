@@ -1,9 +1,11 @@
 import { Army, Location, Road, CombatState } from '../../types';
+import { StructuredLogData } from './types';
 export interface RetreatResult {
     armies: Army[];
     locations: Location[];
     characters: Character[];
     logMessage: string;
+    logEntries?: StructuredLogData[];
 }
 import { Character } from '../../types';
 /**

@@ -113,11 +113,17 @@ const handleAttackerRetreat = (combat, armies, prevArmies, roads, locations, cha
             }
         }
     });
+    // Legacy string message
+    const logMessage = "Attackers retreated.";
     return {
         armies: newArmies,
         locations: newLocations,
         characters: newCharacters,
-        logMessage: "Attackers retreated."
+        logMessage,
+        logEntries: [{
+                key: 'attackersRetreated',
+                params: {}
+            }]
     };
 };
 exports.handleAttackerRetreat = handleAttackerRetreat;
@@ -129,6 +135,7 @@ const handleDefenderRetreatToCity = (combat, armies, locations, characters) => {
     let newLocations = [...locations];
     let newCharacters = [...characters];
     let logMsg = "";
+    const logEntries = [];
     if (combat.locationId) {
         const loc = locations.find(l => l.id === combat.locationId);
         if (loc && loc.linkedLocationId) {
@@ -183,13 +190,18 @@ const handleDefenderRetreatToCity = (combat, armies, locations, characters) => {
                 return l;
             });
             logMsg = "Defenders retreated to safety. Location ceded.";
+            logEntries.push({
+                key: 'defendersRetreated',
+                params: { location: combat.locationId || loc.name }
+            });
         }
     }
     return {
         armies: newArmies,
         locations: newLocations,
         characters: newCharacters,
-        logMessage: logMsg
+        logMessage: logMsg,
+        logEntries
     };
 };
 exports.handleDefenderRetreatToCity = handleDefenderRetreatToCity;

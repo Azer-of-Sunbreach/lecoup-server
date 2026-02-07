@@ -22,12 +22,17 @@ export interface LossResult {
  * Result of calculating a retreat position for an army
  */
 export type RetreatPosition = Partial<Army>;
+export interface StructuredLogData {
+    key: string;
+    params: Record<string, any>;
+}
 /**
  * Result of processing leader survival after combat
  */
 export interface LeaderSurvivalResult {
     updatedCharacters: Character[];
     logMessages: string[];
+    logEntries?: StructuredLogData[];
 }
 /**
  * Result of siege action

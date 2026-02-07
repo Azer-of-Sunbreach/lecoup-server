@@ -1,4 +1,5 @@
-import { Army, Location, Road, CombatState, FactionId } from '../../types';
+import { Army, Location, Road, CombatState, FactionId, SiegeNotification } from '../../types';
+import { StructuredLogData } from './types';
 export interface SiegeResult {
     armies: Army[];
     locations: Location[];
@@ -9,6 +10,8 @@ export interface SiegeResult {
         };
     };
     logMessage: string;
+    logEntries?: StructuredLogData[];
+    siegeNotification?: SiegeNotification | null;
 }
 /**
  * Handle siege construction (SIEGE choice)

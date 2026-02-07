@@ -27,6 +27,7 @@ const resolveAIBattleCascade = (playerFaction, armies, characters, locations, ro
     let newRoads = [...roads];
     let newStats = { ...stats };
     const logMessages = [];
+    const logEntries = [];
     let currentBattles = (0, combatDetection_1.detectBattles)(newLocations, newArmies, newRoads);
     let loops = 0;
     while (loops < 10) {
@@ -110,9 +111,17 @@ const resolveAIBattleCascade = (playerFaction, armies, characters, locations, ro
             if (battle.isInsurgentBattle) {
                 newArmies = newArmies.map(a => battle.attackers.some(atk => atk.id === a.id) ? { ...a, isInsurgent: false } : a);
             }
+            logEntries.push({
+                key: 'aiBattleWon',
+                params: { faction: battle.attackerFaction, location: battle.locationId || locName }
+            });
         }
         else {
             logMessages.push(`AI Battle: ${types_1.FACTION_NAMES[battle.attackerFaction]} repelled.`);
+            logEntries.push({
+                key: 'aiBattleRepelled',
+                params: { faction: battle.attackerFaction }
+            });
         }
         const loserIds = loserArmies.map(a => a.id);
         const { updatedArmies } = (0, powerCalculation_1.applySequentialLosses)(winnerArmies, losses);

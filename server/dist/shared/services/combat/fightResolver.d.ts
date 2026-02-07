@@ -1,4 +1,5 @@
 import { Army, Character, Location, Road, CombatState, GameStats } from '../../types';
+import { StructuredLogData } from './types';
 export interface FightResult {
     armies: Army[];
     locations: Location[];
@@ -6,6 +7,7 @@ export interface FightResult {
     characters: Character[];
     stats: GameStats;
     logMessage: string;
+    logEntries?: StructuredLogData[];
 }
 /**
  * Resolve a direct combat engagement (FIGHT choice)
