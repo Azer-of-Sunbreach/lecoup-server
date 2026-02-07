@@ -31,6 +31,8 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
     let newResources = { ...prevState.resources };
     let newStats = { ...prevState.stats };
     let logMsg = "";
+    let siegeNotificationResult = null;
+    const combinedLogEntries = []; // Typed as any[] to avoid strict import issues if types ref differs, or assume inferred
     // Delegate to appropriate handler based on choice
     switch (choice) {
         case 'FIGHT': {
@@ -41,6 +43,8 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
             newCharacters = result.characters;
             newStats = result.stats;
             logMsg = result.logMessage;
+            if (result.logEntries)
+                combinedLogEntries.push(...result.logEntries);
             break;
         }
         case 'RETREAT': {
@@ -49,6 +53,8 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
             newLocations = result.locations;
             newCharacters = result.characters;
             logMsg = result.logMessage;
+            if (result.logEntries)
+                combinedLogEntries.push(...result.logEntries);
             break;
         }
         case 'RETREAT_CITY': {
@@ -57,6 +63,8 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
             newLocations = result.locations;
             newCharacters = result.characters;
             logMsg = result.logMessage;
+            if (result.logEntries)
+                combinedLogEntries.push(...result.logEntries);
             break;
         }
         case 'SIEGE': {
@@ -66,6 +74,12 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
             newRoads = result.roads;
             newResources = result.resources;
             logMsg = result.logMessage;
+            if (result.logEntries)
+                combinedLogEntries.push(...result.logEntries);
+            // Propagate siege notification if present
+            if (result.siegeNotification) {
+                siegeNotificationResult = result.siegeNotification;
+            }
             break;
         }
     }
@@ -79,6 +93,8 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
     newCharacters = cascadeResult.characters;
     newStats = cascadeResult.stats;
     cascadeResult.logMessages.forEach(msg => logMsg += ` ${msg}`);
+    if (cascadeResult.logEntries)
+        combinedLogEntries.push(...cascadeResult.logEntries);
     // Detect remaining player battles
     const currentBattles = (0, combatDetection_1.detectBattles)(newLocations, newArmies, newRoads);
     console.log(`[COMBAT_RESOLVE] detectBattles found ${currentBattles.length} total battles after resolution`);
@@ -112,6 +128,23 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
     if (nextBattle && !prevState.combatState) {
         logMsg += " Another conflict has erupted!";
     }
+    // Construct logs: Prefer structured entries, fallback to legacy msg
+    let newLogs = prevState.logs;
+    if (combinedLogEntries.length > 0) {
+        const entryLogs = combinedLogEntries.map(entry => (0, logFactory_1.createCombatLog)("Combat Event", prevState.turn, entry.key, entry.params));
+        newLogs = [...newLogs, ...entryLogs];
+        // If there was a "another conflict" message appended to logMsg, we might miss it if we ignore logMsg entirely?
+        // Actually, logMsg isn't used if we have entries?
+        // "Another conflict has erupted!" is appended to logMsg.
+        // It's not in structured logs.
+        // I should probably check if logMsg contains "Another conflict" and append it as a Generic log.
+        if (logMsg.includes("Another conflict has erupted!")) {
+            newLogs.push((0, logFactory_1.createCombatLog)("Another conflict has erupted!", prevState.turn));
+        }
+    }
+    else if (logMsg) {
+        newLogs = [...newLogs, (0, logFactory_1.createCombatLog)(logMsg, prevState.turn)];
+    }
     return {
         armies: newArmies,
         locations: newLocations,
@@ -121,7 +154,9 @@ const resolveCombatResult = (prevState, choice, siegeCost = 0) => {
         stats: newStats,
         combatState: nextBattle,
         combatQueue: nextQueue,
-        logs: logMsg ? [...prevState.logs, (0, logFactory_1.createCombatLog)(logMsg, prevState.turn)] : prevState.logs
+        logs: newLogs,
+        // Include siege notification if relevant (it was handled in the switch but we need to extract it)
+        siegeNotification: choice === 'SIEGE' && siegeNotificationResult ? siegeNotificationResult : prevState.siegeNotification
     };
 };
 exports.resolveCombatResult = resolveCombatResult;

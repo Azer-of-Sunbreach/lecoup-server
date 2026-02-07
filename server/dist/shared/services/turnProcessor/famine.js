@@ -35,7 +35,7 @@ function processFamine(state) {
                 const newStab = Math.max(0, loc.stability - 30);
                 if (loc.stability > 0) {
                     // Updated message per user request
-                    const famineLog = (0, logFactory_1.createFamineLog)(loc.name, loc.faction, state.turn);
+                    const famineLog = (0, logFactory_1.createFamineLog)(loc.id, loc.faction, state.turn);
                     logs.push(famineLog);
                 }
                 return { ...loc, foodStock: 0, stability: newStab };
@@ -45,7 +45,7 @@ function processFamine(state) {
                 const newStab = Math.max(0, loc.stability - 5);
                 // Generate warning log for low food stocks
                 if (loc.faction !== types_1.FactionId.NEUTRAL) {
-                    const lowFoodLog = (0, logFactory_1.createLowFoodWarningLog)(loc.name, loc.id, loc.faction, state.turn);
+                    const lowFoodLog = (0, logFactory_1.createLowFoodWarningLog)(loc.id, loc.faction, state.turn);
                     logs.push(lowFoodLog);
                 }
                 return { ...loc, foodStock: projectedStock, stability: newStab };
@@ -96,7 +96,7 @@ function processFamine(state) {
         if (city.linkedLocationId) {
             const rural = locations.find(l => l.id === city.linkedLocationId);
             if (rural && rural.foodIncome <= 0) {
-                famineNotification = { cityName: city.name, ruralName: rural.name };
+                famineNotification = { cityName: city.id, ruralName: rural.id };
                 if (rural.population > 2500) {
                     const maxLoss = rural.population > 10000 ? 5000 : 1000;
                     const rDeaths = Math.floor(Math.random() * maxLoss) + 1;

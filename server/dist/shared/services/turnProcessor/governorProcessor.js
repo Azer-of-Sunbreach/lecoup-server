@@ -30,7 +30,10 @@ function processGovernorPolicies(locations, characters, armies, resources, turn)
         [types_1.FactionId.NOBLES]: 0,
         [types_1.FactionId.REPUBLICANS]: 0,
         [types_1.FactionId.CONSPIRATORS]: 0,
-        [types_1.FactionId.NEUTRAL]: 0
+        [types_1.FactionId.NEUTRAL]: 0,
+        [types_1.FactionId.LOYALISTS]: 0,
+        [types_1.FactionId.PRINCELY_ARMY]: 0,
+        [types_1.FactionId.CONFEDERATE_CITIES]: 0
     };
     const foodCosts = {};
     const logs = [];

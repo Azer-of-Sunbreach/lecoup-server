@@ -10,4 +10,6 @@ export { applySequentialLosses, calculateCombatStrength };
  * @param siegeCost - Gold cost for siege (only for SIEGE choice)
  * @returns Partial game state updates
  */
-export declare const resolveCombatResult: (prevState: GameState, choice: "FIGHT" | "RETREAT" | "RETREAT_CITY" | "SIEGE", siegeCost?: number) => Partial<GameState>;
+export declare const resolveCombatResult: (prevState: GameState, choice: "FIGHT" | "RETREAT" | "RETREAT_CITY" | "SIEGE", siegeCost?: number) => Partial<GameState> & {
+    siegeNotification?: any;
+};

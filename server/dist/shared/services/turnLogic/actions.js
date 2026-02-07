@@ -7,6 +7,7 @@ const logFactory_1 = require("../logs/logFactory");
 const makeExamples_1 = require("../domain/governor/makeExamples");
 const governorService_1 = require("../domain/governor/governorService");
 const leaderStatusUpdates_1 = require("./leaderStatusUpdates");
+const SmugglerMissionService_1 = require("../ai/leaders/missions/SmugglerMissionService");
 let logIdCounter = 0;
 const generateLogId = () => {
     logIdCounter++;
@@ -30,7 +31,7 @@ const processInsurrections = (locations, characters, armies, playerFaction, curr
                     const loc = nextLocations[locIndex];
                     // FAILSAFE (Spec 5.3.3): If territory is already controlled by the faction, cancel mission
                     if (loc.faction === char.faction) {
-                        const cancelLog = (0, logFactory_1.createInsurrectionCancelledLog)(loc.name, loc.faction, currentTurn);
+                        const cancelLog = (0, logFactory_1.createInsurrectionCancelledLog)(loc.id, loc.faction, currentTurn);
                         logs.push(cancelLog);
                         // Refund Gold
                         refunds[char.faction] = (refunds[char.faction] || 0) + goldInvested;
@@ -77,7 +78,7 @@ const processInsurrections = (locations, characters, armies, playerFaction, curr
                         lastSafePosition: { type: 'LOCATION', id: targetId }
                     });
                     // 5. Attach Leader & Log - Using structured LogEntry
-                    const uprisingLog = (0, logFactory_1.createUprisingLog)(char.name, loc.name, loc.id, loc.faction, numInsurgents, currentTurn);
+                    const uprisingLog = (0, logFactory_1.createUprisingLog)(char.id, loc.id, loc.faction, numInsurgents, currentTurn);
                     logs.push(uprisingLog);
                     return {
                         ...char,
@@ -142,7 +143,7 @@ const processInsurrections = (locations, characters, armies, playerFaction, curr
                             lastSafePosition: { type: 'LOCATION', id: loc.id }
                         });
                         // Spontaneous uprising log - without risk percentage per user request
-                        const spontaneousLog = (0, logFactory_1.createSpontaneousUprisingLog)(loc.name, loc.id, loc.faction, currentTurn);
+                        const spontaneousLog = (0, logFactory_1.createSpontaneousUprisingLog)(loc.id, loc.faction, currentTurn);
                         logs.push(spontaneousLog);
                         return { ...loc, population: Math.max(0, loc.population - numInsurgents) };
                     }
@@ -280,7 +281,7 @@ const processAutoCapture = (locations, roads, armies, characters, playerFaction,
             const winner = invaders[0].faction;
             const previousFaction = loc.faction;
             // Create capture log with dynamic severity
-            const captureLog = (0, logFactory_1.createCaptureUncontestedLog)(loc.name, loc.id, previousFaction, winner, currentTurn);
+            const captureLog = (0, logFactory_1.createCaptureUncontestedLog)(loc.id, previousFaction, winner, currentTurn);
             logs.push(captureLog);
             const newFortLevel = Math.max(0, loc.fortificationLevel - 1);
             const isInsurgentCapture = invaders.some(a => a.isInsurgent);
@@ -314,6 +315,39 @@ const processAutoCapture = (locations, roads, armies, characters, playerFaction,
             }
             // NEW: Update status of other leaders (Available <-> Undercover)
             nextCharacters = (0, leaderStatusUpdates_1.handleLeaderStatusOnCapture)(updatedLoc.id, updatedLoc.faction, nextCharacters);
+            // SMUGGLER DISPATCH: If a RURAL is captured, check if the linked CITY still belongs to previousFaction
+            // If so, that city now needs SMUGGLER support for food
+            if (loc.type === types_1.LocationType.RURAL && previousFaction !== types_1.FactionId.NEUTRAL) {
+                // Find the linked city (the rural's linkedLocationId points to the city)
+                const linkedCity = nextLocations.find(l => l.id === loc.linkedLocationId);
+                if (linkedCity && linkedCity.faction === previousFaction) {
+                    // The city lost its rural food supply - trigger SMUGGLER dispatch evaluation
+                    // Note: This is called during turn processing, so we create a minimal state for evaluation
+                    const smugglerContext = {
+                        state: {
+                            characters: nextCharacters,
+                            locations: nextLocations,
+                            roads: roads,
+                            armies: armies
+                        },
+                        faction: previousFaction,
+                        lostRuralLocationId: loc.id,
+                        cityId: linkedCity.id
+                    };
+                    const smugglerDecision = (0, SmugglerMissionService_1.evaluateSmugglerDispatch)(smugglerContext);
+                    if (smugglerDecision) {
+                        // Apply the smuggler mission to the selected leader
+                        nextCharacters = nextCharacters.map(c => {
+                            if (c.id === smugglerDecision.leaderId) {
+                                const updated = (0, SmugglerMissionService_1.assignSmugglerMission)(c, smugglerDecision.targetCityId);
+                                console.log(`[SMUGGLER DISPATCH] ${c.name} assigned to support ${linkedCity.name}`);
+                                return updated;
+                            }
+                            return c;
+                        });
+                    }
+                }
+            }
             return updatedLoc;
         }
         return loc;

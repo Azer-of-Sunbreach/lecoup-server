@@ -83,12 +83,12 @@ function processNegotiations(state) {
                     // Update leaders present in the negotiated territory
                     characters = (0, leaderStatusUpdates_1.handleLeaderStatusOnCapture)(target.id, winnerFaction, characters);
                     // Success log - visible to all, WARNING for enemies, INFO for winner
-                    const successLog = (0, logFactory_1.createNegotiationsSuccessLog)(target.name, target.id, winnerFaction, state.turn);
+                    const successLog = (0, logFactory_1.createNegotiationsSuccessLog)(target.id, winnerFaction, state.turn);
                     logs.push(successLog);
                 }
                 else {
                     // Failed log - visible only to initiator per user request
-                    const failedLog = (0, logFactory_1.createNegotiationsFailedLog)(target.name, neg.factionId || state.playerFaction, state.turn);
+                    const failedLog = (0, logFactory_1.createNegotiationsFailedLog)(target.id, neg.factionId || state.playerFaction, state.turn);
                     logs.push(failedLog);
                 }
             }

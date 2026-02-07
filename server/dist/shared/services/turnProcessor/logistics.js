@@ -50,7 +50,7 @@ function processConvoys(convoys, roads, locations, currentTurn = 1) {
             const destCityIndex = updatedLocations.findIndex(l => l.id === convoy.destinationCityId);
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
-                const arrivalLog = (0, logFactory_1.createConvoyArrivalLog)(updatedLocations[destCityIndex].name, convoy.foodAmount, currentTurn);
+                const arrivalLog = (0, logFactory_1.createConvoyArrivalLog)(updatedLocations[destCityIndex].id, convoy.foodAmount, currentTurn);
                 logs.push(arrivalLog);
             }
         }
@@ -85,7 +85,7 @@ function processNavalConvoys(navalConvoys, locations, currentTurn = 1) {
             const destCityIndex = updatedLocations.findIndex(l => l.id === convoy.destinationCityId);
             if (destCityIndex !== -1) {
                 updatedLocations[destCityIndex].foodStock += convoy.foodAmount;
-                const navalArrivalLog = (0, logFactory_1.createNavalConvoyArrivalLog)(updatedLocations[destCityIndex].name, convoy.foodAmount, currentTurn);
+                const navalArrivalLog = (0, logFactory_1.createNavalConvoyArrivalLog)(updatedLocations[destCityIndex].id, convoy.foodAmount, currentTurn);
                 logs.push(navalArrivalLog);
             }
         }

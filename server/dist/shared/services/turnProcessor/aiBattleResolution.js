@@ -101,12 +101,13 @@ function resolveAIBattles(state, existingInsurrectionNotification) {
                 if (!insurrectionNotification) {
                     const armyIds = battle.attackers.map(a => a.id);
                     const leader = characters.find(c => c.armyId && armyIds.includes(c.armyId));
-                    const locName = locations.find(l => l.id === battle.locationId)?.name || "Unknown";
+                    // Pass location ID for translation
+                    const targetId = battle.locationId || "unknown";
                     const notifType = battle.attackerFaction === types_1.FactionId.NEUTRAL ? 'SUCCESS_NEUTRAL' : 'SUCCESS_AI';
                     insurrectionNotification = {
                         type: notifType,
                         faction: battle.attackerFaction,
-                        targetName: locName,
+                        targetName: targetId,
                         leaderName: leader?.name || "A leader",
                         loserFaction: battle.defenderFaction
                     };
@@ -154,11 +155,13 @@ function resolveAIBattles(state, existingInsurrectionNotification) {
             if (battle.isInsurgentBattle && !insurrectionNotification && battle.attackerFaction !== types_1.FactionId.NEUTRAL) {
                 const armyIds = battle.attackers.map(a => a.id);
                 const leader = characters.find(c => c.armyId && armyIds.includes(c.armyId));
+                // Pass location ID for translation
+                const targetId = battle.locationId || "unknown";
                 const locName = locations.find(l => l.id === battle.locationId)?.name || "Unknown";
                 insurrectionNotification = {
                     type: 'FAILURE',
                     faction: battle.attackerFaction,
-                    targetName: locName,
+                    targetName: targetId,
                     leaderName: leader?.name || "A leader",
                     loserFaction: battle.defenderFaction
                 };
@@ -188,7 +191,7 @@ function resolveAIBattles(state, existingInsurrectionNotification) {
                             ? { ...c, status: types_1.CharacterStatus.DEAD }
                             : c);
                         // Leader death log - INFO severity
-                        const deathLog = (0, logFactory_1.createLeaderDiedLog)(leader.name, state.turn);
+                        const deathLog = (0, logFactory_1.createLeaderDiedLog)(leader.id, state.turn);
                         logs.push(deathLog);
                     }
                     else {
