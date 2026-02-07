@@ -27,6 +27,7 @@ export interface SiegeExecutionResult {
         targetId: string;
         targetName: string;
         attackerName: FactionId;
+        turn: number; // Turn when siege occurred, for filtering
     } | null;
 }
 
@@ -137,12 +138,11 @@ export function executeSiegeFromOpportunity(
         result.siegeNotification = {
             targetId: city.id,
             targetName: city.name,
-            attackerName: faction
+            attackerName: faction,
+            turn: state.turn + 1 // Next turn (after AI turn processing, during Phase 2)
         };
     }
-
     result.executed = true;
     console.log(`[AI SIEGE EXEC ${faction}] SUCCESS: Sieged ${city.name} (Fort ${city.fortificationLevel} -> ${newFortLevel}), Cost: ${opportunity.siegeCost}g`);
-
     return result;
 }
