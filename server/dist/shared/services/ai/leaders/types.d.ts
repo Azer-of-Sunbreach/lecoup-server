@@ -153,6 +153,7 @@ export interface RoleAssignment {
     assignedBudget?: number;
     missionType?: 'MAJOR' | 'MINOR';
     targetActionId?: ClandestineActionId;
+    shouldDetachFromArmy?: boolean;
 }
 /**
  * Faction strategy configuration.

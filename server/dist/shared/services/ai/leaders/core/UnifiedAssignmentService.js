@@ -22,6 +22,7 @@ const clandestineTypes_1 = require("../../../../types/clandestineTypes");
 const governorTypes_1 = require("../../../../types/governorTypes");
 const IPGCalculator_1 = require("../utils/IPGCalculator");
 const leaderPathfinding_1 = require("../../../domain/leaders/leaderPathfinding");
+const types_3 = require("../../../../types");
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -102,19 +103,62 @@ function generateUnifiedAssignments(context, territories, enemyLocations, armies
             if (!assignedLocations.has(currentLocation.id)) {
                 const urgentPolicy = getUrgentGovernorPolicy(currentLocation, state, faction);
                 if (urgentPolicy) {
-                    assignments.push({
-                        leaderId: leader.id,
-                        assignedRole: types_2.AILeaderRole.GOVERNOR,
-                        targetLocationId: currentLocation.id,
-                        priority: 100,
-                        reasoning: `Urgent: ${urgentPolicy} at ${currentLocation.name}`
-                    });
-                    assignedLeaderIds.add(leader.id);
-                    assignedLocations.add(currentLocation.id);
-                    logs.push(`${leader.name}: Urgent Governor (${urgentPolicy})`);
+                    // MAN_OF_ACTION: Only allow HUNT_NETWORKS, MAKE_EXAMPLES, and RATIONING
+                    const hasManOfAction = leader.stats?.traits?.includes('MAN_OF_ACTION') ?? false;
+                    const allowedForManOfAction = [governorTypes_1.GovernorPolicy.HUNT_NETWORKS, governorTypes_1.GovernorPolicy.MAKE_EXAMPLES, governorTypes_1.GovernorPolicy.RATIONING];
+                    if (hasManOfAction && !allowedForManOfAction.includes(urgentPolicy)) {
+                        // Skip this MAN_OF_ACTION leader for non-allowed urgent policies
+                        console.log(`[AI UNIFIED ${faction}] ${leader.name}: Skipped for urgent ${urgentPolicy} (MAN_OF_ACTION)`);
+                    }
+                    else {
+                        assignments.push({
+                            leaderId: leader.id,
+                            assignedRole: types_2.AILeaderRole.GOVERNOR,
+                            targetLocationId: currentLocation.id,
+                            priority: 100,
+                            reasoning: `Urgent: ${urgentPolicy} at ${currentLocation.name}`
+                        });
+                        assignedLeaderIds.add(leader.id);
+                        assignedLocations.add(currentLocation.id);
+                        logs.push(`${leader.name}: Urgent Governor (${urgentPolicy})`);
+                    }
                 }
             }
         }
+    }
+    // =========================================================================
+    // PHASE 0.5: Handle Army-Attached Leaders
+    // =========================================================================
+    // Leaders attached to armies can be detached if a better assignment exists.
+    // Exception: Cannot detach if army is on a road.
+    const commanderIPGs = new Map(); // leaderId -> commanderIPG
+    const pendingDetachLeaders = new Set(); // leaderId -> should be detached
+    for (const leader of leaders) {
+        const armyId = leader.assignedArmyId || leader.armyId;
+        if (!armyId)
+            continue;
+        const army = armies.find(a => a.id === armyId);
+        if (!army)
+            continue;
+        // Cannot detach if army is on a road
+        if (army.roadId || army.locationType === 'ROAD') {
+            assignedLeaderIds.add(leader.id);
+            console.log(`[AI UNIFIED] ${leader.name}: Reserved (Commander on road)`);
+            continue;
+        }
+        const commandBonus = leader.stats?.commandBonus || 0;
+        // Auto-detach leaders with 0% command bonus (no value as commander)
+        if (commandBonus === 0) {
+            pendingDetachLeaders.add(leader.id);
+            console.log(`[AI UNIFIED] ${leader.name}: Marked for detachment (0% command bonus)`);
+            // Don't reserve - let them be assigned to other roles
+            continue;
+        }
+        // Calculate current commander IPG for comparison
+        const commanderResult = (0, IPGCalculator_1.calculateCommanderValue)(leader, army, context.isCampaignActive);
+        commanderIPGs.set(leader.id, commanderResult.value);
+        console.log(`[AI UNIFIED] ${leader.name}: Commander IPG=${commanderResult.value.toFixed(2)} (${commanderResult.details})`);
+        // Don't reserve yet - let Phase 1 generate alternatives and Phase 2 will compare
     }
     // =========================================================================
     // PHASE 1: Generate All Possible Assignments
@@ -127,7 +171,9 @@ function generateUnifiedAssignments(context, territories, enemyLocations, armies
         const isStabilizerCandidate = STABILIZER_CANDIDATES.includes(leaderKey);
         const currentLoc = state.locations.find(l => l.id === leader.locationId);
         // 1. Governor at nearby territories (current + linkedLocation)
-        if (currentLoc && currentLoc.faction === faction) {
+        // MAN_OF_ACTION: Skip for governor IPG assignments (cannot stabilize, only HUNT_NETWORKS/MAKE_EXAMPLES/RATIONING)
+        const hasManOfAction = leader.stats?.traits?.includes('MAN_OF_ACTION') ?? false;
+        if (!hasManOfAction && currentLoc && currentLoc.faction === faction) {
             const nearbyTerritories = getNearbyTerritories(currentLoc, territories);
             // Debug: Log what territories are found for this leader
             if (nearbyTerritories.length > 0) {
@@ -151,6 +197,9 @@ function generateUnifiedAssignments(context, territories, enemyLocations, armies
                     details: result.details
                 });
             }
+        }
+        else if (hasManOfAction && currentLoc && currentLoc.faction === faction) {
+            console.log(`[PHASE1] ${leader.name}: SKIP governor IPG (MAN_OF_ACTION)`);
         }
         // 2. STABILIZER missions (for candidates, max 3 turns travel)
         if (isStabilizerCandidate && (leader.stats?.stabilityPerTurn || 0) > 0) {
@@ -179,73 +228,161 @@ function generateUnifiedAssignments(context, territories, enemyLocations, armies
         // Low ops leaders will naturally have lower IPG and be filtered out
         const ops = leader.stats?.clandestineOps || 0;
         if (ops > 0) {
+            // Check for leader abilities (respecting Internal Factions: granted and disabled abilities)
+            const disabledAbilities = leader.disabledAbilities || [];
+            const grantedAbilities = leader.grantedAbilities || [];
+            const hasEliteNetworks = ((leader.stats?.ability?.includes('ELITE_NETWORKS') ?? false) ||
+                grantedAbilities.includes('ELITE_NETWORKS')) && !disabledAbilities.includes('ELITE_NETWORKS');
+            const hasAgitationalNetworks = ((leader.stats?.ability?.includes('AGITATIONAL_NETWORKS') ?? false) ||
+                grantedAbilities.includes('AGITATIONAL_NETWORKS')) && !disabledAbilities.includes('AGITATIONAL_NETWORKS');
+            // ELITE_NETWORKS: If we have ANY target with resentment < 50, skip targets with resentment >= 50 for MINOR missions
+            let validMinorTargets = enemyLocations;
+            if (hasEliteNetworks) {
+                const lowResentmentTargets = enemyLocations.filter(loc => (0, IPGCalculator_1.getResentmentAgainst)(loc, faction) < 50);
+                if (lowResentmentTargets.length > 0) {
+                    // Filter down to only low resentment targets for minor missions
+                    // "Un leader avec ELITE_NETWORKS pourrait se rendre en mission mineure dans un territoire 
+                    // où le ressentiment est < à 50... cherche la zone ennemie avec l'IPG... le plus élevé"
+                    validMinorTargets = lowResentmentTargets;
+                    console.log(`[AI ABILITY] ${leader.name} has ELITE_NETWORKS - restricting MINOR missions to ${lowResentmentTargets.length} low-resentment targets`);
+                }
+            }
             for (const enemy of enemyLocations) {
+                const resentment = (0, IPGCalculator_1.getResentmentAgainst)(enemy, faction);
+                // MANAGER opportunity cost: check if leader is in a friendly CITY
+                // Applied to ALL clandestine mission types (Grand, Neutral, Minor)
+                const hasManagerAbility = leader.stats?.ability?.includes('MANAGER') ?? false;
+                const isInFriendlyCity = currentLoc &&
+                    currentLoc.faction === faction &&
+                    currentLoc.type === types_3.LocationType.CITY;
                 // 3a. Grand Insurrection (Major, min 300g)
                 // BASELINE: Calculate potential using standard 400g investment for comparison
-                const grandIPG = (0, IPGCalculator_1.calculateGrandIPG)(enemy, ops, 400, faction) * factionMultiplier;
-                if (grandIPG > 0) {
-                    const travelTime = (0, leaderPathfinding_1.calculateLeaderTravelTime)(leader.locationId || '', enemy.id, state.locations, state.roads);
+                let grandIPG = (0, IPGCalculator_1.calculateGrandIPG)(enemy, ops, 400, faction) * factionMultiplier;
+                // MANAGER opportunity cost for Grand Insurrection
+                // Grand Insurrection prep time = 4 turns
+                const GRAND_INSURRECTION_PREP_TURNS = 4;
+                const grandTravelTime = (0, leaderPathfinding_1.calculateLeaderTravelTime)(leader.locationId || '', enemy.id, state.locations, state.roads);
+                let managerGrandCost = 0;
+                let managerGrandDetails = '';
+                if (hasManagerAbility && isInFriendlyCity) {
+                    managerGrandCost = (0, IPGCalculator_1.calculateManagerOpportunityCost)(GRAND_INSURRECTION_PREP_TURNS, grandTravelTime);
+                    // Convert IPG reduction: cost in soldiers / gold invested
+                    const grandIPGReduction = managerGrandCost / 400; // 400g standard investment
+                    grandIPG = Math.max(0, grandIPG - grandIPGReduction);
+                    managerGrandDetails = ` [MGR-COST:${managerGrandCost}]`;
+                }
+                // ELITE_NETWORKS: Add minor mission IPG bonus if resentment < 50
+                // "Lorsque l'IA calcule l'IPG d'une mission d'insurrection... si la région a un ressentiment < à 50... 
+                // elle peut ajouter la valeur d'IPG d'une mission mineure à l'IPG de la mission majeure."
+                let eliteBonus = 0;
+                let eliteBonusDetails = '';
+                if (hasEliteNetworks && resentment < 50) {
+                    const minorResult = (0, IPGCalculator_1.calculateMinorIPG)(enemy, ops, faction, leader.stats?.discretion ?? 3, faction);
+                    // Add the raw IPG value (normalized for duration)
+                    eliteBonus = minorResult.ipg * factionMultiplier;
+                    eliteBonusDetails = ` + EliteBonus(${eliteBonus.toFixed(2)})`;
+                }
+                if (grandIPG + eliteBonus > 0) {
                     // Determine actual gold to assign based on available budget
-                    // If rich (>500), assign 500. If >400, assign 400. Else 300 default.
-                    let goldToAssign = 300;
+                    // AGITATIONAL_NETWORKS: Allow 200g budget if resentment < 60
+                    let minGoldRequired = 300;
+                    if (hasAgitationalNetworks && resentment < 60) {
+                        minGoldRequired = 200; // +200g bonus on arrival
+                    }
+                    let goldToAssign = minGoldRequired;
                     if (budget >= 500)
                         goldToAssign = 500;
                     else if (budget >= 400)
                         goldToAssign = 400;
+                    // Ensure we assign at least the calculated minimum
+                    else if (budget >= minGoldRequired)
+                        goldToAssign = minGoldRequired;
                     potentialAssignments.push({
                         leaderId: leader.id,
                         leaderName: leader.name,
                         role: types_2.AILeaderRole.CLANDESTINE,
                         targetId: enemy.id,
                         targetName: enemy.name,
-                        ipg: (0, IPGCalculator_1.applyDistancePenalty)(grandIPG, travelTime),
+                        ipg: (0, IPGCalculator_1.applyDistancePenalty)(grandIPG + eliteBonus, grandTravelTime),
                         missionType: 'MAJOR',
                         targetActionId: clandestineTypes_1.ClandestineActionId.PREPARE_GRAND_INSURRECTION,
-                        goldRequired: goldToAssign, // Assign dynamic amount based on wealth
-                        travelTime: travelTime,
-                        details: `Grand @ ${enemy.name}: IPG=${grandIPG.toFixed(2)} (Dist: ${travelTime}) [Alloc: ${goldToAssign}g]`
+                        goldRequired: goldToAssign, // Assign dynamic amount based on wealth/ability
+                        travelTime: grandTravelTime,
+                        details: `Grand @ ${enemy.name}: IPG=${grandIPG.toFixed(2)}${eliteBonusDetails}${managerGrandDetails} (Dist: ${grandTravelTime}) [Alloc: ${goldToAssign}g]`
                     });
-                } // 3b. Incite Neutral (Major, budget based on discretion)
+                }
+                // 3b. Incite Neutral (Major, budget based on discretion)
                 const discretion = leader.stats?.discretion ?? 3;
                 const neutralMinBudget = (0, IPGCalculator_1.calculateNeutralMissionBudget)(discretion);
-                const neutralIPG = (0, IPGCalculator_1.calculateNeutralIPG)(enemy, ops, faction, discretion) * factionMultiplier;
-                if (neutralIPG > 0) {
-                    const travelTime = (0, leaderPathfinding_1.calculateLeaderTravelTime)(leader.locationId || '', enemy.id, state.locations, state.roads);
+                let neutralIPG = (0, IPGCalculator_1.calculateNeutralIPG)(enemy, ops, faction, discretion) * factionMultiplier;
+                // MANAGER opportunity cost for Neutral Insurrection
+                // Neutral duration = (threshold - 10) / 10 turns + 1 prep turn
+                const neutralTravelTime = (0, leaderPathfinding_1.calculateLeaderTravelTime)(leader.locationId || '', enemy.id, state.locations, state.roads);
+                const threshold = (0, IPGCalculator_1.getDetectionThreshold)(discretion);
+                const neutralActiveTurns = (threshold - 10) / 10 + 1; // +1 for prep
+                let managerNeutralCost = 0;
+                let managerNeutralDetails = '';
+                if (hasManagerAbility && isInFriendlyCity) {
+                    managerNeutralCost = (0, IPGCalculator_1.calculateManagerOpportunityCost)(neutralActiveTurns, neutralTravelTime);
+                    const neutralIPGReduction = managerNeutralCost / neutralMinBudget;
+                    neutralIPG = Math.max(0, neutralIPG - neutralIPGReduction);
+                    managerNeutralDetails = ` [MGR-COST:${managerNeutralCost}]`;
+                }
+                // ELITE_NETWORKS applies to Neutral Insurrection too
+                // "ELITE_NETWORKS augmente également la valeur des GRAND_INSURRECTION et INCITE_NEUTRAL"
+                const totalNeutralIPG = neutralIPG + eliteBonus;
+                if (totalNeutralIPG > 0) {
                     potentialAssignments.push({
                         leaderId: leader.id,
                         leaderName: leader.name,
                         role: types_2.AILeaderRole.CLANDESTINE,
                         targetId: enemy.id,
                         targetName: enemy.name,
-                        ipg: (0, IPGCalculator_1.applyDistancePenalty)(neutralIPG, travelTime),
+                        ipg: (0, IPGCalculator_1.applyDistancePenalty)(totalNeutralIPG, neutralTravelTime),
                         missionType: 'MAJOR',
                         targetActionId: clandestineTypes_1.ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS,
                         goldRequired: neutralMinBudget,
-                        travelTime: travelTime,
-                        details: `Neutral @ ${enemy.name}: IPG=${neutralIPG.toFixed(2)} (Dist: ${travelTime})`
+                        travelTime: neutralTravelTime,
+                        details: `Neutral @ ${enemy.name}: IPG=${neutralIPG.toFixed(2)}${eliteBonusDetails}${managerNeutralDetails} (Dist: ${neutralTravelTime})`
                     });
-                } // 3c. Undermine (Minor)
-                // SCORCHED_EARTH leaders need 200g minimum to cover destructive actions
-                const hasScorchedEarth = leader.stats?.traits?.includes('SCORCHED_EARTH') ?? false;
-                const minorMinBudget = hasScorchedEarth ? 200 : 100;
-                const leaderDiscretion = leader.stats?.discretion ?? 3;
-                const minorResult = (0, IPGCalculator_1.calculateMinorIPG)(enemy, ops, faction, leaderDiscretion, faction);
-                const minorIPG = minorResult.ipg * factionMultiplier;
-                if (minorResult.ipg > 0) {
+                }
+                // 3c. Undermine (Minor)
+                // Filter check: Is this target valid for minor mission given Elite Networks constraint?
+                const isValidMinorTarget = validMinorTargets.some(t => t.id === enemy.id);
+                if (isValidMinorTarget) {
+                    // SCORCHED_EARTH leaders need 200g minimum to cover destructive actions
+                    const hasScorchedEarth = leader.stats?.traits?.includes('SCORCHED_EARTH') ?? false;
+                    const minorMinBudget = hasScorchedEarth ? 200 : 100;
+                    const leaderDiscretion = leader.stats?.discretion ?? 3;
+                    // Calculate travel time first (needed for MANAGER opportunity cost)
                     const travelTime = (0, leaderPathfinding_1.calculateLeaderTravelTime)(leader.locationId || '', enemy.id, state.locations, state.roads);
-                    potentialAssignments.push({
-                        leaderId: leader.id,
-                        leaderName: leader.name,
-                        role: types_2.AILeaderRole.CLANDESTINE,
-                        targetId: enemy.id,
-                        targetName: enemy.name,
-                        ipg: (0, IPGCalculator_1.applyDistancePenalty)(minorIPG, travelTime),
-                        missionType: 'MINOR',
-                        targetActionId: clandestineTypes_1.ClandestineActionId.UNDERMINE_AUTHORITIES, // Default for minor, will pick up others too
-                        goldRequired: minorMinBudget,
-                        travelTime: travelTime,
-                        details: `Minor @ ${enemy.name}: ${minorResult.details}${hasScorchedEarth ? ' [SCORCHED]' : ''} (Dist: ${travelTime})`
-                    });
+                    // MANAGER opportunity cost: if leader is in a friendly CITY, account for lost gold production
+                    const hasManagerAbility = leader.stats?.ability?.includes('MANAGER') ?? false;
+                    const isInFriendlyCity = currentLoc &&
+                        currentLoc.faction === faction &&
+                        currentLoc.type === types_3.LocationType.CITY;
+                    const managerOptions = hasManagerAbility ? {
+                        hasManagerAbility: true,
+                        isInFriendlyLocation: !!isInFriendlyCity,
+                        travelTurns: travelTime
+                    } : undefined;
+                    const minorResult = (0, IPGCalculator_1.calculateMinorIPG)(enemy, ops, faction, leaderDiscretion, faction, managerOptions);
+                    const minorIPG = minorResult.ipg * factionMultiplier;
+                    if (minorResult.ipg > 0) {
+                        potentialAssignments.push({
+                            leaderId: leader.id,
+                            leaderName: leader.name,
+                            role: types_2.AILeaderRole.CLANDESTINE,
+                            targetId: enemy.id,
+                            targetName: enemy.name,
+                            ipg: (0, IPGCalculator_1.applyDistancePenalty)(minorIPG, travelTime),
+                            missionType: 'MINOR',
+                            targetActionId: clandestineTypes_1.ClandestineActionId.UNDERMINE_AUTHORITIES, // Default for minor, will pick up others too
+                            goldRequired: minorMinBudget,
+                            travelTime: travelTime,
+                            details: `Minor @ ${enemy.name}: ${minorResult.details}${hasScorchedEarth ? ' [SCORCHED]' : ''}${hasManagerAbility && isInFriendlyCity ? ' [MGR-COST]' : ''} (Dist: ${travelTime})`
+                        });
+                    }
                 }
             }
         }
@@ -348,7 +485,23 @@ function generateUnifiedAssignments(context, territories, enemyLocations, armies
                 continue;
             }
         }
+        // Check if leader is currently commanding an army - require +5 IPG to detach
+        // (Skip this check for COMMANDER assignments - they're keeping the leader as commander)
+        if (pa.role !== types_2.AILeaderRole.COMMANDER) {
+            const currentCommanderIPG = commanderIPGs.get(pa.leaderId);
+            if (currentCommanderIPG !== undefined && currentCommanderIPG > 0) {
+                const requiredIPG = currentCommanderIPG + 5;
+                if (pa.ipg < requiredIPG) {
+                    console.log(`  [REJECTED] ${pa.leaderName} -> ${pa.role}: IPG ${pa.ipg.toFixed(2)} < commander ${currentCommanderIPG.toFixed(2)} + 5`);
+                    continue;
+                }
+                // IPG is high enough - mark for detachment
+                pendingDetachLeaders.add(pa.leaderId);
+                console.log(`  [DETACH] ${pa.leaderName}: New mission IPG ${pa.ipg.toFixed(2)} >= commander ${currentCommanderIPG.toFixed(2)} + 5, will detach`);
+            }
+        }
         // ASSIGN!
+        const shouldDetach = pendingDetachLeaders.has(pa.leaderId);
         assignments.push({
             leaderId: pa.leaderId,
             assignedRole: pa.role,
@@ -358,7 +511,8 @@ function generateUnifiedAssignments(context, territories, enemyLocations, armies
             reasoning: pa.details,
             assignedBudget: pa.role === types_2.AILeaderRole.CLANDESTINE ? pa.goldRequired : undefined,
             missionType: pa.missionType,
-            targetActionId: pa.targetActionId
+            targetActionId: pa.targetActionId,
+            shouldDetachFromArmy: shouldDetach // New field for execution layer
         });
         assignedLeaderIds.add(pa.leaderId);
         if (pa.role === types_2.AILeaderRole.GOVERNOR || pa.role === types_2.AILeaderRole.STABILIZER) {
@@ -370,6 +524,42 @@ function generateUnifiedAssignments(context, territories, enemyLocations, armies
             clandestineDestinations.add(pa.targetId); // Prevent multiple agents to same location
         }
         console.log(`  [ASSIGNED] ${pa.leaderName} -> ${pa.role} @ ${pa.targetName} (IPG=${pa.ipg.toFixed(2)})`);
+    }
+    // =========================================================================
+    // PHASE 2.5: MANAGER Rural-to-City Check
+    // =========================================================================
+    // MANAGER leaders in rural areas cannot generate their 20g/turn bonus.
+    // If they would be IDLE and their linkedLocation is a friendly city, move them there.
+    for (const leader of availableLeaders) {
+        if (assignedLeaderIds.has(leader.id))
+            continue; // Already assigned
+        const hasManagerAbility = leader.stats?.ability?.includes('MANAGER') ?? false;
+        if (!hasManagerAbility)
+            continue;
+        const currentLoc = state.locations.find(l => l.id === leader.locationId);
+        if (!currentLoc)
+            continue;
+        // Only process if leader is in a RURAL area controlled by their faction
+        if (currentLoc.type !== types_3.LocationType.RURAL)
+            continue;
+        if (currentLoc.faction !== faction)
+            continue;
+        // Check if linkedLocation is a city controlled by our faction
+        const linkedCity = currentLoc.linkedLocationId
+            ? state.locations.find(l => l.id === currentLoc.linkedLocationId)
+            : null;
+        if (linkedCity && linkedCity.faction === faction && linkedCity.type === types_3.LocationType.CITY) {
+            // Create an assignment to move to the linked city
+            assignments.push({
+                leaderId: leader.id,
+                assignedRole: types_2.AILeaderRole.IDLE, // Will move, then be available
+                targetLocationId: linkedCity.id,
+                priority: 20, // Low priority but should still happen
+                reasoning: `MANAGER ${leader.name} moving from rural ${currentLoc.name} to city ${linkedCity.name} for gold bonus`
+            });
+            assignedLeaderIds.add(leader.id);
+            console.log(`  [MANAGER] ${leader.name}: Moving from rural ${currentLoc.name} to city ${linkedCity.name} (gold bonus)`);
+        }
     }
     // Assign remaining leaders as IDLE
     for (const leader of availableLeaders) {
@@ -410,12 +600,32 @@ function getNearbyTerritories(currentLoc, territories) {
  * Returns the urgent policy type or null.
  */
 function getUrgentGovernorPolicy(location, state, faction) {
-    // HUNT_NETWORKS: Enemy agent detected
-    const hasEnemyAgent = state.characters.some(c => c.faction !== faction &&
-        c.faction !== types_1.FactionId.NEUTRAL &&
-        c.status === types_1.CharacterStatus.UNDERCOVER &&
-        c.locationId === location.id);
-    if (hasEnemyAgent)
+    // HUNT_NETWORKS: Enemy agent detected - but only if they represent a threat
+    // Exception: Don't hunt agents with budget=0 AND detectionLevel < baseThreshold/2
+    // (They can't do anything and HUNT_NETWORKS won't help catch them)
+    const hasThreateningAgent = state.characters.some(c => {
+        // Must be enemy agent UNDERCOVER in this location
+        if (c.faction === faction || c.faction === types_1.FactionId.NEUTRAL)
+            return false;
+        if (c.status !== types_1.CharacterStatus.UNDERCOVER)
+            return false;
+        if (c.locationId !== location.id)
+            return false;
+        // Check if agent is threatening
+        const budget = c.clandestineBudget || c.budget || 0;
+        const detectionLevel = c.detectionLevel || 0;
+        // Calculate base threshold: 20 + (10 × discretion)
+        const discretion = c.stealthLevel ?? c.stats?.discretion ?? 2;
+        const baseThreshold = 20 + (10 * discretion);
+        const halfThreshold = Math.floor(baseThreshold / 2);
+        // Non-threatening: budget=0 AND detectionLevel < halfThreshold
+        if (budget === 0 && detectionLevel < halfThreshold) {
+            console.log(`[AI HUNT_NETWORKS] Skipping ${c.name}: non-threatening (budget=${budget}, detection=${detectionLevel} < halfThreshold=${halfThreshold})`);
+            return false;
+        }
+        return true; // Threatening agent
+    });
+    if (hasThreateningAgent)
         return governorTypes_1.GovernorPolicy.HUNT_NETWORKS;
     // RATIONING: City cut off from rural with low food
     if (location.type === 'CITY') {

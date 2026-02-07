@@ -21,6 +21,7 @@ const governorTypes_1 = require("../../../../types/governorTypes");
 const clandestineTypes_1 = require("../../../../types/clandestineTypes");
 const leaderPathfinding_1 = require("../../../domain/leaders/leaderPathfinding");
 const ClandestineAgentProcessor_1 = require("./ClandestineAgentProcessor");
+const AIRepublicansInternalFactions_1 = require("../recruitment/AIRepublicansInternalFactions");
 // ============================================================================
 // MAIN PROCESSING FUNCTION
 // ============================================================================
@@ -43,6 +44,26 @@ function processLeaderAI(state, faction, turn, debugMode = false) {
     }
     for (const log of travelResult.logs) {
         logger.logEvent('SYSTEM', 'Travel', typeof log === 'string' ? log : log.message);
+    }
+    // =========================================================================
+    // PHASE 0.5: REPUBLICANS Internal Faction Decision (Turn 6+)
+    // =========================================================================
+    // Process one-time internal faction choice for AI REPUBLICANS
+    let workingState = state;
+    if (faction === types_1.FactionId.REPUBLICANS && turn >= AIRepublicansInternalFactions_1.INTERNAL_FACTION_MIN_TURN) {
+        const internalFactionResult = (0, AIRepublicansInternalFactions_1.processRepublicanInternalFaction)(state, faction, turn);
+        if (internalFactionResult.choiceMade) {
+            // Apply the choice and update working state
+            workingState = (0, AIRepublicansInternalFactions_1.applyInternalFactionResult)(state, internalFactionResult);
+            // Sync updated characters back into state manager
+            for (const char of workingState.characters) {
+                stateManager.updateCharacter(char);
+            }
+            logger.logEvent('SYSTEM', 'Internal Factions', `Chose ${internalFactionResult.chosenOption} - cost: ${internalFactionResult.goldCost}g`);
+        }
+        else if (internalFactionResult.inSavingsMode) {
+            logger.logEvent('SYSTEM', 'Internal Factions', `Saving for ${internalFactionResult.savingsTarget} (${internalFactionResult.savedGold}/${250}g)`);
+        }
     }
     // 1. Normalize budgets for all leaders (fix starting agents)
     normalizeAllBudgets(stateManager, faction);
@@ -448,7 +469,12 @@ function findBestLeaderForRole(leaders, role, alreadyAssigned, targetLocationId,
             score -= 100; // Heavy penalty
         }
         // Stat bonuses for specific roles
-        if (role === types_2.AILeaderRole.GOVERNOR) {
+        if (role === types_2.AILeaderRole.GOVERNOR || role === types_2.AILeaderRole.STABILIZER) {
+            // MAN_OF_ACTION: Cannot fully govern - heavy penalty
+            const hasManOfAction = leader.stats?.traits?.includes('MAN_OF_ACTION') ?? false;
+            if (hasManOfAction) {
+                score -= 200; // Reject for full governor duties
+            }
             // Statesmanship is CRITICAL for governors - weight heavily
             // Inept (1) = -30, Poor (2) = -15, Average (3) = 0, Good (4) = +15, Excellent (5) = +30
             const statesmanship = leader.stats?.statesmanship || 3;
@@ -461,6 +487,10 @@ function findBestLeaderForRole(leaders, role, alreadyAssigned, targetLocationId,
                 score += 20;
             if (leader.stats?.ability?.includes('MAN_OF_CHURCH'))
                 score += 10;
+            // Stabilizer-specific bonus
+            if (role === types_2.AILeaderRole.STABILIZER) {
+                score += (leader.stats?.stabilityPerTurn || 0) * 30;
+            }
         }
         else if (role === types_2.AILeaderRole.CLANDESTINE) {
             score += (leader.stats?.clandestineOps || 3) * 10;
@@ -471,9 +501,6 @@ function findBestLeaderForRole(leaders, role, alreadyAssigned, targetLocationId,
                 score += 15;
             if (leader.stats?.ability?.includes('GHOST'))
                 score += 15;
-        }
-        else if (role === types_2.AILeaderRole.STABILIZER) {
-            score += (leader.stats?.stabilityPerTurn || 0) * 30;
         }
         else if (role === types_2.AILeaderRole.PROTECTOR) {
             if (leader.stats?.ability?.includes('LEGENDARY'))
@@ -622,6 +649,45 @@ function executeClandestineRole(leader, assignment, opportunities, strategy, sta
         decision.reasoning.join('; '));
     }
     result.decisions.clandestineDecisions.push(decision);
+}
+/**
+ * Execute commander role - attach leader to an army.
+ */
+function executeCommanderRole(leader, assignment, stateManager, state, turn, logger, result) {
+    const targetArmyId = assignment.targetArmyId;
+    const targetLocationId = assignment.targetLocationId;
+    if (!targetArmyId)
+        return;
+    const army = state.armies.find(a => a.id === targetArmyId);
+    if (!army) {
+        logger.logEvent(leader.id, leader.name, `COMMANDER: Army ${targetArmyId} not found`);
+        return;
+    }
+    // Check if leader needs to move to army location
+    if (targetLocationId && leader.locationId !== targetLocationId) {
+        // Calculate travel time
+        const travelTime = (0, leaderPathfinding_1.calculateLeaderTravelTime)(leader.locationId || '', targetLocationId, state.locations, state.roads);
+        if (travelTime > 0) {
+            // Start movement towards army
+            stateManager.startMovement(leader.id, targetLocationId, travelTime, turn);
+            logger.logMovement(leader.id, leader.name, leader.locationId, targetLocationId, 'Moving to command army');
+            return;
+        }
+        else {
+            // Instant movement (same location or adjacent)
+            stateManager.moveToLocation(leader.id, targetLocationId);
+        }
+    }
+    // Attach leader to army
+    stateManager.assignAsCommander(leader.id, targetArmyId);
+    logger.logEvent(leader.id, leader.name, `COMMANDER: Attached to army (${army.strength} troops)`);
+    // Record commander decision
+    result.decisions.commanderDecisions.push({
+        leaderId: leader.id,
+        targetArmyId: targetArmyId,
+        shouldDetach: false,
+        reasoning: [`Assigned to command army of ${army.strength} troops`]
+    });
 }
 /**
  * Execute protector role (LEGENDARY leader blocking insurrections).

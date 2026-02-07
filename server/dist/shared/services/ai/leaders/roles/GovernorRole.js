@@ -93,6 +93,9 @@ function scoreAllPolicies(context, currentPolicies) {
     const hasChurch = leader.stats?.ability?.includes('MAN_OF_CHURCH') || false;
     const hasParanoid = leader.stats?.ability?.includes('PARANOID') || false;
     const isCity = location.type === 'CITY';
+    // MAN_OF_ACTION: Only allow HUNT_NETWORKS, MAKE_EXAMPLES, and RATIONING
+    const hasManOfAction = leader.stats?.traits?.includes('MAN_OF_ACTION') ?? false;
+    const manOfActionAllowed = [governorTypes_1.GovernorPolicy.HUNT_NETWORKS, governorTypes_1.GovernorPolicy.MAKE_EXAMPLES, governorTypes_1.GovernorPolicy.RATIONING];
     // =========================================================================
     // STABILIZE_REGION - Increase stability
     // =========================================================================
@@ -100,8 +103,12 @@ function scoreAllPolicies(context, currentPolicies) {
         let score = 0;
         let reasoning = '';
         const goldCost = governorTypes_1.GOVERNOR_POLICY_COSTS[governorTypes_1.GovernorPolicy.STABILIZE_REGION] || 10;
-        // Higher priority if stability is low
-        if (territory.stability < types_2.STABILITY_THRESHOLDS.CRITICAL) {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot stabilize region';
+        }
+        else if (territory.stability < types_2.STABILITY_THRESHOLDS.CRITICAL) {
             score = 100;
             reasoning = 'Critical stability - urgent';
         }
@@ -149,7 +156,12 @@ function scoreAllPolicies(context, currentPolicies) {
         const resentment = (location.resentment && leader.faction !== types_1.FactionId.NEUTRAL)
             ? (location.resentment[leader.faction] || 0)
             : 0;
-        if (resentment > 70) {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot appease minds';
+        }
+        else if (resentment > 70) {
             score = 70;
             reasoning = 'High resentment - urgent';
         }
@@ -195,14 +207,21 @@ function scoreAllPolicies(context, currentPolicies) {
         let score = 0;
         let reasoning = '';
         const goldCost = governorTypes_1.GOVERNOR_POLICY_COSTS[governorTypes_1.GovernorPolicy.DENOUNCE_ENEMIES] || 10;
-        // Priority: lower enemy resentment = more room to increase
-        // This is typically a secondary action
-        score = 30;
-        reasoning = 'Baseline propaganda';
-        // Boost if enemy agent detected
-        if (territory.hasEnemyAgent) {
-            score += 30;
-            reasoning = 'Counter enemy propaganda';
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot denounce enemies';
+        }
+        else {
+            // Priority: lower enemy resentment = more room to increase
+            // This is typically a secondary action
+            score = 30;
+            reasoning = 'Baseline propaganda';
+            // Boost if enemy agent detected
+            if (territory.hasEnemyAgent) {
+                score += 30;
+                reasoning = 'Counter enemy propaganda';
+            }
         }
         // Cost check
         if (context.availableGold < goldCost) {
@@ -303,8 +322,12 @@ function scoreAllPolicies(context, currentPolicies) {
     {
         let score = 0;
         let reasoning = '';
-        // Priority based on economic situation
-        if (territory.economicDamage.severity === 'MAJOR') {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot improve economy';
+        }
+        else if (territory.economicDamage.severity === 'MAJOR') {
             score = 60;
             reasoning = 'Major economic damage - rebuild priority';
         }
@@ -366,7 +389,12 @@ function scoreAllPolicies(context, currentPolicies) {
         let score = 0;
         let reasoning = '';
         const goldCost = governorTypes_1.GOVERNOR_POLICY_COSTS[governorTypes_1.GovernorPolicy.REBUILD_REGION] || 10;
-        if (territory.economicDamage.burned) {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot rebuild region';
+        }
+        else if (territory.economicDamage.burned) {
             if (territory.economicDamage.severity === 'MAJOR') {
                 score = 80;
                 reasoning = 'Major damage - rebuild urgently';
