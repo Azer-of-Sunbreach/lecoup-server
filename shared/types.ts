@@ -643,6 +643,7 @@ export const FACTION_NAMES = {
 export interface CoreGameState {
   gameId: string;
   turn: number;
+  mapId?: string; // ID of the map being played (e.g. 'larion', 'valis')
   currentPlayerFaction: FactionId;
   turnOrder: FactionId[];
   playerFactions: FactionId[];
