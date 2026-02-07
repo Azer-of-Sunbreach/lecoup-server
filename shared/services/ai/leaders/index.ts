@@ -40,3 +40,11 @@ export type { PotentialAssignment, AssignmentContext } from './core/UnifiedAssig
 export { processClandestineAgent } from './core/ClandestineAgentProcessor';
 export type { ClandestineResult } from './core/ClandestineAgentProcessor';
 // ClandestineActionId and ActiveClandestineAction are exported from shared/types/clandestineTypes.ts
+
+// Stranded Leader Service
+export { processStrandedLeaders } from './core/StrandedLeaderService';
+export type { StrandedLeaderResult } from './core/StrandedLeaderService';
+
+// Unified Leader Manager (replaces legacy processLeaderAI)
+export { manageLeadersUnified } from './core/UnifiedLeaderManager';
+export type { UnifiedLeaderResult } from './core/UnifiedLeaderManager';

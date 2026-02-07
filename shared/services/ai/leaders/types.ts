@@ -182,6 +182,7 @@ export interface RoleAssignment {
     assignedBudget?: number;
     missionType?: 'MAJOR' | 'MINOR';
     targetActionId?: ClandestineActionId;
+    shouldDetachFromArmy?: boolean; // If true, leader should be detached from current army before assignment
 }
 
 // ============================================================================

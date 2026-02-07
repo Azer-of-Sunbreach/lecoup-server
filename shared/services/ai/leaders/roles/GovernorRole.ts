@@ -147,6 +147,10 @@ function scoreAllPolicies(
     const hasParanoid = leader.stats?.ability?.includes('PARANOID') || false;
     const isCity = location.type === 'CITY';
 
+    // MAN_OF_ACTION: Only allow HUNT_NETWORKS, MAKE_EXAMPLES, and RATIONING
+    const hasManOfAction = leader.stats?.traits?.includes('MAN_OF_ACTION') ?? false;
+    const manOfActionAllowed = [GovernorPolicy.HUNT_NETWORKS, GovernorPolicy.MAKE_EXAMPLES, GovernorPolicy.RATIONING];
+
     // =========================================================================
     // STABILIZE_REGION - Increase stability
     // =========================================================================
@@ -155,8 +159,11 @@ function scoreAllPolicies(
         let reasoning = '';
         const goldCost = GOVERNOR_POLICY_COSTS[GovernorPolicy.STABILIZE_REGION] || 10;
 
-        // Higher priority if stability is low
-        if (territory.stability < STABILITY_THRESHOLDS.CRITICAL) {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot stabilize region';
+        } else if (territory.stability < STABILITY_THRESHOLDS.CRITICAL) {
             score = 100;
             reasoning = 'Critical stability - urgent';
         } else if (territory.stability < STABILITY_THRESHOLDS.LOW) {
@@ -208,7 +215,11 @@ function scoreAllPolicies(
             ? (location.resentment[leader.faction as keyof typeof location.resentment] || 0)
             : 0;
 
-        if (resentment > 70) {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot appease minds';
+        } else if (resentment > 70) {
             score = 70;
             reasoning = 'High resentment - urgent';
         } else if (resentment > 50) {
@@ -257,15 +268,21 @@ function scoreAllPolicies(
         let reasoning = '';
         const goldCost = GOVERNOR_POLICY_COSTS[GovernorPolicy.DENOUNCE_ENEMIES] || 10;
 
-        // Priority: lower enemy resentment = more room to increase
-        // This is typically a secondary action
-        score = 30;
-        reasoning = 'Baseline propaganda';
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot denounce enemies';
+        } else {
+            // Priority: lower enemy resentment = more room to increase
+            // This is typically a secondary action
+            score = 30;
+            reasoning = 'Baseline propaganda';
 
-        // Boost if enemy agent detected
-        if (territory.hasEnemyAgent) {
-            score += 30;
-            reasoning = 'Counter enemy propaganda';
+            // Boost if enemy agent detected
+            if (territory.hasEnemyAgent) {
+                score += 30;
+                reasoning = 'Counter enemy propaganda';
+            }
         }
 
         // Cost check
@@ -373,8 +390,11 @@ function scoreAllPolicies(
         let score = 0;
         let reasoning = '';
 
-        // Priority based on economic situation
-        if (territory.economicDamage.severity === 'MAJOR') {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot improve economy';
+        } else if (territory.economicDamage.severity === 'MAJOR') {
             score = 60;
             reasoning = 'Major economic damage - rebuild priority';
         } else if (territory.economicDamage.severity === 'MINOR') {
@@ -441,7 +461,11 @@ function scoreAllPolicies(
         let reasoning = '';
         const goldCost = GOVERNOR_POLICY_COSTS[GovernorPolicy.REBUILD_REGION] || 10;
 
-        if (territory.economicDamage.burned) {
+        // MAN_OF_ACTION: Block this policy
+        if (hasManOfAction) {
+            score = -200;
+            reasoning = 'MAN_OF_ACTION: Cannot rebuild region';
+        } else if (territory.economicDamage.burned) {
             if (territory.economicDamage.severity === 'MAJOR') {
                 score = 80;
                 reasoning = 'Major damage - rebuild urgently';

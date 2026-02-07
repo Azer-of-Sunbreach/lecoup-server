@@ -14,6 +14,12 @@ import { calculateDetectionThreshold, calculateCaptureRisk } from '../../../doma
 import { getStrategyForFaction } from '../strategies/factionStrategy';
 import { assessRisk } from '../utils/AIRiskDecisionService';
 import { calculateLeaderTravelTime } from '../../../domain/leaders/leaderPathfinding';
+import {
+    calculateGrandIPG,
+    calculateNeutralIPG,
+    calculateMinorIPG,
+    applyDistancePenalty
+} from '../utils/IPGCalculator';
 
 // ============================================================================
 // TYPES
@@ -108,6 +114,76 @@ export function processClandestineAgent(
             },
             logs
         };
+    }
+
+    // =========================================================================
+    // SPECIAL: Duke Great Plains first-turn relocation evaluation
+    // When duke_great_plains arrives UNDERCOVER at Windward, compare IPG at
+    // Windward vs Great Plains before deciding whether to relocate.
+    // =========================================================================
+    if (leader.id === 'duke_great_plains' &&
+        location.id === 'windward' &&
+        ((leader as any).activeClandestineActions || []).length === 0 &&
+        !(leader as any).plannedMissionAction) {
+
+        const greatPlains = locations.find(l => l.id === 'great_plains');
+
+        // Only consider relocation if great_plains is enemy or neutral (not NOBLES)
+        if (greatPlains && greatPlains.faction !== actorFaction && greatPlains.faction !== FactionId.NEUTRAL) {
+            const ops = leader.stats?.clandestineOps || 2;
+            const discretion = leader.stats?.discretion || 2;
+            const dukeBudget = (leader as any).clandestineBudget ?? 400;
+
+            // Calculate best IPG at Windward
+            const windwardGrandIPG = calculateGrandIPG(location, ops, dukeBudget, actorFaction);
+            const windwardNeutralIPG = calculateNeutralIPG(location, ops, actorFaction, discretion);
+            const windwardMinorResult = calculateMinorIPG(location, ops, actorFaction, discretion);
+            const windwardBestIPG = Math.max(windwardGrandIPG, windwardNeutralIPG, windwardMinorResult.ipg);
+
+            // Calculate best IPG at Great Plains
+            const gpGrandIPG = calculateGrandIPG(greatPlains, ops, dukeBudget, actorFaction);
+            const gpNeutralIPG = calculateNeutralIPG(greatPlains, ops, actorFaction, discretion);
+            const gpMinorResult = calculateMinorIPG(greatPlains, ops, actorFaction, discretion);
+            const gpBestIPG = Math.max(gpGrandIPG, gpNeutralIPG, gpMinorResult.ipg);
+
+            // Apply travel penalty (10% per turn)
+            const travelTurns = calculateLeaderTravelTime(location.id, 'great_plains', locations, roads);
+            const adjustedGpIPG = applyDistancePenalty(gpBestIPG, travelTurns);
+
+            logs.push(`${leader.name}: IPG comparison - Windward: ${windwardBestIPG.toFixed(2)} vs Great Plains: ${adjustedGpIPG.toFixed(2)} (raw: ${gpBestIPG.toFixed(2)}, travel: ${travelTurns}t)`);
+
+            if (adjustedGpIPG > windwardBestIPG) {
+                // Determine best mission type for great_plains
+                let plannedAction: ClandestineActionId;
+                if (gpGrandIPG >= gpNeutralIPG && gpGrandIPG >= gpMinorResult.ipg && dukeBudget >= 300) {
+                    plannedAction = ClandestineActionId.PREPARE_GRAND_INSURRECTION;
+                } else if (gpNeutralIPG > gpMinorResult.ipg) {
+                    plannedAction = ClandestineActionId.INCITE_NEUTRAL_INSURRECTIONS;
+                } else {
+                    plannedAction = ClandestineActionId.UNDERMINE_AUTHORITIES;
+                }
+
+                logs.push(`${leader.name}: Relocating to Great Plains for ${plannedAction} (IPG: ${adjustedGpIPG.toFixed(2)} > ${windwardBestIPG.toFixed(2)})`);
+
+                return {
+                    character: {
+                        ...leader,
+                        status: CharacterStatus.MOVING,
+                        undercoverMission: {
+                            destinationId: 'great_plains',
+                            turnsRemaining: travelTurns,
+                            turnStarted: turn
+                        },
+                        activeClandestineActions: [],
+                        plannedMissionAction: plannedAction,
+                        detectionLevel: 0
+                    } as Character,
+                    logs
+                };
+            } else {
+                logs.push(`${leader.name}: Staying at Windward (IPG: ${windwardBestIPG.toFixed(2)} >= ${adjustedGpIPG.toFixed(2)})`);
+            }
+        }
     }
 
     let budget = (leader as any).clandestineBudget ?? (leader as any).budget ?? 0;

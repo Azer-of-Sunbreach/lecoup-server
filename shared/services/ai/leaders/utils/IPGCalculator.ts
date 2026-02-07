@@ -38,6 +38,14 @@ const IPG_FLOOR_REDUCED = 5;
 const GOLD_RICH_THRESHOLD = 1000;
 
 /**
+ * MANAGER ability: generates 20 gold/turn in a city.
+ * 20 gold = 200 soldiers equivalent (10 soldiers per gold).
+ * Used to calculate opportunity cost for clandestine missions.
+ */
+const MANAGER_GOLD_PER_TURN = 20;
+const MANAGER_SOLDIERS_PER_TURN = 200;
+
+/**
  * Get effective IPG floor based on faction wealth.
  * If faction has >1000g, floor is reduced to 5 (need to spend excess gold).
  * Otherwise floor is 10 (equivalent to recruiting: 50g = 500 soldiers).
@@ -68,6 +76,28 @@ export function calculateNeutralMissionBudget(discretion: number): number {
 
 /** Bonus multiplier when target stability <= 60 */
 const LOW_STABILITY_BONUS = 1.2;
+
+// ============================================================================
+// MANAGER OPPORTUNITY COST
+// ============================================================================
+
+/**
+ * Calculate opportunity cost for a MANAGER leader going on a clandestine mission.
+ * 
+ * A MANAGER generates 20 gold/turn when in a friendly city, equivalent to 200 soldiers.
+ * When the leader leaves for a clandestine mission, this production is lost.
+ * 
+ * @param missionDurationTurns - Duration of the clandestine mission (prep + active)
+ * @param travelTurns - Turns needed to reach the target location
+ * @returns Opportunity cost in soldier equivalents
+ */
+export function calculateManagerOpportunityCost(
+    missionDurationTurns: number,
+    travelTurns: number
+): number {
+    const totalTurns = missionDurationTurns + travelTurns;
+    return totalTurns * MANAGER_SOLDIERS_PER_TURN;
+}
 
 // ============================================================================
 // GRAND INSURRECTION FORMULA
@@ -163,6 +193,15 @@ export function calculateNeutralIPG(
 // ============================================================================
 
 /**
+ * Options for MANAGER ability opportunity cost calculation.
+ */
+export interface ManagerOpportunityCostOptions {
+    hasManagerAbility: boolean;
+    isInFriendlyLocation: boolean;  // In a city controlled by their faction
+    travelTurns: number;
+}
+
+/**
  * Calculate IPG for Minor Mission (Undermine).
  * 
  * Calculates delta insurgents from stability reduction for both Grand and Neutral,
@@ -171,14 +210,18 @@ export function calculateNeutralIPG(
  * Stability damage = activeTurns × Ops × 2
  * activeTurns = (threshold/10) + tolerance
  * tolerance: +1 for Nobles/Conspirators, +2 for Republicans
+ * 
+ * MANAGER leaders: If the leader has the MANAGER ability and is currently in a
+ * friendly city, the IPG is reduced by the opportunity cost of lost gold production.
  */
 export function calculateMinorIPG(
     location: Location,
     ops: number,
     actorFaction: FactionId,
     discretion: number = 3,  // Default: Capable
-    faction: FactionId = FactionId.NOBLES  // For tolerance calculation
-): { ipg: number; details: string } {
+    faction: FactionId = FactionId.NOBLES,  // For tolerance calculation
+    managerOptions?: ManagerOpportunityCostOptions
+): { ipg: number; details: string; managerOpportunityCost?: number } {
     const threshold = getDetectionThreshold(discretion);
     const tolerance = (faction === FactionId.REPUBLICANS) ? 2 : 1;
     const activeTurns = (threshold / 10) + tolerance;
@@ -208,8 +251,17 @@ export function calculateMinorIPG(
     const deltaNeutral = neutralAtReduced - neutralAtCurrent;
 
     // Use the better of the two
-    const deltaInsurgents = Math.max(deltaGrand, deltaNeutral);
+    let deltaInsurgents = Math.max(deltaGrand, deltaNeutral);
     const deltaType = deltaGrand >= deltaNeutral ? 'Grand' : 'Neutral';
+
+    // MANAGER opportunity cost: subtract lost production if leader is in friendly city
+    let managerOpportunityCost = 0;
+    let managerDetails = '';
+    if (managerOptions?.hasManagerAbility && managerOptions?.isInFriendlyLocation) {
+        managerOpportunityCost = calculateManagerOpportunityCost(activeTurns, managerOptions.travelTurns);
+        deltaInsurgents = Math.max(0, deltaInsurgents - managerOpportunityCost);
+        managerDetails = ` -MGR:${managerOpportunityCost}`;
+    }
 
     let ipg = deltaInsurgents / MINOR_MISSION_BUDGET;
 
@@ -226,12 +278,13 @@ export function calculateMinorIPG(
 
     return {
         ipg,
-        details: `${activeTurns}t: Stab ${location.stability}->${reducedStability}, Δ${deltaType}=${deltaInsurgents.toFixed(0)}`
+        details: `${activeTurns}t: Stab ${location.stability}->${reducedStability}, Δ${deltaType}=${deltaGrand >= deltaNeutral ? deltaGrand.toFixed(0) : deltaNeutral.toFixed(0)}${managerDetails}`,
+        managerOpportunityCost: managerOpportunityCost > 0 ? managerOpportunityCost : undefined
     };
 }
 
 // ============================================================================
-// GOVERNOR IPG (REVERSE ITG)
+// GOVERNOR IPG (REVERSE IPG)
 // ============================================================================
 
 /**
@@ -246,6 +299,12 @@ export function calculateGovernorIPG(
     actorFaction: FactionId,
     turns: number = DEFAULT_GOVERNANCE_TURNS
 ): { ipg: number; details: string } {
+    // MAN_OF_ACTION: Cannot fully govern, return 0 IPG for recruitment evaluation
+    const hasManOfAction = leader.stats?.traits?.includes('MAN_OF_ACTION') ?? false;
+    if (hasManOfAction) {
+        return { ipg: 0, details: 'MAN_OF_ACTION: Cannot fully govern' };
+    }
+
     const statesmanship = leader.stats?.statesmanship || 3;
     const stabilityPerTurn = leader.stats?.stabilityPerTurn || 0;
     const stabilityGain = (statesmanship + stabilityPerTurn) * turns;
@@ -299,7 +358,7 @@ export function calculateCommanderValue(
     isCampaignActive: boolean
 ): { value: number; details: string } {
     const commandBonus = (leader.stats?.commandBonus || 0) / 100; // 15% -> 0.15
-    const campaignMult = isCampaignActive ? 1.5 : 0.1;
+    const campaignMult = isCampaignActive ? 1 : 0.1;
     const value = (army.strength * commandBonus * campaignMult) / 10;
 
     return {
@@ -315,7 +374,7 @@ export function calculateCommanderValue(
 /**
  * Get resentment level against a faction at a location.
  */
-function getResentmentAgainst(location: Location, faction: FactionId): number {
+export function getResentmentAgainst(location: Location, faction: FactionId): number {
     if (!location.resentment || faction === FactionId.NEUTRAL) return 0;
     const resentmentMap = location.resentment as Record<string, number>;
     return resentmentMap[faction] ?? 0;
@@ -323,6 +382,7 @@ function getResentmentAgainst(location: Location, faction: FactionId): number {
 
 /**
  * Get faction-specific IPG multiplier.
+ 
  * Republicans: 1.0 (aggressive)
  * Nobles: 0.9 (slightly conservative)
  * Conspirators: 0.8 (methodical)

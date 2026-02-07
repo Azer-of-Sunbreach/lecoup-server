@@ -26,6 +26,11 @@ import { GovernorPolicy } from '../../../../types/governorTypes';
 import { ClandestineActionId } from '../../../../types/clandestineTypes';
 import { processUndercoverMissionTravel, calculateLeaderTravelTime } from '../../../domain/leaders/leaderPathfinding';
 import { processClandestineAgent } from './ClandestineAgentProcessor';
+import {
+    processRepublicanInternalFaction,
+    applyInternalFactionResult,
+    INTERNAL_FACTION_MIN_TURN
+} from '../recruitment/AIRepublicansInternalFactions';
 
 // ============================================================================
 // MAIN PROCESSING FUNCTION
@@ -62,6 +67,31 @@ export function processLeaderAI(
     }
     for (const log of travelResult.logs) {
         logger.logEvent('SYSTEM', 'Travel', typeof log === 'string' ? log : log.message);
+    }
+
+    // =========================================================================
+    // PHASE 0.5: REPUBLICANS Internal Faction Decision (Turn 6+)
+    // =========================================================================
+    // Process one-time internal faction choice for AI REPUBLICANS
+    let workingState = state;
+    if (faction === FactionId.REPUBLICANS && turn >= INTERNAL_FACTION_MIN_TURN) {
+        const internalFactionResult = processRepublicanInternalFaction(state, faction, turn);
+
+        if (internalFactionResult.choiceMade) {
+            // Apply the choice and update working state
+            workingState = applyInternalFactionResult(state, internalFactionResult);
+
+            // Sync updated characters back into state manager
+            for (const char of workingState.characters) {
+                stateManager.updateCharacter(char);
+            }
+
+            logger.logEvent('SYSTEM', 'Internal Factions',
+                `Chose ${internalFactionResult.chosenOption} - cost: ${internalFactionResult.goldCost}g`);
+        } else if (internalFactionResult.inSavingsMode) {
+            logger.logEvent('SYSTEM', 'Internal Factions',
+                `Saving for ${internalFactionResult.savingsTarget} (${internalFactionResult.savedGold}/${250}g)`);
+        }
     }
 
     // 1. Normalize budgets for all leaders (fix starting agents)
@@ -484,11 +514,31 @@ function assignRoles(
     const assignedGovernorLocations = new Set<string>();
     const assignedClandestineLocations = new Set<string>();
 
+    // Build set of owned territory IDs for validation
+    const ownedTerritoryIds = new Set(territories.map(t => t.location.id));
+
     // Phase 0: Handle leaders ALREADY in a role (GOVERNING, UNDERCOVER)
     // These should NOT be reassigned - they continue their current mission
+    // FIX: Validate that GOVERNING leaders are still in friendly territory + enforce uniqueness
     for (const leader of leaders) {
         if (leader.status === CharacterStatus.GOVERNING) {
-            // Already governing - mark as assigned and track location
+            const locationId = leader.locationId;
+            
+            // FIX #1: Check if location is still controlled by leader's faction
+            if (!locationId || !ownedTerritoryIds.has(locationId)) {
+                // Territory lost - governor will be handled as stranded (not assigned here)
+                console.log(`[AI GOVERNOR FIX] ${leader.name}: Location ${locationId} no longer friendly - marking for evacuation`);
+                continue; // Skip - will be picked up by stranded leader handler or reassigned
+            }
+            
+            // FIX #2: Check uniqueness - only one governor per location
+            if (assignedGovernorLocations.has(locationId)) {
+                // Duplicate governor - demote to IDLE
+                console.log(`[AI GOVERNOR FIX] ${leader.name}: Duplicate governor at ${locationId} - demoting to IDLE`);
+                continue; // Skip - will be assigned IDLE in Phase 6
+            }
+            
+            // Valid governor - continue assignment
             assignments.push({
                 leaderId: leader.id,
                 assignedRole: AILeaderRole.GOVERNOR,
@@ -497,9 +547,7 @@ function assignRoles(
                 reasoning: 'Continue governing current territory'
             });
             assignedLeaderIds.add(leader.id);
-            if (leader.locationId) {
-                assignedGovernorLocations.add(leader.locationId);
-            }
+            assignedGovernorLocations.add(locationId);
         } else if (leader.status === CharacterStatus.UNDERCOVER) {
             // Already undercover - continue mission
             assignments.push({
@@ -590,6 +638,8 @@ function assignRoles(
         }
     }
 
+
+
     // Phase 5: Assign CLANDESTINE agents to best opportunities
     for (const opportunity of opportunities.slice(0, 3)) { // Top 3 opportunities
         if (assignedClandestineLocations.has(opportunity.locationId)) continue;
@@ -670,7 +720,13 @@ function findBestLeaderForRole(
         }
 
         // Stat bonuses for specific roles
-        if (role === AILeaderRole.GOVERNOR) {
+        if (role === AILeaderRole.GOVERNOR || role === AILeaderRole.STABILIZER) {
+            // MAN_OF_ACTION: Cannot fully govern - heavy penalty
+            const hasManOfAction = leader.stats?.traits?.includes('MAN_OF_ACTION') ?? false;
+            if (hasManOfAction) {
+                score -= 200; // Reject for full governor duties
+            }
+
             // Statesmanship is CRITICAL for governors - weight heavily
             // Inept (1) = -30, Poor (2) = -15, Average (3) = 0, Good (4) = +15, Excellent (5) = +30
             const statesmanship = leader.stats?.statesmanship || 3;
@@ -683,14 +739,17 @@ function findBestLeaderForRole(
 
             if (leader.stats?.ability?.includes('MANAGER')) score += 20;
             if (leader.stats?.ability?.includes('MAN_OF_CHURCH')) score += 10;
+
+            // Stabilizer-specific bonus
+            if (role === AILeaderRole.STABILIZER) {
+                score += (leader.stats?.stabilityPerTurn || 0) * 30;
+            }
         } else if (role === AILeaderRole.CLANDESTINE) {
             score += (leader.stats?.clandestineOps || 3) * 10;
             score += (leader.stats?.discretion || 3) * 5;
             if (leader.stats?.ability?.includes('FIREBRAND')) score += 20;
             if (leader.stats?.ability?.includes('DAREDEVIL')) score += 15;
             if (leader.stats?.ability?.includes('GHOST')) score += 15;
-        } else if (role === AILeaderRole.STABILIZER) {
-            score += (leader.stats?.stabilityPerTurn || 0) * 30;
         } else if (role === AILeaderRole.PROTECTOR) {
             if (leader.stats?.ability?.includes('LEGENDARY')) score += 100;
             else score -= 200; // Must have LEGENDARY
@@ -923,6 +982,62 @@ function executeClandestineRole(
 }
 
 /**
+ * Execute commander role - attach leader to an army.
+ */
+function executeCommanderRole(
+    leader: Character,
+    assignment: RoleAssignment,
+    stateManager: LeaderStateManager,
+    state: GameState,
+    turn: number,
+    logger: AILogger,
+    result: AILeaderProcessingResult
+): void {
+    const targetArmyId = assignment.targetArmyId;
+    const targetLocationId = assignment.targetLocationId;
+    if (!targetArmyId) return;
+
+    const army = state.armies.find(a => a.id === targetArmyId);
+    if (!army) {
+        logger.logEvent(leader.id, leader.name, `COMMANDER: Army ${targetArmyId} not found`);
+        return;
+    }
+
+    // Check if leader needs to move to army location
+    if (targetLocationId && leader.locationId !== targetLocationId) {
+        // Calculate travel time
+        const travelTime = calculateLeaderTravelTime(
+            leader.locationId || '',
+            targetLocationId,
+            state.locations,
+            state.roads
+        );
+
+        if (travelTime > 0) {
+            // Start movement towards army
+            stateManager.startMovement(leader.id, targetLocationId, travelTime, turn);
+            logger.logMovement(leader.id, leader.name, leader.locationId, targetLocationId, 'Moving to command army');
+            return;
+        } else {
+            // Instant movement (same location or adjacent)
+            stateManager.moveToLocation(leader.id, targetLocationId);
+        }
+    }
+
+    // Attach leader to army
+    stateManager.assignAsCommander(leader.id, targetArmyId);
+    logger.logEvent(leader.id, leader.name, `COMMANDER: Attached to army (${army.strength} troops)`);
+
+    // Record commander decision
+    result.decisions.commanderDecisions.push({
+        leaderId: leader.id,
+        targetArmyId: targetArmyId,
+        shouldDetach: false,
+        reasoning: [`Assigned to command army of ${army.strength} troops`]
+    });
+}
+
+/**
  * Execute protector role (LEGENDARY leader blocking insurrections).
  */
 function executeProtectorRole(
@@ -958,6 +1073,19 @@ function handleIdleLeader(
     // If at a friendly location, become a basic governor (IMPROVE_ECONOMY)
     const currentLocation = stateManager.getLocation(leader.locationId);
     if (currentLocation && territories.some(t => t.location.id === currentLocation.id)) {
+        // FIX: Check if location already has a governor
+        const existingGovernor = stateManager.getUpdatedCharacters().find(c => 
+            c.id !== leader.id &&
+            c.locationId === currentLocation.id &&
+            c.status === CharacterStatus.GOVERNING &&
+            c.faction === leader.faction
+        );
+        
+        if (existingGovernor) {
+            logger.logEvent(leader.id, leader.name, `IDLE - ${currentLocation.name} already has governor ${existingGovernor.name}`);
+            return;
+        }
+        
         stateManager.assignAsGovernor(leader.id, currentLocation.id, [GovernorPolicy.IMPROVE_ECONOMY]);
         logger.logGovernorAction(
             leader.id,
