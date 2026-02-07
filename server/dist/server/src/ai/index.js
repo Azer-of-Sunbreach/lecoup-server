@@ -12,6 +12,10 @@ const leaders_1 = require("./leaders");
 const budget_1 = require("./economy/budget");
 const budgetDistributor_1 = require("../../../shared/services/ai/budgetDistributor");
 const leaders_2 = require("../../../shared/services/ai/leaders");
+// AI Leader Recruitment (CONSPIRATORS)
+const recruitment_1 = require("../../../shared/services/ai/leaders/recruitment");
+// AI Leader Recruitment (NOBLES)
+const recruitment_2 = require("../../../shared/services/ai/leaders/recruitment");
 // Flags controlled by feature flags or config
 const USE_NEW_LEADER_AI = true;
 /**
@@ -104,6 +108,23 @@ function processAITurnForFaction(gameState, faction, profile) {
     };
     (0, budget_1.applyBalancedRecruitmentOverride)(faction, state, budget, state.armies);
     (0, budget_1.allocateSiegeBudget)(faction, state, budget);
+    // 2c. LEADER RECRUITMENT BUDGET (CONSPIRATORS only)
+    // Reserve gold for leader recruitment fund BEFORE other allocations
+    let leaderRecruitmentReserve = 0;
+    let leaderRecruitmentSeizeGoldLocation;
+    if (faction === types_1.FactionId.CONSPIRATORS) {
+        const recruitBudget = (0, recruitment_1.calculateRecruitmentBudgetReservation)(state, faction);
+        leaderRecruitmentReserve = recruitBudget.amountToReserve;
+        leaderRecruitmentSeizeGoldLocation = recruitBudget.seizeGoldLocationId;
+        if (leaderRecruitmentReserve > 0) {
+            // Deduct from recruitment budget (military recruitment)
+            const deductFromRecruitment = Math.min(leaderRecruitmentReserve, budget.allocations.recruitment);
+            budget.allocations.recruitment -= deductFromRecruitment;
+            if (recruitment_1.ENABLE_RECRUITMENT_LOGS) {
+                console.log(`[AI LEADER RECRUIT ${faction}] Reserved ${leaderRecruitmentReserve}g for leader fund (${recruitBudget.reasoning})`);
+            }
+        }
+    }
     // REPUBLICAN EARLY GAME SCRIPT (Turns 1-2)
     if (faction === types_1.FactionId.REPUBLICANS && state.turn <= 2) {
         const earlyResult = (0, republicanEarlyGame_1.executeRepublicanEarlyGame)(state, faction, budget);
@@ -180,6 +201,30 @@ function processAITurnForFaction(gameState, faction, profile) {
     else {
         const leaderResult = (0, leaders_1.manageLeaders)(state, faction);
         state = { ...state, ...leaderResult };
+    }
+    // 7. LEADER RECRUITMENT (CONSPIRATORS only)
+    // Process recruitment fund and recruit if ready
+    if (faction === types_1.FactionId.CONSPIRATORS) {
+        const recruitResult = (0, recruitment_1.processAIRecruitment)(state, faction, leaderRecruitmentReserve, leaderRecruitmentSeizeGoldLocation);
+        state = { ...state, ...recruitResult.updatedState };
+        recruitResult.logs.forEach(log => {
+            if (recruitment_1.ENABLE_RECRUITMENT_LOGS || log.includes('SUCCESS')) {
+                console.log(log);
+            }
+        });
+    }
+    // 8. LEADER RECRUITMENT (NOBLES only)
+    // NOBLES grant fiefs instead of paying gold
+    if (faction === types_1.FactionId.NOBLES) {
+        const noblesRecruitResult = (0, recruitment_2.processAINoblesRecruitment)(state);
+        if (noblesRecruitResult.leaderRecruited) {
+            state = (0, recruitment_2.applyNoblesRecruitmentResults)(state, noblesRecruitResult);
+        }
+        noblesRecruitResult.logs.forEach(log => {
+            if (recruitment_1.ENABLE_RECRUITMENT_LOGS || log.includes('SUCCESS')) {
+                console.log(log);
+            }
+        });
     }
     return state;
 }

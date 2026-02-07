@@ -2,7 +2,10 @@ export declare enum FactionId {
     REPUBLICANS = "REPUBLICANS",
     CONSPIRATORS = "CONSPIRATORS",
     NOBLES = "NOBLES",
-    NEUTRAL = "NEUTRAL"
+    NEUTRAL = "NEUTRAL",
+    LOYALISTS = "LOYALISTS",
+    PRINCELY_ARMY = "PRINCELY_ARMY",
+    CONFEDERATE_CITIES = "CONFEDERATE_CITIES"
 }
 export interface PlayerInfo {
     odId: string;

@@ -9,4 +9,8 @@ var FactionId;
     FactionId["CONSPIRATORS"] = "CONSPIRATORS";
     FactionId["NOBLES"] = "NOBLES";
     FactionId["NEUTRAL"] = "NEUTRAL";
+    // Valis Factions (Future support)
+    FactionId["LOYALISTS"] = "LOYALISTS";
+    FactionId["PRINCELY_ARMY"] = "PRINCELY_ARMY";
+    FactionId["CONFEDERATE_CITIES"] = "CONFEDERATE_CITIES";
 })(FactionId || (exports.FactionId = FactionId = {}));

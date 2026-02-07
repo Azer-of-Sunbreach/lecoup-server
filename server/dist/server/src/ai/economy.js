@@ -4,6 +4,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.manageEconomy = void 0;
 const types_1 = require("../../../shared/types");
+const strategy_1 = require("../../../shared/services/ai/strategy");
 // Import from new modular structure
 const index_1 = require("./economy/index");
 /**
@@ -32,6 +33,7 @@ const manageEconomy = (state, faction, profile, budget) => {
         navalConvoys: [...state.navalConvoys],
         armies: [...state.armies],
         roads: [...state.roads],
+        characters: [...state.characters],
         logs: [...state.logs]
     };
     // BUDGET OVERRIDES
@@ -72,9 +74,13 @@ const manageEconomy = (state, faction, profile, budget) => {
     updates.locations = logisticsResult.locations;
     updates.convoys = logisticsResult.convoys;
     updates.navalConvoys = logisticsResult.navalConvoys;
-    // 5. RECRUITMENT - Track amount spent
+    // 5. RECRUITMENT - Track amount spent (now with CONSCRIPTION + insurrection defense)
     const goldBeforeRecruitment = treasuryGold - spentGold;
-    const goldAfterRecruitment = (0, index_1.handleRecruitment)(faction, updates.locations, updates.armies, budget, profile, state.turn, goldBeforeRecruitment);
+    // Detect insurrection threats and convert to alerts for recruitment prioritization
+    const insurrectionAlerts = (0, strategy_1.getInsurrectionAlerts)(state, faction);
+    const recruitmentResult = (0, index_1.handleRecruitment)(faction, updates.locations, updates.armies, updates.roads, budget, profile, state.turn, goldBeforeRecruitment, insurrectionAlerts, updates.characters);
+    const goldAfterRecruitment = recruitmentResult.remainingGold;
+    updates.characters = recruitmentResult.updatedCharacters;
     spentGold += (goldBeforeRecruitment - goldAfterRecruitment);
     // 6. FORTIFICATIONS - Track amount spent
     const goldBeforeFortifications = goldAfterRecruitment;

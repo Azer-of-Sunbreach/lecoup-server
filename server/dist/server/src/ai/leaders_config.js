@@ -1,4 +1,14 @@
 "use strict";
+/**
+ * @deprecated This file is OBSOLETE. Use shared/services/ai/leaders_config.ts instead.
+ * This local copy is missing recent updates including:
+ * - governorQuality property
+ * - AGENT role (renamed from INSURRECTION)
+ * - GOVERNOR role
+ * - New utility functions
+ *
+ * This file is kept for backward compatibility only and will be removed in a future version.
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.hasCommanderRole = exports.isRoleValidForSituation = exports.getLeaderProfile = exports.LEADER_PROFILES = void 0;
 const types_1 = require("../../../shared/types");

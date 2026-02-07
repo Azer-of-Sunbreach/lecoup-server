@@ -75,7 +75,7 @@ function handleConspiratorEmbargo(state, windward, greatPlains, logs, setNotific
             return; // No political cover
         const embargoChance = Math.min(0.1 + (state.turn * 0.1), 0.8);
         if (windward.stability > 60 && Math.random() < embargoChance) {
-            applyEmbargo(windward, greatPlains, types_1.FactionId.CONSPIRATORS, logs, setNotification);
+            applyEmbargo(windward, greatPlains, types_1.FactionId.CONSPIRATORS, state.turn, logs, setNotification);
         }
     }
     else {
@@ -100,7 +100,7 @@ function handleNobleEmbargo(state, faction, locations, windward, greatPlains, lo
             return; // No political cover
         // Check if embargo is economically advantageous
         if (isEmbargoAdvantageousForNobles(faction, locations)) {
-            applyEmbargo(windward, greatPlains, types_1.FactionId.NOBLES, logs, setNotification);
+            applyEmbargo(windward, greatPlains, types_1.FactionId.NOBLES, state.turn, logs, setNotification);
         }
     }
     else {
@@ -139,12 +139,11 @@ function isEmbargoAdvantageousForNobles(faction, locations) {
 /**
  * Apply embargo: deactivate grain trade and reduce stability.
  */
-function applyEmbargo(windward, greatPlains, faction, logs, setNotification) {
+function applyEmbargo(windward, greatPlains, faction, turn, logs, setNotification) {
     windward.isGrainTradeActive = false;
     windward.stability -= 20;
     greatPlains.stability -= 20;
-    const msg = `Embargo applied on Grain Trade by ${types_1.FACTION_NAMES[faction]}!`;
-    logs.push((0, logFactory_1.createEmbargoLog)(msg, 1));
+    logs.push((0, logFactory_1.createEmbargoLog)(faction, turn));
     setNotification({
         type: 'EMBARGO',
         factionName: types_1.FACTION_NAMES[faction]

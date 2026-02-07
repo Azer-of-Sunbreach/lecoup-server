@@ -396,7 +396,8 @@ function executeSiege(mission, faction, armies, assigned, state, targetLoc, armi
     if (isPlayerTarget) {
         state.siegeNotification = {
             targetName: targetLoc.name,
-            attackerName: faction
+            attackerName: faction,
+            targetId: targetId
         };
     }
     // Siege log - visible to all, CRITICAL for territory owner

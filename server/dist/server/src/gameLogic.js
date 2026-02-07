@@ -22,7 +22,7 @@ const stateUtils_1 = require("../../shared/utils/stateUtils");
  * Create initial multiplayer game state
  */
 function createMultiplayerGameState(humanFactions, aiFaction) {
-    const baseState = (0, initialState_1.createInitialState)();
+    const baseState = (0, initialState_1.createInitialState)(types_1.FactionId.NEUTRAL);
     // Set up resources - humans get base, AI gets bonus
     const multiplayerResources = {
         [types_1.FactionId.REPUBLICANS]: {
@@ -35,6 +35,9 @@ function createMultiplayerGameState(humanFactions, aiFaction) {
             gold: aiFaction === types_1.FactionId.NOBLES ? gameConstants_1.INITIAL_AI_RESOURCES.NOBLES : gameConstants_1.INITIAL_PLAYER_RESOURCES.NOBLES
         },
         [types_1.FactionId.NEUTRAL]: { gold: 0 },
+        [types_1.FactionId.LOYALISTS]: { gold: 0 },
+        [types_1.FactionId.PRINCELY_ARMY]: { gold: 0 },
+        [types_1.FactionId.CONFEDERATE_CITIES]: { gold: 0 }
     };
     // Turn order: humans first (in faction order), then AI last
     // This ensures the game starts with a human player's turn
@@ -42,7 +45,7 @@ function createMultiplayerGameState(humanFactions, aiFaction) {
     const humanTurns = standardOrder.filter(f => humanFactions.includes(f));
     const turnOrder = aiFaction ? [...humanTurns, aiFaction] : humanTurns;
     // Calculate initial economy
-    const calculatedLocations = (0, economy_1.calculateEconomyAndFood)(baseState.locations, baseState.armies, baseState.characters, baseState.roads);
+    const calculatedLocations = (0, economy_1.calculateEconomyAndFood)(baseState, baseState.locations, baseState.armies, baseState.characters, baseState.roads);
     return {
         ...baseState,
         locations: calculatedLocations,

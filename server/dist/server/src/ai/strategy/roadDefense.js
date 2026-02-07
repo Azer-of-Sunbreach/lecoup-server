@@ -29,7 +29,10 @@ exports.ROAD_DEFENSE_TARGETS = {
         // Lys Castelleny - fallback if Northern Forests impossible
         { stageId: 'lys_castelleny', roadId: 'road_great_plains_northern_barony', priority: 40, hasNaturalDefense: false }
     ],
-    [types_1.FactionId.NEUTRAL]: []
+    [types_1.FactionId.NEUTRAL]: [],
+    [types_1.FactionId.LOYALISTS]: [],
+    [types_1.FactionId.PRINCELY_ARMY]: [],
+    [types_1.FactionId.CONFEDERATE_CITIES]: []
 };
 /**
  * Generate ROAD_DEFENSE missions for strategic road stage control.

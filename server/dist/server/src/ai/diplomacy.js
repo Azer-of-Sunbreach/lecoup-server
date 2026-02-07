@@ -4,7 +4,7 @@ exports.manageDiplomacy = void 0;
 const types_1 = require("../../../shared/types");
 const constants_1 = require("../../../shared/constants");
 const utils_1 = require("./utils");
-const leaders_config_1 = require("./leaders_config");
+const leaders_config_1 = require("../../../shared/services/ai/leaders_config");
 const logFactory_1 = require("../../../shared/services/logs/logFactory");
 // Helper to determine how valuable a leader is to keep on the field
 const getLeaderValue = (char) => {
@@ -224,7 +224,8 @@ function handleInsurrection(mission, state, faction, updates, currentGold) {
         };
     }
     // Use specialized log with faction-aware visibility and highlight
-    updates.logs.push((0, logFactory_1.createInsurrectionPreparationLog)(spy.name, targetLoc.name, mission.targetId, targetLoc.faction, state.turn));
+    updates.logs.push((0, logFactory_1.createInsurrectionPreparationLog)(spy.id, mission.targetId, targetLoc.faction, 0, // estimatedCount
+    state.turn));
     mission.status = 'ACTIVE';
     return currentGold;
 }
