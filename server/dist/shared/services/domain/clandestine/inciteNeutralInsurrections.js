@@ -13,6 +13,7 @@ exports.calculateInsurgentStrength = calculateInsurgentStrength;
 exports.processInciteNeutralInsurrections = processInciteNeutralInsurrections;
 const types_1 = require("../../../types");
 const makeExamples_1 = require("../governor/makeExamples");
+const logFactory_1 = require("../../logs/logFactory");
 /**
  * Check if the action should be disabled (e.g. not enough budget)
  */
@@ -60,16 +61,9 @@ function processInciteNeutralInsurrections(leader, location, activeAction, turn)
     const uniqueId = Math.random().toString(36).substring(2, 9);
     // T1 (duration 1): Send Warning Log
     if (duration === 1) {
-        const warningLog = {
-            id: `incite-insurrection-warn-${turn}-${location.id}-${uniqueId}`,
-            type: types_1.LogType.INSURRECTION,
-            message: `Enemy agents have been reported stirring imminent neutral insurrections against us in ${location.name}!`,
-            turn,
-            visibleToFactions: [location.faction],
-            baseSeverity: types_1.LogSeverity.CRITICAL,
-            criticalForFactions: [location.faction],
-            highlightTarget: { type: 'LOCATION', id: location.id }
-        };
+        // Estimate strength for the warning
+        const strength = calculateInsurgentStrength(leader, location);
+        const warningLog = (0, logFactory_1.createNeutralInsurrectionWarningLog)(location.id, location.faction, strength, turn);
         return { log: warningLog };
     }
     // T2+ (duration >= 2): Generate Insurgents
@@ -87,7 +81,9 @@ function processInciteNeutralInsurrections(leader, location, activeAction, turn)
                 turn,
                 visibleToFactions: [leader.faction],
                 baseSeverity: types_1.LogSeverity.WARNING,
-                highlightTarget: { type: 'LOCATION', id: location.id }
+                highlightTarget: { type: 'LOCATION', id: location.id },
+                i18nKey: 'neutralInsurrectionBlocked',
+                i18nParams: { leader: leader.id, location: location.id, governor: governorName }
             };
             // Refund the cost (50 gold)
             return { feedbackLog, refund: 50 };
@@ -122,7 +118,9 @@ function processInciteNeutralInsurrections(leader, location, activeAction, turn)
             message: `Our agents in ${location.name} have successfully incited ${strength} commoners to take up arms against the ${location.faction}!`,
             turn,
             visibleToFactions: [leader.faction],
-            baseSeverity: types_1.LogSeverity.GOOD
+            baseSeverity: types_1.LogSeverity.GOOD,
+            i18nKey: 'neutralInsurrectionSpawn',
+            i18nParams: { location: location.id, strength, faction: location.faction }
         };
         return {
             newArmy,

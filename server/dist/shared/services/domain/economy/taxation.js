@@ -43,7 +43,7 @@ const executeUpdateCityManagement = (state, locId, updates) => {
         });
     }
     // IMMEDIATE REACTIVITY: Recalculate economy/food for ALL locations
-    tempLocs = (0, economy_1.calculateEconomyAndFood)(tempLocs, state.armies, state.characters, state.roads);
+    tempLocs = (0, economy_1.calculateEconomyAndFood)(state, tempLocs, state.armies, state.characters, state.roads);
     return {
         success: true,
         newState: { locations: tempLocs },

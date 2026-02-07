@@ -54,7 +54,9 @@ function processAttackTaxConvoys(leader, location, locations, turn) {
         message: `${stolenAmount} gold stolen from the enemy in ${location.name} and added to ${leader.name}'s cell treasury.`,
         turn,
         visibleToFactions: [leader.faction],
-        baseSeverity: types_1.LogSeverity.GOOD
+        baseSeverity: types_1.LogSeverity.GOOD,
+        i18nKey: 'attackTaxSuccess',
+        i18nParams: { amount: stolenAmount, location: location.id, leader: leader.id }
     };
     // Warning Log for Victim (50% Chance)
     let warningLog;
@@ -70,7 +72,9 @@ function processAttackTaxConvoys(leader, location, locations, turn) {
             highlightTarget: {
                 type: 'LOCATION',
                 id: location.id
-            }
+            },
+            i18nKey: 'attackTaxWarning',
+            i18nParams: { location: location.id }
         };
     }
     return {

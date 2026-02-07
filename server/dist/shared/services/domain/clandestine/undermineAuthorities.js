@@ -34,7 +34,7 @@ function processUndermineAuthorities(leader, location, turn) {
     // 25% chance to generate warning log for defender
     let warningLog;
     if (Math.random() < 0.25) {
-        warningLog = (0, logFactory_1.createClandestineSabotageWarningLog)(location.name, location.id, location.faction, turn);
+        warningLog = (0, logFactory_1.createClandestineSabotageWarningLog)(location.id, location.faction, turn);
     }
     return {
         location: updatedLocation,

@@ -19,6 +19,8 @@ import { Character, Location } from '../../../types';
 export declare function isAssassinationAvailable(location: Location, leader: Character): {
     available: boolean;
     reason?: string;
+    reasonKey?: string;
+    reasonParams?: any;
 };
 /**
  * Calculate the success chance (0-100) for the assassination.

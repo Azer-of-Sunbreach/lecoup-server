@@ -27,7 +27,9 @@ function isAssassinationAvailable(location, leader) {
     if (leader.stats.traits && leader.stats.traits.includes(leaderTypes_1.CharacterTrait.FAINT_HEARTED)) {
         return {
             available: false,
-            reason: `${leader.name} would refuse to obey such an order.`
+            reason: `${leader.name} would refuse to obey such an order.`,
+            reasonKey: 'clandestineMenu.validation.faintHeartedRefusal',
+            reasonParams: { leader: leader.name }
         };
     }
     // 2. Check Trust
@@ -48,7 +50,8 @@ function isAssassinationAvailable(location, leader) {
     if (trust > 24) {
         return {
             available: false,
-            reason: 'Trust towards the enemy is too high here.'
+            reason: 'Trust towards the enemy is too high here.',
+            reasonKey: 'clandestineMenu.validation.trustTooHigh'
         };
     }
     return { available: true };

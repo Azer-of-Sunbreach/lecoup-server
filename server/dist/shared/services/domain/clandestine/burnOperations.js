@@ -57,7 +57,9 @@ function processBurnOperation(actionId, leader, location, characters, turn) {
                     message: `Sabotage failed! Our agents were identified attempting to start fires in ${location.name}. Resentment has increased.`,
                     turn,
                     visibleToFactions: [leader.faction],
-                    baseSeverity: types_1.LogSeverity.WARNING
+                    baseSeverity: types_1.LogSeverity.WARNING,
+                    i18nKey: 'burnFailIdentified',
+                    i18nParams: { location: location.id }
                 }
             };
         }
@@ -71,7 +73,9 @@ function processBurnOperation(actionId, leader, location, characters, turn) {
                     message: `Sabotage failed! Our agents failed to start the fires in ${location.name} but remained undetected.`,
                     turn,
                     visibleToFactions: [leader.faction],
-                    baseSeverity: types_1.LogSeverity.INFO
+                    baseSeverity: types_1.LogSeverity.INFO,
+                    i18nKey: 'burnFailUnidentified',
+                    i18nParams: { location: location.id }
                 }
             };
         }
@@ -106,7 +110,9 @@ function processBurnOperation(actionId, leader, location, characters, turn) {
         highlightTarget: {
             type: 'LOCATION',
             id: location.id
-        }
+        },
+        i18nKey: isUrban ? 'burnUrbanWarning' : 'burnRuralWarning',
+        i18nParams: { location: location.id }
     };
     const feedbackLog = {
         id: `burn-success-${turn}-${leader.id}`,
@@ -114,7 +120,9 @@ function processBurnOperation(actionId, leader, location, characters, turn) {
         message: `Sabotage successful! We burned ${targetName} in ${location.name}, destroying ${amount} worth of resources.`,
         turn,
         visibleToFactions: [leader.faction],
-        baseSeverity: types_1.LogSeverity.GOOD
+        baseSeverity: types_1.LogSeverity.GOOD,
+        i18nKey: isUrban ? 'burnUrbanSuccess' : 'burnRuralSuccess',
+        i18nParams: { location: location.id, amount }
     };
     return {
         burnedAmount: amount,

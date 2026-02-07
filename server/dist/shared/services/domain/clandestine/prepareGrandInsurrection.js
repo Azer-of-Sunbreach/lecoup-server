@@ -52,7 +52,9 @@ turn) {
             visibleToFactions: allFactions,
             baseSeverity: types_1.LogSeverity.WARNING,
             criticalForFactions: location.faction !== types_1.FactionId.NEUTRAL ? [location.faction] : undefined,
-            highlightTarget: { type: 'LOCATION', id: location.id }
+            highlightTarget: { type: 'LOCATION', id: location.id },
+            i18nKey: 'insurrectionPreparing',
+            i18nParams: { leader: leader.id, location: location.id }
         };
         return {
             updatedLeader: finalLeader,
@@ -152,7 +154,9 @@ turn) {
         turn,
         visibleToFactions: [], // All
         baseSeverity: types_1.LogSeverity.WARNING,
-        highlightTarget: { type: 'LOCATION', id: location.id }
+        highlightTarget: { type: 'LOCATION', id: location.id },
+        i18nKey: 'grandInsurrectionStart',
+        i18nParams: { faction: leader.faction, location: location.id, leader: leader.id }
     };
     return {
         updatedLeader: finalLeader,

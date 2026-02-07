@@ -120,13 +120,16 @@ function buildClandestineAlerts(characters, locations, armies, playerFaction) {
                     : 'clandestineAlerts.infiltrationSuccess',
                 messageParams: {
                     leader: leader.name,
-                    location: location.name
+                    leaderId: leader.id,
+                    location: location.name,
+                    locationId: location.id
                 },
                 subMessageKey: isDetected
                     ? 'clandestineAlerts.infiltrationDetectedSub'
                     : 'clandestineAlerts.infiltrationSuccessSub',
                 subMessageParams: {
-                    leader: leader.name
+                    leader: leader.name,
+                    leaderId: leader.id
                 },
                 targetFaction: playerFaction,
                 timestamp: Date.now()
@@ -185,13 +188,16 @@ function createInfiltrationEvent(leader, location, wasDetected, turn) {
             : 'clandestineAlerts.infiltrationSuccess',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         subMessageKey: wasDetected
             ? 'clandestineAlerts.infiltrationDetectedSub'
             : 'clandestineAlerts.infiltrationSuccessSub',
         subMessageParams: {
-            leader: leader.name
+            leader: leader.name,
+            leaderId: leader.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -208,7 +214,9 @@ function createHuntNetworksEvent(leader, location, turn) {
         messageKey: 'clandestineAlerts.huntNetworksActivated',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -229,13 +237,16 @@ function createThresholdExceededEvent(leader, location, turn) {
         messageKey: 'clandestineAlerts.thresholdExceeded',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         subMessageKey: isFemale
             ? 'clandestineAlerts.thresholdExceededSubFemale'
             : 'clandestineAlerts.thresholdExceededSub',
         subMessageParams: {
-            leader: leader.name
+            leader: leader.name,
+            leaderId: leader.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -244,7 +255,7 @@ function createThresholdExceededEvent(leader, location, turn) {
 /**
  * Create an event when a PARANOID governor is appointed in the agent's location.
  */
-function createParanoidGovernorEvent(leader, location, governorName, turn) {
+function createParanoidGovernorEvent(leader, location, governorName, governorId, turn) {
     return {
         leaderId: leader.id,
         turn,
@@ -252,8 +263,11 @@ function createParanoidGovernorEvent(leader, location, governorName, turn) {
         messageKey: 'clandestineAlerts.paranoidGovernor',
         messageParams: {
             leader: leader.name,
+            leaderId: leader.id,
             location: location.name,
-            governor: governorName
+            locationId: location.id,
+            governor: governorName,
+            governorId: governorId
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -262,7 +276,7 @@ function createParanoidGovernorEvent(leader, location, governorName, turn) {
 /**
  * Create an event when both PARANOID governor and HUNT_NETWORKS are active same turn.
  */
-function createCombinedParanoidHuntEvent(leader, location, governorName, turn) {
+function createCombinedParanoidHuntEvent(leader, location, governorName, governorId, turn) {
     return {
         leaderId: leader.id,
         turn,
@@ -270,8 +284,11 @@ function createCombinedParanoidHuntEvent(leader, location, governorName, turn) {
         messageKey: 'clandestineAlerts.combinedParanoidHunt',
         messageParams: {
             leader: leader.name,
+            leaderId: leader.id,
             location: location.name,
-            governor: governorName
+            locationId: location.id,
+            governor: governorName,
+            governorId: governorId
         },
         targetFaction: leader.faction,
         timestamp: Date.now()
@@ -288,12 +305,16 @@ function createExecutionEvent(leader, location, turn) {
         messageKey: 'clandestineAlerts.execution',
         messageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         subMessageKey: 'clandestineAlerts.executionSub',
         subMessageParams: {
             leader: leader.name,
-            location: location.name
+            leaderId: leader.id,
+            location: location.name,
+            locationId: location.id
         },
         targetFaction: leader.faction,
         timestamp: Date.now(),
@@ -311,8 +332,11 @@ function createEscapeEvent(leader, oldLocation, newLocation, turn) {
         messageKey: 'clandestineAlerts.escape',
         messageParams: {
             leader: leader.name,
+            leaderId: leader.id,
             location: oldLocation.name,
-            destination: newLocation.name
+            locationId: oldLocation.id,
+            destination: newLocation.name,
+            destinationId: newLocation.id
         },
         subMessageKey: 'clandestineAlerts.escapeSub',
         subMessageParams: {},

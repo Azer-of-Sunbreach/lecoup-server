@@ -65,7 +65,9 @@ function validateAndCleanupClandestineStates(characters, locations, resourceUpda
                     message: `With ${location.name} now under our control, ${leader.name} ceases clandestine operations and returns the remaining budget to the treasury.`,
                     turn,
                     visibleToFactions: [leader.faction],
-                    baseSeverity: types_1.LogSeverity.INFO
+                    baseSeverity: types_1.LogSeverity.INFO,
+                    i18nKey: 'clandestineFlipFriendly',
+                    i18nParams: { location: location.id, leader: leader.id }
                 });
             }
             // If territory is Neutral
@@ -78,7 +80,9 @@ function validateAndCleanupClandestineStates(characters, locations, resourceUpda
                     message: `${location.name} is now Neutral. ${leader.name} ceases clandestine operations but remains in the area.`,
                     turn,
                     visibleToFactions: [leader.faction],
-                    baseSeverity: types_1.LogSeverity.INFO
+                    baseSeverity: types_1.LogSeverity.INFO,
+                    i18nKey: 'clandestineFlipNeutral',
+                    i18nParams: { location: location.id, leader: leader.id }
                 });
             }
         }
@@ -142,7 +146,10 @@ function processClandestineActions(characters, locations, armies, turn) {
         [types_1.FactionId.NOBLES]: 0,
         [types_1.FactionId.CONSPIRATORS]: 0,
         [types_1.FactionId.REPUBLICANS]: 0,
-        [types_1.FactionId.NEUTRAL]: 0
+        [types_1.FactionId.NEUTRAL]: 0,
+        [types_1.FactionId.LOYALISTS]: 0,
+        [types_1.FactionId.PRINCELY_ARMY]: 0,
+        [types_1.FactionId.CONFEDERATE_CITIES]: 0
     };
     const newArmies = [];
     // Log Buffer for consolidation
@@ -239,6 +246,7 @@ function processClandestineActions(characters, locations, armies, turn) {
         const isHuntActiveEarly = location.governorPolicies?.HUNT_NETWORKS === true;
         const hasParanoidGovernorEarly = governorForAlerts?.stats.ability.includes('PARANOID') ?? false;
         const governorNameEarly = governorForAlerts?.name || 'Unknown Governor';
+        const governorIdEarly = governorForAlerts?.id || '';
         const huntNotifiedEarly = leader.pendingDetectionEffects?.huntNetworksNotified ?? false;
         const paranoidNotifiedEarly = leader.pendingDetectionEffects?.paranoidGovernorNotified ?? false;
         let newHuntNotifiedEarly = huntNotifiedEarly;
@@ -248,7 +256,7 @@ function processClandestineActions(characters, locations, armies, turn) {
         // Case 1: Both New (Combined Alert)
         if (isHuntActiveEarly && !huntNotifiedEarly && hasParanoidGovernorEarly && !paranoidNotifiedEarly) {
             console.log(`[CLANDESTINE] Creating COMBINED alert for ${leader.name}`);
-            const alertEvent = (0, clandestineAlertService_1.createCombinedParanoidHuntEvent)(leader, location, governorNameEarly, turn);
+            const alertEvent = (0, clandestineAlertService_1.createCombinedParanoidHuntEvent)(leader, location, governorNameEarly, governorIdEarly, turn);
             leader = (0, clandestineAlertService_1.addLeaderAlertEvent)(leader, alertEvent);
             newHuntNotifiedEarly = true;
             newParanoidNotifiedEarly = true;
@@ -263,7 +271,7 @@ function processClandestineActions(characters, locations, armies, turn) {
         // Case 3: Paranoid New
         else if (hasParanoidGovernorEarly && !paranoidNotifiedEarly) {
             console.log(`[CLANDESTINE] Creating PARANOID alert for ${leader.name}`);
-            const alertEvent = (0, clandestineAlertService_1.createParanoidGovernorEvent)(leader, location, governorNameEarly, turn);
+            const alertEvent = (0, clandestineAlertService_1.createParanoidGovernorEvent)(leader, location, governorNameEarly, governorIdEarly, turn);
             leader = (0, clandestineAlertService_1.addLeaderAlertEvent)(leader, alertEvent);
             newParanoidNotifiedEarly = true;
         }
@@ -287,12 +295,6 @@ function processClandestineActions(characters, locations, armies, turn) {
         }
         // Update character in array after alert processing
         updatedCharacters[charIndex] = leader;
-        // Skip remaining processing if no active actions
-        if (activeActions.length === 0)
-            continue;
-        // --------------------------------------------------------------------
-        // 1. CAPTURE ROLL (Detection Level System - 2026-01-10)
-        // --------------------------------------------------------------------
         // Identify governor (must be GOVERNING status)
         const governor = updatedCharacters.find(c => c.locationId === location.id &&
             c.faction === location.faction &&
@@ -303,7 +305,19 @@ function processClandestineActions(characters, locations, armies, turn) {
         // We'll assume human control for now and let the timing flags handle it
         const isAIControlled = false; // TODO: Pass from turn processor context
         // Check which effects should apply based on notification timing
-        const effectsApply = (0, detectionLevelService_1.shouldEffectsApply)(leader, isAIControlled);
+        // FIX (2026-01-24): Use INITIAL notification state (captured at start of loop) for risk calculation.
+        // This ensures that if a Paranoid/Hunt alert is generated THIS turn, the penalty 
+        // does NOT apply until next turn (1-turn grace period).
+        // The 'leader' object itself HAS been updated with new alerts, so we construct a temporary context.
+        const leaderForRiskCalc = {
+            ...leader,
+            pendingDetectionEffects: {
+                ...leader.pendingDetectionEffects,
+                huntNetworksNotified: huntNotifiedEarly,
+                paranoidGovernorNotified: paranoidNotifiedEarly
+            }
+        };
+        const effectsApply = (0, detectionLevelService_1.shouldEffectsApply)(leaderForRiskCalc, isAIControlled);
         // Calculate capture risk using new detection level system
         // Only include PARANOID/HUNT_NETWORKS if effects have been acknowledged
         const captureRisk = (0, detectionLevelService_1.calculateCaptureRisk)(leader, effectsApply.huntNetworksApplies ? location : { ...location, governorPolicies: { ...location.governorPolicies, HUNT_NETWORKS: false } }, effectsApply.paranoidApplies ? governor : undefined);
@@ -346,7 +360,14 @@ function processClandestineActions(characters, locations, armies, turn) {
                         message: `We caught the enemy leader ${leader.name} in ${location.name}. ${leader.name === 'Alia' || leader.name === 'Lady Ethell' ? 'She' : 'He'} escaped, but ${leaderBudget}g was seized!`,
                         turn,
                         visibleToFactions: [controllerFaction],
-                        baseSeverity: types_1.LogSeverity.GOOD
+                        baseSeverity: types_1.LogSeverity.GOOD,
+                        i18nKey: 'clandestineEscapeController',
+                        i18nParams: {
+                            leader: leader.id,
+                            location: location.id,
+                            pronoun: leader.name === 'Alia' || leader.name === 'Lady Ethell' ? 'she' : 'he',
+                            gold: leaderBudget
+                        }
                     });
                     updatedCharacters[charIndex] = leader;
                     continue;
@@ -372,7 +393,9 @@ function processClandestineActions(characters, locations, armies, turn) {
                 message: `We arrested and executed the enemy leader ${leader.name} in ${location.name}. ${leaderBudget}g was seized!`,
                 turn,
                 visibleToFactions: [controllerFaction],
-                baseSeverity: types_1.LogSeverity.GOOD
+                baseSeverity: types_1.LogSeverity.GOOD,
+                i18nKey: 'clandestineExecutionController',
+                i18nParams: { leader: leader.id, location: location.id, gold: leaderBudget }
             });
             const otherFactions = [types_1.FactionId.NOBLES, types_1.FactionId.REPUBLICANS, types_1.FactionId.CONSPIRATORS]
                 .filter(f => f !== leader.faction && f !== controllerFaction);
@@ -382,7 +405,9 @@ function processClandestineActions(characters, locations, armies, turn) {
                 message: `${leader.name} of the ${leader.faction} was arrested and executed in ${location.name}.`,
                 turn,
                 visibleToFactions: otherFactions,
-                baseSeverity: types_1.LogSeverity.INFO
+                baseSeverity: types_1.LogSeverity.INFO,
+                i18nKey: 'clandestineExecutionInfo',
+                i18nParams: { leader: leader.id, faction: leader.faction, location: location.id }
             });
             updatedCharacters[charIndex] = leader;
             continue;
@@ -390,13 +415,25 @@ function processClandestineActions(characters, locations, armies, turn) {
         // --------------------------------------------------------------------
         // 2. ACTION PROCESSING (If not caught)
         // --------------------------------------------------------------------
+        // Skip action processing if no active actions (but Risk Calculation above ran!)
+        if (activeActions.length === 0)
+            continue;
         let leaderBudget = leader.clandestineBudget ?? leader.budget ?? 0;
         const actionsToRemove = [];
         // Process each active action
         for (const action of activeActions) {
             const cost = clandestineTypes_1.CLANDESTINE_ACTION_COSTS[action.actionId] ?? 0;
             // Deduct cost (unless one-time prepaid or 0)
-            if (cost > 0) {
+            // ELITE_NETWORKS: Free actions if resentment < 50%
+            const hasEliteNetworks = leader.stats.ability.includes('ELITE_NETWORKS');
+            const eliteNetworksApplies = hasEliteNetworks &&
+                (location.resentment?.[leader.faction] ?? 0) < 50 &&
+                [
+                    clandestineTypes_1.ClandestineActionId.UNDERMINE_AUTHORITIES,
+                    clandestineTypes_1.ClandestineActionId.DISTRIBUTE_PAMPHLETS,
+                    clandestineTypes_1.ClandestineActionId.SPREAD_PROPAGANDA
+                ].includes(action.actionId);
+            if (cost > 0 && !eliteNetworksApplies) {
                 leaderBudget = Math.max(0, leaderBudget - cost);
             }
             // Process specific action effects
@@ -489,7 +526,9 @@ function processClandestineActions(characters, locations, armies, turn) {
                                 message: `Reports say enemy agents in ${location.name} are planning to assassinate ${targetName}!`,
                                 turn,
                                 visibleToFactions: [targetFaction],
-                                baseSeverity: types_1.LogSeverity.CRITICAL // Defined as Critical Category in Spec
+                                baseSeverity: types_1.LogSeverity.CRITICAL, // Defined as Critical Category in Spec
+                                i18nKey: 'assassinateWarning',
+                                i18nParams: { location: location.id, target: targetId }
                             };
                             // Add to buffer using Target Faction as key?
                             // Standard buffer key is Location/SourceFaction.
@@ -516,7 +555,9 @@ function processClandestineActions(characters, locations, armies, turn) {
                             message: `Assassination aborted! Target out of reach. ${gold}g returned.`,
                             turn,
                             visibleToFactions: [leader.faction],
-                            baseSeverity: types_1.LogSeverity.INFO
+                            baseSeverity: types_1.LogSeverity.INFO,
+                            i18nKey: 'assassinateAborted',
+                            i18nParams: { gold }
                         });
                         break;
                     }
@@ -545,7 +586,9 @@ function processClandestineActions(characters, locations, armies, turn) {
                             message: `Success! ${target.name} was assassinated in ${location.name}!`,
                             turn,
                             visibleToFactions: [leader.faction],
-                            baseSeverity: types_1.LogSeverity.GOOD
+                            baseSeverity: types_1.LogSeverity.GOOD,
+                            i18nKey: 'assassinateSuccess',
+                            i18nParams: { target: target.id, location: location.id }
                         });
                         // Victim Log - Critical
                         const victimLog = {
@@ -555,7 +598,9 @@ function processClandestineActions(characters, locations, armies, turn) {
                             turn,
                             visibleToFactions: [target.faction],
                             baseSeverity: types_1.LogSeverity.CRITICAL,
-                            criticalForFactions: [target.faction]
+                            criticalForFactions: [target.faction],
+                            i18nKey: 'assassinateVictim',
+                            i18nParams: { target: target.id, location: location.id }
                         };
                         // Buffer it? It's critical, so yes.
                         // Wait, Assassination SUCCESS is likely an Event that shouldn't be suppressed?
@@ -570,7 +615,9 @@ function processClandestineActions(characters, locations, armies, turn) {
                             message: `Assassination attempt on ${target.name} failed.`,
                             turn,
                             visibleToFactions: [leader.faction],
-                            baseSeverity: types_1.LogSeverity.WARNING
+                            baseSeverity: types_1.LogSeverity.WARNING,
+                            i18nKey: 'assassinateFail',
+                            i18nParams: { target: target.id }
                         });
                     }
                     break;

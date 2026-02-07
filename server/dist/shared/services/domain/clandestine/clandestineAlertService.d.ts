@@ -73,11 +73,11 @@ export declare function createThresholdExceededEvent(leader: Character, location
 /**
  * Create an event when a PARANOID governor is appointed in the agent's location.
  */
-export declare function createParanoidGovernorEvent(leader: Character, location: Location, governorName: string, turn: number): LeaderAlertEvent;
+export declare function createParanoidGovernorEvent(leader: Character, location: Location, governorName: string, governorId: string, turn: number): LeaderAlertEvent;
 /**
  * Create an event when both PARANOID governor and HUNT_NETWORKS are active same turn.
  */
-export declare function createCombinedParanoidHuntEvent(leader: Character, location: Location, governorName: string, turn: number): LeaderAlertEvent;
+export declare function createCombinedParanoidHuntEvent(leader: Character, location: Location, governorName: string, governorId: string, turn: number): LeaderAlertEvent;
 /**
  * Create an event when a leader is executed.
  */

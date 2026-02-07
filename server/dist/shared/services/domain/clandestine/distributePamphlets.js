@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.processDistributePamphlets = processDistributePamphlets;
 exports.shouldDisableDistributePamphlets = shouldDisableDistributePamphlets;
 const types_1 = require("../../../types");
+const logFactory_1 = require("../../logs/logFactory");
 const leaderTypes_1 = require("../../../types/leaderTypes");
 /**
  * Process the effects of distributing pamphlets.
@@ -44,19 +45,7 @@ function processDistributePamphlets(leader, location, turn) {
     // 2. Check for Warning Log (25% chance)
     let log = null;
     if (Math.random() < 0.25) {
-        log = {
-            id: `pamphlets-warn-${turn}-${location.id}`,
-            // Using LEADER type as it relates to clandestine actions (closest fit)
-            type: types_1.LogType.LEADER,
-            message: `Something is steering the people’s mind against us in ${location.name}…`,
-            turn,
-            visibleToFactions: [controllerFaction],
-            baseSeverity: types_1.LogSeverity.WARNING,
-            highlightTarget: {
-                type: 'LOCATION',
-                id: location.id
-            }
-        };
+        log = (0, logFactory_1.createClandestineSabotageWarningLog)(location.id, controllerFaction, turn);
     }
     return {
         location: updatedLocation,
