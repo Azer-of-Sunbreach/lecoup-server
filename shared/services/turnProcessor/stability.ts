@@ -4,6 +4,15 @@ import { Location, Character, CharacterStatus, LocationType, LogEntry, LogSeveri
 import { StabilityProcessingResult } from './types';
 
 /**
+ * Get the effective stability modifier for a character.
+ * Uses stabilityModifierOverride if set (from Internal Factions effects),
+ * otherwise falls back to stats.stabilityPerTurn.
+ */
+function getEffectiveStabilityModifier(character: Character): number {
+    return character.stabilityModifierOverride ?? character.stats.stabilityPerTurn;
+}
+
+/**
  * Apply leader stability modifiers to locations.
  * Leaders with AVAILABLE status apply their stabilityPerTurn bonus to their current location,
  * BUT ONLY if the location is controlled by the leader's faction.
@@ -19,7 +28,8 @@ export function applyLeaderStabilityModifiers(
     let updatedLocations = locations.map(l => ({ ...l }));
 
     characters.forEach(char => {
-        if ((char.status === CharacterStatus.AVAILABLE || char.status === CharacterStatus.GOVERNING) && char.stats.stabilityPerTurn !== 0) {
+        const effectiveStability = getEffectiveStabilityModifier(char);
+        if ((char.status === CharacterStatus.AVAILABLE || char.status === CharacterStatus.GOVERNING) && effectiveStability !== 0) {
             const targetLocId = char.locationId;
             const loc = updatedLocations.find(l => l.id === targetLocId);
 
@@ -27,7 +37,7 @@ export function applyLeaderStabilityModifiers(
             if (loc && loc.faction === char.faction) {
                 updatedLocations = updatedLocations.map(l => {
                     if (l.id === targetLocId) {
-                        const newStab = Math.min(100, Math.max(0, l.stability + char.stats.stabilityPerTurn));
+                        const newStab = Math.min(100, Math.max(0, l.stability + effectiveStability));
                         return { ...l, stability: newStab };
                     }
                     return l;

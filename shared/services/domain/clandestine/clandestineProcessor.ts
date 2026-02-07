@@ -88,7 +88,9 @@ function validateAndCleanupClandestineStates(
         let newStatus: CharacterStatus | undefined = undefined;
 
         // 1. Check Territory Status (Flip)
-        // Applies to UNDERCOVER and ON_MISSION (Grand Insurrection uses ON_MISSION)
+        // UNDERCOVER agents cease operations when territory flips (friendly or neutral)
+        // ON_MISSION agents (e.g., preparing Grand Insurrection) CONTINUE when territory becomes NEUTRAL
+        // but stop if territory becomes friendly
         if (leader.status === CharacterStatus.UNDERCOVER || leader.status === CharacterStatus.ON_MISSION) {
             // If territory is Friendly (Player Controlled)
             if (location.faction === leader.faction) {
@@ -109,19 +111,24 @@ function validateAndCleanupClandestineStates(
             }
             // If territory is Neutral
             else if (location.faction === FactionId.NEUTRAL) {
-                shouldClearActions = true;
-                newStatus = CharacterStatus.AVAILABLE;
+                // ON_MISSION leaders (e.g., Grand Insurrection) continue their mission against neutrals
+                // Only UNDERCOVER agents cease operations
+                if (leader.status === CharacterStatus.UNDERCOVER) {
+                    shouldClearActions = true;
+                    newStatus = CharacterStatus.AVAILABLE;
 
-                logs.push({
-                    id: `clandestine-flip-neutral-${turn}-${leader.id}`,
-                    type: LogType.LEADER,
-                    message: `${location.name} is now Neutral. ${leader.name} ceases clandestine operations but remains in the area.`,
-                    turn,
-                    visibleToFactions: [leader.faction],
-                    baseSeverity: LogSeverity.INFO,
-                    i18nKey: 'clandestineFlipNeutral',
-                    i18nParams: { location: location.id, leader: leader.id }
-                });
+                    logs.push({
+                        id: `clandestine-flip-neutral-${turn}-${leader.id}`,
+                        type: LogType.LEADER,
+                        message: `${location.name} is now Neutral. ${leader.name} ceases clandestine operations but remains in the area.`,
+                        turn,
+                        visibleToFactions: [leader.faction],
+                        baseSeverity: LogSeverity.INFO,
+                        i18nKey: 'clandestineFlipNeutral',
+                        i18nParams: { location: location.id, leader: leader.id }
+                    });
+                }
+                // ON_MISSION: Do nothing - leader continues preparing the insurrection
             }
         }
 
@@ -199,7 +206,10 @@ export function processClandestineActions(
         [FactionId.NOBLES]: 0,
         [FactionId.CONSPIRATORS]: 0,
         [FactionId.REPUBLICANS]: 0,
-        [FactionId.NEUTRAL]: 0
+        [FactionId.NEUTRAL]: 0,
+        [FactionId.LOYALISTS]: 0,
+        [FactionId.PRINCELY_ARMY]: 0,
+        [FactionId.CONFEDERATE_CITIES]: 0
     };
     const newArmies: Army[] = [];
 
@@ -378,12 +388,6 @@ export function processClandestineActions(
         // Update character in array after alert processing
         updatedCharacters[charIndex] = leader;
 
-        // Skip remaining processing if no active actions
-        if (activeActions.length === 0) continue;
-        // --------------------------------------------------------------------
-        // 1. CAPTURE ROLL (Detection Level System - 2026-01-10)
-        // --------------------------------------------------------------------
-
         // Identify governor (must be GOVERNING status)
         const governor = updatedCharacters.find(c =>
             c.locationId === location.id &&
@@ -532,6 +536,9 @@ export function processClandestineActions(
         // 2. ACTION PROCESSING (If not caught)
         // --------------------------------------------------------------------
 
+        // Skip action processing if no active actions (but Risk Calculation above ran!)
+        if (activeActions.length === 0) continue;
+
         let leaderBudget = leader.clandestineBudget ?? leader.budget ?? 0;
         const actionsToRemove: string[] = [];
 
@@ -540,7 +547,17 @@ export function processClandestineActions(
             const cost = CLANDESTINE_ACTION_COSTS[action.actionId] ?? 0;
 
             // Deduct cost (unless one-time prepaid or 0)
-            if (cost > 0) {
+            // ELITE_NETWORKS: Free actions if resentment < 50%
+            const hasEliteNetworks = leader.stats.ability.includes('ELITE_NETWORKS');
+            const eliteNetworksApplies = hasEliteNetworks &&
+                (location.resentment?.[leader.faction as any] ?? 0) < 50 &&
+                [
+                    ClandestineActionId.UNDERMINE_AUTHORITIES,
+                    ClandestineActionId.DISTRIBUTE_PAMPHLETS,
+                    ClandestineActionId.SPREAD_PROPAGANDA
+                ].includes(action.actionId as ClandestineActionId);
+
+            if (cost > 0 && !eliteNetworksApplies) {
                 leaderBudget = Math.max(0, leaderBudget - cost);
             }
 

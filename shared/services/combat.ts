@@ -33,7 +33,7 @@ export const resolveCombatResult = (
     prevState: GameState,
     choice: 'FIGHT' | 'RETREAT' | 'RETREAT_CITY' | 'SIEGE',
     siegeCost: number = 0
-): Partial<GameState> => {
+): Partial<GameState> & { siegeNotification?: any } => {
 
     if (!prevState.combatState) return {};
 
@@ -47,6 +47,7 @@ export const resolveCombatResult = (
     let newResources = { ...prevState.resources };
     let newStats = { ...prevState.stats };
     let logMsg = "";
+    let siegeNotificationResult: any = null;
     const combinedLogEntries: any[] = []; // Typed as any[] to avoid strict import issues if types ref differs, or assume inferred
 
     // Delegate to appropriate handler based on choice
@@ -119,6 +120,11 @@ export const resolveCombatResult = (
             newResources = result.resources;
             logMsg = result.logMessage;
             if (result.logEntries) combinedLogEntries.push(...result.logEntries);
+
+            // Propagate siege notification if present
+            if (result.siegeNotification) {
+                siegeNotificationResult = result.siegeNotification;
+            }
             break;
         }
     }
@@ -217,6 +223,8 @@ export const resolveCombatResult = (
         stats: newStats,
         combatState: nextBattle,
         combatQueue: nextQueue,
-        logs: newLogs
+        logs: newLogs,
+        // Include siege notification if relevant (it was handled in the switch but we need to extract it)
+        siegeNotification: choice === 'SIEGE' && siegeNotificationResult ? siegeNotificationResult : prevState.siegeNotification
     };
 };

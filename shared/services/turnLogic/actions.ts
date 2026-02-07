@@ -11,6 +11,7 @@ import {
 import { isNeutralInsurrectionBlocked, createBlockedInsurrectionLog } from '../domain/governor/makeExamples';
 import { validateGovernorStatus } from '../domain/governor/governorService';
 import { handleLeaderStatusOnCapture } from './leaderStatusUpdates';
+import { evaluateSmugglerDispatch, assignSmugglerMission } from '../ai/leaders/missions/SmugglerMissionService';
 
 let logIdCounter = 0;
 const generateLogId = (): string => {
@@ -391,6 +392,43 @@ export const processAutoCapture = (
 
             // NEW: Update status of other leaders (Available <-> Undercover)
             nextCharacters = handleLeaderStatusOnCapture(updatedLoc.id, updatedLoc.faction, nextCharacters);
+
+            // SMUGGLER DISPATCH: If a RURAL is captured, check if the linked CITY still belongs to previousFaction
+            // If so, that city now needs SMUGGLER support for food
+            if (loc.type === LocationType.RURAL && previousFaction !== FactionId.NEUTRAL) {
+                // Find the linked city (the rural's linkedLocationId points to the city)
+                const linkedCity = nextLocations.find(l => l.id === loc.linkedLocationId);
+
+                if (linkedCity && linkedCity.faction === previousFaction) {
+                    // The city lost its rural food supply - trigger SMUGGLER dispatch evaluation
+                    // Note: This is called during turn processing, so we create a minimal state for evaluation
+                    const smugglerContext = {
+                        state: {
+                            characters: nextCharacters,
+                            locations: nextLocations,
+                            roads: roads,
+                            armies: armies
+                        } as any,
+                        faction: previousFaction,
+                        lostRuralLocationId: loc.id,
+                        cityId: linkedCity.id
+                    };
+
+                    const smugglerDecision = evaluateSmugglerDispatch(smugglerContext);
+
+                    if (smugglerDecision) {
+                        // Apply the smuggler mission to the selected leader
+                        nextCharacters = nextCharacters.map(c => {
+                            if (c.id === smugglerDecision.leaderId) {
+                                const updated = assignSmugglerMission(c, smugglerDecision.targetCityId);
+                                console.log(`[SMUGGLER DISPATCH] ${c.name} assigned to support ${linkedCity.name}`);
+                                return updated;
+                            }
+                            return c;
+                        });
+                    }
+                }
+            }
 
             return updatedLoc;
         }

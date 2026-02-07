@@ -243,18 +243,19 @@ export const createInsurrectionPreparationLog = (
     leaderId: string,
     locationId: string,
     locationFaction: FactionId,
+    estimatedCount: number,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.INSURRECTION,
-    message: `${leaderId} is preparing an insurrection in ${locationId}.`,
+    message: `${leaderId} is preparing an insurrection in ${locationId}. Est: ${estimatedCount}`,
     turn,
     visibleToFactions: [],
     baseSeverity: LogSeverity.INFO,
     criticalForFactions: locationFaction !== FactionId.NEUTRAL ? [locationFaction] : undefined,
     highlightTarget: { type: 'LOCATION', id: locationId },
     i18nKey: 'insurrectionPreparing',
-    i18nParams: { leader: leaderId, location: locationId }
+    i18nParams: { leader: leaderId, location: locationId, count: estimatedCount }
 });
 
 /**
@@ -730,16 +731,17 @@ export const createLeaderDepartureSpottedLog = (
 export const createNeutralInsurrectionWarningLog = (
     locationId: string,
     locationFaction: FactionId,
+    estimatedCount: number,
     turn: number
 ): LogEntry => ({
     id: generateLogId(),
     type: LogType.INSURRECTION,
-    message: `Neutral insurrection warning in ${locationId}!`,
+    message: `Neutral insurrection warning in ${locationId}! Est: ${estimatedCount}`,
     turn,
     visibleToFactions: [locationFaction],
     baseSeverity: LogSeverity.CRITICAL,
     criticalForFactions: [locationFaction],
     highlightTarget: { type: 'LOCATION', id: locationId },
     i18nKey: 'neutralInsurrectionWarning',
-    i18nParams: { location: locationId }
+    i18nParams: { location: locationId, count: estimatedCount }
 });

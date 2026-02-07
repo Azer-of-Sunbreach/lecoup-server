@@ -8,8 +8,11 @@
  * - All formulas extracted from specifications
  */
 
-import { Location, Army, Character, Road, LocationType, RuralCategory, FactionId, ManagementLevel, Convoy, NavalConvoy, GovernorPolicy, GOVERNOR_POLICY_COSTS } from '../../../types';
-import { FORTIFICATION_LEVELS, BONUS_HUNTING_ONLY, BONUS_FISHING_HUNTING, isPort, getAppeaseFoodCost } from '../../../data';
+import { Location, Army, Character, Road, LocationType, RuralCategory, FactionId, ManagementLevel, Convoy, NavalConvoy, GovernorPolicy, GOVERNOR_POLICY_COSTS, CharacterStatus } from '../../../types';
+import { FORTIFICATION_LEVELS, BONUS_HUNTING_ONLY, BONUS_FISHING_HUNTING, isPort, getAppeaseFoodCost as _getAppeaseFoodCost } from '../../../data';
+import { getEffectiveTaxLevel, getEffectiveTradeTaxLevel, getEffectiveFoodCollectionLevel, countFreeTradersAtLocation, getMaxManagementLevel } from '../economy/freeTrader';
+
+export const getAppeaseFoodCost = _getAppeaseFoodCost;
 
 
 // ============================================================================
@@ -29,6 +32,7 @@ export interface RevenueStats {
     burnedDistricts: number;      // Sabotaged by clandestine ops
     improvedEconomyBonus: number; // From governor's Improve Economy policy (2 * statesmanship)
     governorActionsCost: number;  // Gold cost of active governor policies
+    grantedFiefCost: number;      // -30 gold if fief granted and granting faction controls
     total: number;
 }
 
@@ -45,6 +49,8 @@ export interface RuralFoodStats {
     embargoBonus: number;         // Great Plains if embargo
     burnedFields: number;         // Sabotaged by clandestine ops
     improvedEconomyBonus: number; // From governor's Improve Economy policy (2 * statesmanship)
+    governorFoodCost: number;     // Food cost from governor policies (Appease the Minds)
+    grantedFiefCost: number;      // -30 food if fief granted and granting faction controls
     netProduction: number;        // Final production after consumption
     linkedCityConsumption: number; // For display in rural menu
     linkedCityStocks: number;     // For display in rural menu
@@ -60,6 +66,7 @@ export interface CityFoodStats {
     rationingBonus: number;       // Food saved by Rationing policy
     foodImports: number;          // From trade tax level
     embargoMalus: number;         // If grain embargo active
+    smugglingBonus: number;       // From SMUGGLER ability
     ruralSupply: number;          // From linked rural area
     total: number;                // Net flow
     currentStocks: number;
@@ -191,7 +198,8 @@ export function calculateRevenueStats(
     const personalTaxBase = Math.floor(location.population / 1000);
 
     // Personal tax modifier: FIXED to 0.5 gold per 1000 per level
-    const taxLevel = location.taxLevel || 'NORMAL';
+    // Apply FREE_TRADER cap
+    const taxLevel = getEffectiveTaxLevel(location, characters);
     const personalTaxMod = Math.floor(personalTaxBase * TAX_MODIFIERS[taxLevel]);
 
     // Trade gold calculation
@@ -203,7 +211,8 @@ export function calculateRevenueStats(
             .filter(r => r.from === linkedRural.id || r.to === linkedRural.id)
             .map(r => r.from === linkedRural.id ? r.to : r.from);
 
-        const tradeTaxLevel = location.tradeTaxLevel || 'NORMAL';
+        // Apply FREE_TRADER cap to trade tax level
+        const tradeTaxLevel = getEffectiveTradeTaxLevel(location, characters);
 
         neighboringRuralIds.forEach(neighborId => {
             const neighbor = allLocations.find(l => l.id === neighborId);
@@ -228,12 +237,14 @@ export function calculateRevenueStats(
     }
 
     // Manager bonus: +20 gold per MANAGER leader in the city
+    // Leaders with MOVING status don't count - they're in transit
     const managerBonus = characters
         .filter(c =>
             c.locationId === location.id &&
             c.status !== 'DEAD' &&
+            c.status !== CharacterStatus.MOVING &&
             c.faction === location.faction &&
-            c.stats.ability.includes('MANAGER')
+            c.stats?.ability?.includes('MANAGER')
         )
         .length * 20;
 
@@ -284,7 +295,13 @@ export function calculateRevenueStats(
         }
     }
 
-    const total = Math.max(0, personalTaxBase + personalTaxMod + tradeGold + managerBonus + specialIncome + embargoImpact - burnedDistricts + improvedEconomyBonus - governorActionsCost);
+    // Granted Fief cost: -30 gold if fief granted by faction that currently controls
+    let grantedFiefCost = 0;
+    if (location.grantedFief && location.grantedFief.grantedBy === location.faction) {
+        grantedFiefCost = 30;
+    }
+
+    const total = Math.max(0, personalTaxBase + personalTaxMod + tradeGold + managerBonus + specialIncome + embargoImpact - burnedDistricts + improvedEconomyBonus - governorActionsCost - grantedFiefCost);
 
     return {
         personalTaxBase,
@@ -296,6 +313,7 @@ export function calculateRevenueStats(
         burnedDistricts,
         improvedEconomyBonus,
         governorActionsCost,
+        grantedFiefCost,
         total
     };
 }
@@ -323,8 +341,8 @@ export function calculateRuralFoodStats(
     }
     // INHOSPITABLE: no bonus
 
-    // Collection orders
-    const collectionLevel = location.foodCollectionLevel || 'NORMAL';
+    // Collection orders - Apply FREE_TRADER cap
+    const collectionLevel = getEffectiveFoodCollectionLevel(location, characters);
     const collModUnit = Math.floor(location.population / 20000);
     const collectionOrders = COLLECTION_MODIFIERS[collectionLevel] * collModUnit;
 
@@ -368,8 +386,29 @@ export function calculateRuralFoodStats(
         improvedEconomyBonus = 2 * statesmanship;
     }
 
+    // Governor Policy Cost (Appease Minds)
+    let governorFoodCost = 0;
+    if (location.governorPolicies?.[GovernorPolicy.APPEASE_MINDS] && characters.length > 0) {
+        // Need governor to check Man of Church
+        const governor = characters.find(c =>
+            c.status === 'GOVERNING' &&
+            c.locationId === location.id &&
+            c.faction === location.faction
+        );
+        const hasManOfChurch = governor?.stats.ability.includes('MAN_OF_CHURCH');
+        if (!hasManOfChurch) {
+            governorFoodCost = getAppeaseFoodCost(location.population);
+        }
+    }
+
+    // Granted Fief cost: -30 food if fief granted by faction that currently controls
+    let grantedFiefCost = 0;
+    if (location.grantedFief && location.grantedFief.grantedBy === location.faction) {
+        grantedFiefCost = 30;
+    }
+
     // Net production
-    const netProduction = productionBase + fertilityEffect + collectionOrders + huntingBonus + fishingBonus + embargoBonus - armyConsumption - burnedFields + improvedEconomyBonus;
+    const netProduction = productionBase + fertilityEffect + collectionOrders + huntingBonus + fishingBonus + embargoBonus - armyConsumption - burnedFields + improvedEconomyBonus - governorFoodCost - grantedFiefCost;
 
     // Linked city info (consumption and stocks)
     // We display this to help the player know if the city is starving
@@ -399,6 +438,8 @@ export function calculateRuralFoodStats(
         embargoBonus,
         burnedFields,
         improvedEconomyBonus,
+        governorFoodCost,
+        grantedFiefCost,
         netProduction,
         linkedCityConsumption,
         linkedCityStocks
@@ -447,6 +488,22 @@ export function calculateCityFoodStats(
         if (ruralStats) {
             ruralSupply = Math.max(0, ruralStats.netProduction);
         }
+        if (ruralStats) {
+            ruralSupply = Math.max(0, ruralStats.netProduction);
+        }
+    }
+
+    // Smuggler Ability
+    let smugglingBonus = 0;
+    if (linkedRural && linkedRural.faction !== location.faction) {
+        // Leaders with MOVING status don't count - they're in transit
+        const smugglerLeader = characters.find(c => c.locationId === location.id && c.faction === location.faction && c.status !== CharacterStatus.MOVING && c.stats.ability.includes('SMUGGLER'));
+        if (smugglerLeader) {
+            const ruralStats = calculateRuralFoodStats(linkedRural, allLocations, armies, characters);
+            if (ruralStats) {
+                smugglingBonus = Math.max(5, Math.min(15, ruralStats.netProduction));
+            }
+        }
     }
 
     // Governor actions food cost (from APPEASE_MINDS policy - calculated instantly)
@@ -463,7 +520,7 @@ export function calculateCityFoodStats(
 
     // Total flow (governor actions is purely cost now)
     const totalConsumption = populationConsumption + armyConsumption + governorActions + embargoMalus - foodImports;
-    const total = ruralSupply - totalConsumption + rationingBonus;
+    const total = ruralSupply + smugglingBonus - totalConsumption + rationingBonus;
 
     // Stock status thresholds
     const currentStocks = location.foodStock;
@@ -486,6 +543,7 @@ export function calculateCityFoodStats(
         rationingBonus,
         foodImports,
         embargoMalus,
+        smugglingBonus,
         ruralSupply,
         total,
         currentStocks,
@@ -576,8 +634,13 @@ export function getLocationLeaders(
             name: c.name,
             faction: c.faction,
             commandBonus: c.stats.commandBonus,
-            stabilityEffect: c.stats.stabilityPerTurn,
-            abilities: c.stats.ability.filter(a => a !== 'NONE'),
+            // Use effective stability (respects Internal Factions override)
+            stabilityEffect: c.stabilityModifierOverride ?? c.stats.stabilityPerTurn,
+            // Combine base abilities with granted abilities, filter out disabled (respects Internal Factions effects)
+            abilities: [
+                ...c.stats.ability.filter(a => a !== 'NONE'),
+                ...(c.grantedAbilities || [])
+            ].filter(a => !c.disabledAbilities?.includes(a)),
             // New fields from leader system refactoring
             traits: (c.stats as any).traits || [],
             clandestineOps: (c.stats as any).clandestineOps,
@@ -673,7 +736,7 @@ export function calculateFactionRevenue(
                 c.locationId === location.id &&
                 c.faction === location.faction
             );
-            const hasManOfChurch = governor?.stats.ability.includes('MAN_OF_CHURCH');
+            const hasManOfChurch = governor?.stats?.ability?.includes('MAN_OF_CHURCH');
 
             if (location.governorPolicies[GovernorPolicy.STABILIZE_REGION]) {
                 ruralPolicyCosts += hasManOfChurch ? 0 : (GOVERNOR_POLICY_COSTS[GovernorPolicy.STABILIZE_REGION] || 0);
@@ -699,7 +762,8 @@ export function calculateFactionRevenue(
 export function canChangeTaxLevel(
     location: Location,
     taxType: 'PERSONAL' | 'TRADE',
-    direction: 'UP' | 'DOWN'
+    direction: 'UP' | 'DOWN',
+    characters: Character[] = []
 ): boolean {
     const LEVELS: ManagementLevel[] = ['VERY_LOW', 'LOW', 'NORMAL', 'HIGH', 'VERY_HIGH'];
     const currentLevel = taxType === 'PERSONAL' ? location.taxLevel : location.tradeTaxLevel;
@@ -708,6 +772,17 @@ export function canChangeTaxLevel(
     // Boundary checks
     if (direction === 'UP' && idx >= 4) return false;
     if (direction === 'DOWN' && idx <= 0) return false;
+
+    // FREE_TRADER cap check (for raising taxes)
+    if (direction === 'UP' && characters.length > 0) {
+        const freeTraderCount = countFreeTradersAtLocation(location.id, location.faction, characters);
+        if (freeTraderCount > 0) {
+            const maxLevel = getMaxManagementLevel(freeTraderCount);
+            const maxIdx = LEVELS.indexOf(maxLevel);
+            // Can't raise if already at or above the cap
+            if (idx >= maxIdx) return false;
+        }
+    }
 
     // Stability checks (from spec)
     if (taxType === 'PERSONAL') {
@@ -727,7 +802,8 @@ export function canChangeTaxLevel(
  */
 export function canChangeFoodCollection(
     location: Location,
-    direction: 'UP' | 'DOWN'
+    direction: 'UP' | 'DOWN',
+    characters: Character[] = []
 ): boolean {
     const LEVELS: ManagementLevel[] = ['VERY_LOW', 'LOW', 'NORMAL', 'HIGH', 'VERY_HIGH'];
     const currentLevel = location.foodCollectionLevel || 'NORMAL';
@@ -736,9 +812,43 @@ export function canChangeFoodCollection(
     if (direction === 'UP' && idx >= 4) return false;
     if (direction === 'DOWN' && idx <= 0) return false;
 
+    // FREE_TRADER cap check (for raising food collection)
+    if (direction === 'UP' && characters.length > 0) {
+        const freeTraderCount = countFreeTradersAtLocation(location.id, location.faction, characters);
+        if (freeTraderCount > 0) {
+            const maxLevel = getMaxManagementLevel(freeTraderCount);
+            const maxIdx = LEVELS.indexOf(maxLevel);
+            // Can't raise if already at or above the cap
+            if (idx >= maxIdx) return false;
+        }
+    }
+
     // Stability checks
     if (direction === 'DOWN' && location.stability > 80) return false;
     if (direction === 'UP' && location.stability < 20) return false;
+
+    // Granted fief check: can't reduce collection if it would make production <= 0
+    // Only applies when the granting faction controls the territory
+    if (direction === 'DOWN' && location.grantedFief && location.grantedFief.grantedBy === location.faction) {
+        // Calculate what production would be at next lower level
+        const nextLevel = LEVELS[idx - 1];
+        const collModUnit = Math.floor(location.population / 20000);
+        const nextCollectionOrders = COLLECTION_MODIFIERS[nextLevel] * collModUnit;
+        
+        // Calculate base production components (simplified - without full context)
+        const productionBase = Math.floor(location.population / 10000);
+        let fertilityEffect = 0;
+        if (location.ruralCategory === RuralCategory.FERTILE) {
+            fertilityEffect = productionBase * 2;
+        } else if (location.ruralCategory === RuralCategory.ORDINARY) {
+            fertilityEffect = productionBase;
+        }
+        
+        // Estimate production at next level (without hunting/fishing bonuses for safety margin)
+        const estimatedProduction = productionBase + fertilityEffect + nextCollectionOrders - 30; // -30 for fief
+        
+        if (estimatedProduction <= 0) return false;
+    }
 
     return true;
 }

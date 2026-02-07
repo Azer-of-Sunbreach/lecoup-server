@@ -10,3 +10,7 @@ export type { NegotiationResult } from './negotiation';
 export { executeAttachLeader, executeDetachLeader, executeMoveLeader } from './leaders';
 export type { LeaderActionResult } from './leaders';
 export type { InciteResult } from './insurrection';
+
+// Undercover Mission
+export { executeSendUndercoverMission, processUndercoverMissionTravel } from './undercoverMission';
+export type { SendUndercoverMissionResult } from './undercoverMission';

@@ -1,6 +1,6 @@
 // Siege Handler - Handles SIEGE choice
 
-import { Army, Location, Road, CombatState, FactionId } from '../../types';
+import { Army, Location, Road, CombatState, FactionId, SiegeNotification } from '../../types';
 import { FORTIFICATION_LEVELS } from '../../constants';
 import {
     calculateRetreatPosition,
@@ -18,6 +18,7 @@ export interface SiegeResult {
     resources: { [key in FactionId]: { gold: number } };
     logMessage: string;
     logEntries?: StructuredLogData[];
+    siegeNotification?: SiegeNotification | null;
 }
 
 /**
@@ -171,7 +172,12 @@ export const handleSiege = (
                 logEntries: [{
                     key: 'siegeConstructed',
                     params: {}
-                }]
+                }],
+                siegeNotification: {
+                    targetId: combat.locationId!,
+                    targetName: loc?.name || 'Unknown Location',
+                    attackerName: playerFaction
+                }
             };
         }
     } else if (combat.roadId && combat.stageIndex !== undefined) {

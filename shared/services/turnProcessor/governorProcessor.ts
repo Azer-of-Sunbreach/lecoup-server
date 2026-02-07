@@ -47,7 +47,10 @@ export function processGovernorPolicies(
         [FactionId.NOBLES]: 0,
         [FactionId.REPUBLICANS]: 0,
         [FactionId.CONSPIRATORS]: 0,
-        [FactionId.NEUTRAL]: 0
+        [FactionId.NEUTRAL]: 0,
+        [FactionId.LOYALISTS]: 0,
+        [FactionId.PRINCELY_ARMY]: 0,
+        [FactionId.CONFEDERATE_CITIES]: 0
     };
     const foodCosts: Record<string, number> = {};
     const logs: LogEntry[] = [];

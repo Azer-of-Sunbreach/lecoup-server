@@ -107,7 +107,7 @@ export function processFamine(state: GameState): FamineProcessingResult {
             const rural = locations.find(l => l.id === city.linkedLocationId);
 
             if (rural && rural.foodIncome <= 0) {
-                famineNotification = { cityName: city.name, ruralName: rural.name };
+                famineNotification = { cityName: city.id, ruralName: rural.id };
 
                 if (rural.population > 2500) {
                     const maxLoss = rural.population > 10000 ? 5000 : 1000;

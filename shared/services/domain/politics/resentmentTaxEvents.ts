@@ -16,7 +16,7 @@ const TRADE_TAX_CHANGE_DELTA = 5;
 const FOOD_COLLECTION_CHANGE_DELTA = 20;
 
 // Mapping of levels to numeric values for delta calculation
-const LEVEL_VALUES: Record<ManagementLevel, number> = {
+export const LEVEL_VALUES: Record<ManagementLevel, number> = {
     'VERY_LOW': 0,
     'LOW': 1,
     'NORMAL': 2,

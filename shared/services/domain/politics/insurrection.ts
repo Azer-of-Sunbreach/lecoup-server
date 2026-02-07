@@ -16,6 +16,7 @@
 
 import { GameState, FactionId, CharacterStatus } from '../../../types';
 import { createInsurrectionPreparationLog } from '../../logs/logFactory';
+import { estimateGrandInsurgents } from '../clandestine/insurrectionFormulas';
 
 export interface InciteResult {
     success: boolean;
@@ -92,6 +93,15 @@ export const executeIncite = (
                     character.id,
                     loc.id,
                     loc.faction,
+                    estimateGrandInsurgents(
+                        goldAmount,
+                        loc.population,
+                        loc.stability,
+                        character.stats.clandestineOps || 1,
+                        (loc.resentment as Record<string, number>)?.[loc.faction] || 0,
+                        (loc.resentment as Record<string, number>)?.[faction] || 0,
+                        character.stats.ability?.includes('FIREBRAND') || false
+                    ),
                     state.turn
                 )
             ]

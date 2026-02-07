@@ -91,9 +91,13 @@ export function processInciteNeutralInsurrections(
 
     // T1 (duration 1): Send Warning Log
     if (duration === 1) {
+        // Estimate strength for the warning
+        const strength = calculateInsurgentStrength(leader, location);
+
         const warningLog = createNeutralInsurrectionWarningLog(
             location.id,
             location.faction,
+            strength,
             turn
         );
 

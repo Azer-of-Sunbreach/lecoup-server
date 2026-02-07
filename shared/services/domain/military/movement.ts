@@ -232,7 +232,7 @@ export const executeArmyMove = (
     }
 
     // Recalculate Economy
-    updatedLocs = calculateEconomyAndFood(updatedLocs, updatedArmies, updatedChars, state.roads);
+    updatedLocs = calculateEconomyAndFood(state, updatedLocs, updatedArmies, updatedChars, state.roads);
 
     return {
         success: true,

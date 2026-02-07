@@ -15,3 +15,6 @@ export { executeMergeRegiments } from './mergeRegiments';
 export type { MergeResult } from './mergeRegiments';
 
 export { executeGarrison } from './garrison';
+
+export { executeConscription, canConscript, CONSCRIPTION_GOLD_COST, CONSCRIPTION_STABILITY_COST } from './conscription';
+export type { ConscriptionResult, CanConscriptResult } from './conscription';

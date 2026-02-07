@@ -90,6 +90,7 @@ export const executeDetachLeader = (
  * 2. Linked location check (preserves detection when hopping between linked locations with same controller)
  */
 import { calculateLeaderTravelTime } from '../leaders/leaderPathfinding';
+import { enforceFreeTraderLimits } from '../economy/freeTrader';
 
 export const executeMoveLeader = (
     state: GameState,
@@ -173,6 +174,25 @@ export const executeMoveLeader = (
         );
     }
 
+    // EVOLUTION: Free Trader Logic - Immediate Effect
+    // If arriving immediately, enforce tax limits at destination with the new leader present
+    let ftMessagePart = "";
+    if (turns === 0 && destLocation) {
+        // Simulate character at destination to check limits
+        const tempCharacters = state.characters.map(c =>
+            c.id === charId ? { ...c, locationId: destId, status: finalStatus } : c
+        );
+
+        const ftResult = enforceFreeTraderLimits(destLocation, tempCharacters);
+        if (ftResult.modified) {
+            updatedLocations = updatedLocations.map(l =>
+                l.id === destLocation.id ? ftResult.location : l
+            );
+            ftMessagePart = " (Taxes adjusted due to Free Trader)";
+            console.log(`[executeMoveLeader] Free Trader effect applied in ${destLocation.name}: ${ftResult.modifications.join(', ')}`);
+        }
+    }
+
     return {
         success: true,
         newState: {
@@ -200,6 +220,6 @@ export const executeMoveLeader = (
             // Clear governor policies on departure location if was governing
             locations: updatedLocations,
         },
-        message: `${char.name} ${turns === 0 ? 'relocated' : 'travelling'} to ${destName}`
+        message: `${char.name} ${turns === 0 ? 'relocated' : 'travelling'} to ${destName}${ftMessagePart}`
     };
 };

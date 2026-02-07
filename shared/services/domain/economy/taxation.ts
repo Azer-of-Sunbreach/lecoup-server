@@ -59,7 +59,7 @@ export const executeUpdateCityManagement = (
     }
 
     // IMMEDIATE REACTIVITY: Recalculate economy/food for ALL locations
-    tempLocs = calculateEconomyAndFood(tempLocs, state.armies, state.characters, state.roads);
+    tempLocs = calculateEconomyAndFood(state, tempLocs, state.armies, state.characters, state.roads);
 
     return {
         success: true,
