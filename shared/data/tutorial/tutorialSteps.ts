@@ -25,22 +25,23 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         textKey: 'tutorial:tutorial.steps.step_2.text',
         allowedActions: [{ type: 'NONE' }],
     },
-    // Step 3: Map overview — overlay on side panels, highlight all map locations
+    // Step 3: Map overview — highlight all map locations & roads.
+    // No blockedZones needed: TutorialActionBlocker already covers the entire
+    // game area (including side panels) when allowedActions is NONE.
     {
         id: 'step_3',
         titleKey: 'tutorial:tutorial.steps.step_3.title',
         textKey: 'tutorial:tutorial.steps.step_3.text',
-        blockedZones: ['LEFT_PANEL', 'RIGHT_PANEL'],
         highlights: [{ zone: 'MAP_LOCATIONS' }, { zone: 'MAP_ROADS' }],
         allowedActions: [{ type: 'NONE' }],
     },
-    // Step 4: City info — overlay removed on right panel, left still blocked
+    // Step 4: City info — right panel visible for reading.
+    // Left panel blocked (overlay) — same as step 8.
     {
         id: 'step_4',
         titleKey: 'tutorial:tutorial.steps.step_4.title',
         textKey: 'tutorial:tutorial.steps.step_4.text',
         blockedZones: ['LEFT_PANEL'],
-        scrollOnlyZones: ['RIGHT_PANEL'],
         allowedActions: [{ type: 'NONE' }],
     },
     // Step 5: Gold & Food — same as step 4
@@ -49,7 +50,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         titleKey: 'tutorial:tutorial.steps.step_5.title',
         textKey: 'tutorial:tutorial.steps.step_5.text',
         blockedZones: ['LEFT_PANEL'],
-        scrollOnlyZones: ['RIGHT_PANEL'],
         allowedActions: [{ type: 'NONE' }],
     },
     // Step 6: Stability — same as step 4
@@ -58,7 +58,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         titleKey: 'tutorial:tutorial.steps.step_6.title',
         textKey: 'tutorial:tutorial.steps.step_6.text',
         blockedZones: ['LEFT_PANEL'],
-        scrollOnlyZones: ['RIGHT_PANEL'],
         allowedActions: [{ type: 'NONE' }],
     },
     // Step 7: Stability levers — same as step 4
@@ -67,7 +66,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         titleKey: 'tutorial:tutorial.steps.step_7.title',
         textKey: 'tutorial:tutorial.steps.step_7.text',
         blockedZones: ['LEFT_PANEL'],
-        scrollOnlyZones: ['RIGHT_PANEL'],
         allowedActions: [{ type: 'NONE' }],
     },
     // Step 8: Administration button — highlight it, auto-advance when TerritorialMenu opens
@@ -81,7 +79,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         autoAdvanceOn: 'TERRITORIAL_MENU_OPEN',
         hideNextButton: true,
     },
-    // Step 9: Tax management — can modify taxes, auto-advance when menu closes
+    // Step 9: Tax management — can modify taxes, Next button to proceed
     {
         id: 'step_9',
         titleKey: 'tutorial:tutorial.steps.step_9.title',
@@ -90,68 +88,79 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="personal-tax-slider"]' },
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="trade-tax-slider"]' },
         ],
-        allowedActions: [{ type: 'CHANGE_TAX' }, { type: 'CLOSE_MENU' }],
-        autoAdvanceOn: 'TERRITORIAL_MENU_CLOSE',
-        hideNextButton: true,
+        allowedActions: [{ type: 'CHANGE_TAX' }],
     },
-    // Step 10: Left panel — overlay removed, can hover/select territories
+    // Step 10: Food & convoys — highlight convoy panel, auto-advance on menu close
     {
         id: 'step_10',
         titleKey: 'tutorial:tutorial.steps.step_10.title',
         textKey: 'tutorial:tutorial.steps.step_10.text',
-        highlights: [{ zone: 'LEFT_PANEL' }],
-        allowedActions: [{ type: 'CLICK_LOCATION' }, { type: 'OPEN_MENU', target: 'TERRITORIAL_MENU' }],
+        highlights: [
+            { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="convoy-panel"]' },
+        ],
+        allowedActions: [{ type: 'CHANGE_TAX' }, { type: 'CLOSE_MENU' }],
+        autoAdvanceOn: 'TERRITORIAL_MENU_CLOSE',
+        hideNextButton: true,
     },
-    // Step 11: Territory overview — same as step 10
+    // Step 11: Left panel — overlay removed, can hover/select territories
     {
         id: 'step_11',
         titleKey: 'tutorial:tutorial.steps.step_11.title',
         textKey: 'tutorial:tutorial.steps.step_11.text',
-        allowedActions: [{ type: 'CLICK_LOCATION' }, { type: 'OPEN_MENU', target: 'TERRITORIAL_MENU' }],
+        highlights: [{ zone: 'LEFT_PANEL' }],
+        allowedActions: [{ type: 'CLICK_LOCATION' }, { type: 'OPEN_MENU', target: 'TERRITORIAL_MENU' }, { type: 'CLOSE_MENU' }],
     },
-    // Step 12: Population lesson — same as step 10
+    // Step 12: Territory overview — same as step 11
     {
         id: 'step_12',
         titleKey: 'tutorial:tutorial.steps.step_12.title',
         textKey: 'tutorial:tutorial.steps.step_12.text',
-        allowedActions: [{ type: 'CLICK_LOCATION' }, { type: 'OPEN_MENU', target: 'TERRITORIAL_MENU' }],
+        allowedActions: [{ type: 'CLICK_LOCATION' }, { type: 'OPEN_MENU', target: 'TERRITORIAL_MENU' }, { type: 'CLOSE_MENU' }],
     },
-    // Step 13: Leaders introduction — can open LeadersModal/Panel, browse; no recruit/governor/clandestine/moves
-    // On exit → close LeadersModal if open (handled by useTutorialStepEffects)
+    // Step 13: Population lesson — same as step 11
     {
         id: 'step_13',
         titleKey: 'tutorial:tutorial.steps.step_13.title',
         textKey: 'tutorial:tutorial.steps.step_13.text',
-        highlights: [
-            { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leaders-button"]' },
-            { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leaders-panel"]' },
-        ],
-        allowedActions: [{ type: 'OPEN_LEADERS' }],
+        allowedActions: [{ type: 'CLICK_LOCATION' }, { type: 'OPEN_MENU', target: 'TERRITORIAL_MENU' }, { type: 'CLOSE_MENU' }],
     },
-    // Step 14: Appoint Enoch governor of Tamnit (Phase 2 — complex: filtered dropdown, auto-advance on governor appointment)
+    // Step 14: Leaders introduction — can open LeadersModal/Panel, browse; no recruit/governor/clandestine/moves
+    // On exit → close LeadersModal if open (handled by useTutorialStepEffects)
     {
         id: 'step_14',
         titleKey: 'tutorial:tutorial.steps.step_14.title',
         textKey: 'tutorial:tutorial.steps.step_14.text',
         highlights: [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leaders-button"]' },
+            { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leaders-tab"]' },
+            { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leaders-panel"]' },
+        ],
+        allowedActions: [{ type: 'OPEN_LEADERS' }, { type: 'CLOSE_MENU' }],
+    },
+    // Step 15: Appoint Enoch governor of Tamnit (Phase 2 — complex: filtered dropdown, auto-advance on governor appointment)
+    {
+        id: 'step_15',
+        titleKey: 'tutorial:tutorial.steps.step_15.title',
+        textKey: 'tutorial:tutorial.steps.step_15.text',
+        highlights: [
+            { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leaders-tab"]' },
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leaders-panel"]' },
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="location-tamnit_tutorial"]' },
-            { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="nominate-governor"]' },
         ],
         allowedActions: [
             { type: 'OPEN_LEADERS' },
             { type: 'CLICK_LOCATION' },
             { type: 'APPOINT_GOVERNOR', target: 'enoch_tutorial:tamnit_tutorial' },
+            { type: 'CLOSE_MENU' },
         ],
         autoAdvanceOn: 'GOVERNOR_APPOINTED:tamnit_tutorial',
         hideNextButton: true,
     },
-    // Step 15: Open governor menu — highlight Manage Governor + Enoch card, auto-advance on open
+    // Step 16: Open governor menu — highlight Manage Governor + Enoch card, auto-advance on open
     {
-        id: 'step_15',
-        titleKey: 'tutorial:tutorial.steps.step_15.title',
-        textKey: 'tutorial:tutorial.steps.step_15.text',
+        id: 'step_16',
+        titleKey: 'tutorial:tutorial.steps.step_16.title',
+        textKey: 'tutorial:tutorial.steps.step_16.text',
         highlights: [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="manage-governor-button"]' },
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leader-card-enoch_tutorial"]' },
@@ -159,28 +168,29 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         allowedActions: [
             { type: 'CLICK_LOCATION' },
             { type: 'OPEN_GOVERNOR_MENU' },
+            { type: 'CLOSE_MENU' },
         ],
         autoAdvanceOn: 'GOVERNOR_MENU_OPENED',
         hideNextButton: true,
     },
-    // Step 16: Use governor menu — can choose actions, not TerritorialMenu or NominateGovernor
+    // Step 17: Use governor menu — can choose actions, not TerritorialMenu or NominateGovernor
     // On exit → close GovernorMenu if open (handled by useTutorialStepEffects)
     {
-        id: 'step_16',
-        titleKey: 'tutorial:tutorial.steps.step_16.title',
-        textKey: 'tutorial:tutorial.steps.step_16.text',
+        id: 'step_17',
+        titleKey: 'tutorial:tutorial.steps.step_17.title',
+        textKey: 'tutorial:tutorial.steps.step_17.text',
         allowedActions: [
             { type: 'USE_GOVERNOR_ACTIONS' },
             { type: 'CLOSE_MENU' },
         ],
         autoAdvanceOn: 'GOVERNOR_MENU_CLOSED',
     },
-    // Step 17: Click army on bridge — highlight bridge road stage + delta_province + army
+    // Step 18: Click army on bridge — highlight bridge road stage + delta_province + army
     // Auto-advance when bridge selected; if manual advance → auto-select bridge (useTutorialStepEffects)
     {
-        id: 'step_17',
-        titleKey: 'tutorial:tutorial.steps.step_17.title',
-        textKey: 'tutorial:tutorial.steps.step_17.text',
+        id: 'step_18',
+        titleKey: 'tutorial:tutorial.steps.step_18.title',
+        textKey: 'tutorial:tutorial.steps.step_18.text',
         highlights: [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="road-stage-canopy_captainship_tutorial_delta_province_tutorial_road-1"]' },
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="location-delta_province_tutorial"]' },
@@ -188,15 +198,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         ],
         allowedActions: [
             { type: 'CLICK_ROAD_STAGE', target: 'canopy_captainship_tutorial_delta_province_tutorial_road:1' },
+            { type: 'CLOSE_MENU' },
         ],
         autoAdvanceOn: 'ROAD_STAGE_SELECTED:canopy_captainship_tutorial_delta_province_tutorial_road:1',
         hideNextButton: true,
     },
-    // Step 18: End turn — army advances, scripted AI moves (Phase 3 — scripted AI)
+    // Step 19: End turn — army advances, scripted AI moves (Phase 3 — scripted AI)
     {
-        id: 'step_18',
-        titleKey: 'tutorial:tutorial.steps.step_18.title',
-        textKey: 'tutorial:tutorial.steps.step_18.text',
+        id: 'step_19',
+        titleKey: 'tutorial:tutorial.steps.step_19.title',
+        textKey: 'tutorial:tutorial.steps.step_19.text',
         highlights: [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="end-turn-button"]' },
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="stationed-forces"]' },
@@ -205,11 +216,11 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         autoAdvanceOn: 'TURN_ENDED',
         hideNextButton: true,
     },
-    // Step 19: Manage territories + capture Shama (Phase 3 — scripted AI + fine restrictions)
+    // Step 20: Manage territories + capture Shama (Phase 3 — scripted AI + fine restrictions)
     {
-        id: 'step_19',
-        titleKey: 'tutorial:tutorial.steps.step_19.title',
-        textKey: 'tutorial:tutorial.steps.step_19.text',
+        id: 'step_20',
+        titleKey: 'tutorial:tutorial.steps.step_20.title',
+        textKey: 'tutorial:tutorial.steps.step_20.text',
         highlights: [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="location-delta_province_tutorial"]' },
         ],
@@ -224,15 +235,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
             { type: 'RECRUIT' },
             { type: 'CHANGE_TAX' },
             { type: 'MOVE_ARMY', target: 'shama_tutorial' },
+            { type: 'END_TURN' },
         ],
-        autoAdvanceOn: 'SHAMA_CAPTURED',
+        autoAdvanceOn: 'TURN_ENDED',
         hideNextButton: true,
+        objectiveKey: 'tutorial:tutorial.steps.step_20.objective',
     },
-    // Step 20: Access clandestine actions of Sufet Askarbal (Phase 2)
+    // Step 21: Access clandestine actions of Sufet Askarbal (Phase 2)
     {
-        id: 'step_20',
-        titleKey: 'tutorial:tutorial.steps.step_20.title',
-        textKey: 'tutorial:tutorial.steps.step_20.text',
+        id: 'step_21',
+        titleKey: 'tutorial:tutorial.steps.step_21.title',
+        textKey: 'tutorial:tutorial.steps.step_21.text',
         highlights: [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="leader-card-sufet_askarbal"]' },
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="location-high_cliffs_tutorial"]' },
@@ -254,18 +267,18 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         autoAdvanceOn: 'CLANDESTINE_MENU_OPENED:high_cliffs_tutorial',
         hideNextButton: true,
     },
-    // Step 21: Clandestine info (read-only) — NO actions, not even close menu
-    {
-        id: 'step_21',
-        titleKey: 'tutorial:tutorial.steps.step_21.title',
-        textKey: 'tutorial:tutorial.steps.step_21.text',
-        allowedActions: [{ type: 'NONE' }],
-    },
-    // Step 22: Prepare grand insurrection (Phase 2 — slider validation + GRAND_INSURRECTION)
+    // Step 22: Clandestine info (read-only) — NO actions, not even close menu
     {
         id: 'step_22',
         titleKey: 'tutorial:tutorial.steps.step_22.title',
         textKey: 'tutorial:tutorial.steps.step_22.text',
+        allowedActions: [{ type: 'NONE' }],
+    },
+    // Step 23: Prepare grand insurrection (Phase 2 — slider validation + GRAND_INSURRECTION)
+    {
+        id: 'step_23',
+        titleKey: 'tutorial:tutorial.steps.step_23.title',
+        textKey: 'tutorial:tutorial.steps.step_23.text',
         highlights: [
             { zone: 'SPECIFIC_ELEMENT', cssSelector: '[data-tutorial="clandestine-action-prepare-grand-insurrection"]' },
         ],
@@ -275,11 +288,11 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         autoAdvanceOn: 'GRAND_INSURRECTION_LAUNCHED',
         hideNextButton: true,
     },
-    // Step 23: Tutorial complete — free play
+    // Step 24: Tutorial complete — free play
     {
-        id: 'step_23',
-        titleKey: 'tutorial:tutorial.steps.step_23.title',
-        textKey: 'tutorial:tutorial.steps.step_23.text',
+        id: 'step_24',
+        titleKey: 'tutorial:tutorial.steps.step_24.title',
+        textKey: 'tutorial:tutorial.steps.step_24.text',
         allowedActions: [{ type: 'ANY' }],
     },
 ];
