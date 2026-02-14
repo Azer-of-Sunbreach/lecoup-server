@@ -10,7 +10,16 @@ export enum FactionId {
     // Valis Factions (Future support)
     LOYALISTS = 'LOYALISTS',
     PRINCELY_ARMY = 'PRINCELY_ARMY',
-    CONFEDERATE_CITIES = 'CONFEDERATE_CITIES'
+    CONFEDERATE_CITIES = 'CONFEDERATE_CITIES',
+
+    // Thyrakat Tutorial Factions
+    LARION_KNIGHTS = 'LARION_KNIGHTS',
+    THYRAKAT_SULTANATE = 'THYRAKAT_SULTANATE',
+
+    // Thyrakat Factions
+    LINEAGES_COUNCIL = 'LINEAGES_COUNCIL',
+    OATH_COALITION = 'OATH_COALITION',
+    LARION_EXPEDITION = 'LARION_EXPEDITION'
 }
 
 export interface PlayerInfo {

@@ -89,7 +89,12 @@ export function createMultiplayerGameState(
         [FactionId.NEUTRAL]: { gold: 0 },
         [FactionId.LOYALISTS]: { gold: 0 },
         [FactionId.PRINCELY_ARMY]: { gold: 0 },
-        [FactionId.CONFEDERATE_CITIES]: { gold: 0 }
+        [FactionId.CONFEDERATE_CITIES]: { gold: 0 },
+        [FactionId.LARION_KNIGHTS]: { gold: 0 },
+        [FactionId.THYRAKAT_SULTANATE]: { gold: 0 },
+        [FactionId.LINEAGES_COUNCIL]: { gold: 0 },
+        [FactionId.OATH_COALITION]: { gold: 0 },
+        [FactionId.LARION_EXPEDITION]: { gold: 0 }
     };
 
     // Turn order: humans first (in faction order), then AI last
@@ -309,54 +314,27 @@ export function processPlayerAction(
             break;
         }
 
-        case 'ATTACH_LEADER': {
-            const result = executeAttachLeader(updatedState, action.armyId, action.characterId);
-            if (!result.success) {
-                return { success: false, newState: state, error: result.message || 'Failed to attach leader' };
-            }
-            updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
-            break;
-        }
-
-        case 'DETACH_LEADER': {
-            const result = executeDetachLeader(updatedState, action.characterId);
-            if (!result.success) {
-                return { success: false, newState: state, error: result.message || 'Failed to detach leader' };
-            }
-            updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
-            break;
-        }
-
-        case 'MOVE_LEADER': {
-            const result = executeMoveLeader(updatedState, action.characterId, action.destinationId);
-            if (!result.success) {
-                return { success: false, newState: state, error: result.message || 'Failed to move leader' };
-            }
-            updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
-            break;
-        }
-
         // === NEW: Leader Recruitment (Conspirators) ===
         case 'RECRUIT_LEADER': {
             // Validate faction
             if (playerFaction !== FactionId.CONSPIRATORS) {
                 return { success: false, newState: state, error: 'Only Conspirators can use RECRUIT_LEADER' };
             }
-            
+
             // Get player-controlled locations
             const conspiratorLocations = updatedState.locations.filter(l => l.faction === playerFaction);
-            
+
             // Determine destination (use provided or calculate default)
             const destinationId = action.destinationId || getConspiratorRecruitmentDestination(
                 action.leaderId,
                 updatedState.locations,
                 conspiratorLocations
             );
-            
+
             if (!destinationId) {
                 return { success: false, newState: state, error: 'No valid recruitment destination' };
             }
-            
+
             const result = executeConspiratorRecruitLeader(
                 updatedState.characters,
                 action.leaderId,
@@ -364,11 +342,11 @@ export function processPlayerAction(
                 conspiratorLocations,
                 updatedState.resources[playerFaction].gold
             );
-            
+
             if (!result.success) {
                 return { success: false, newState: state, error: result.error || 'Failed to recruit leader' };
             }
-            
+
             // Apply changes
             updatedState = {
                 ...updatedState,
@@ -381,7 +359,7 @@ export function processPlayerAction(
                     }
                 }
             } as MultiplayerGameState;
-            
+
             console.log(`[SERVER] Conspirators recruited leader ${action.leaderId} for ${result.goldCost}g`);
             break;
         }
@@ -392,10 +370,10 @@ export function processPlayerAction(
             if (playerFaction !== FactionId.NOBLES) {
                 return { success: false, newState: state, error: 'Only Nobles can use RECRUIT_NOBLES_LEADER' };
             }
-            
+
             // Get player-controlled locations
             const noblesLocations = updatedState.locations.filter(l => l.faction === playerFaction);
-            
+
             const result = executeNoblesRecruitLeader(
                 updatedState.characters,
                 action.leaderId,
@@ -404,11 +382,11 @@ export function processPlayerAction(
                 action.destinationId,
                 action.fiefdomLocationId
             );
-            
+
             if (!result.success) {
                 return { success: false, newState: state, error: result.error || 'Failed to recruit Nobles leader' };
             }
-            
+
             // Apply changes
             updatedState = {
                 ...updatedState,
@@ -422,7 +400,7 @@ export function processPlayerAction(
                     }
                 } : updatedState.resources
             } as MultiplayerGameState;
-            
+
             // Handle special effects (army creation for Duke of Esmarch)
             if (result.newArmy) {
                 const newArmy = {
@@ -444,7 +422,7 @@ export function processPlayerAction(
                 };
                 updatedState.armies = [...updatedState.armies, newArmy];
             }
-            
+
             console.log(`[SERVER] Nobles recruited leader ${action.leaderId} with fiefdom at ${action.fiefdomLocationId}`);
             break;
         }
@@ -458,11 +436,11 @@ export function processPlayerAction(
                 action.goldBudget,
                 playerFaction
             );
-            
+
             if (!result.success) {
                 return { success: false, newState: state, error: result.error || 'Failed to send undercover mission' };
             }
-            
+
             updatedState = { ...updatedState, ...result.newState } as MultiplayerGameState;
             console.log(`[SERVER] ${playerFaction} sent ${action.leaderId} undercover to ${action.targetLocationId} with ${action.goldBudget}g`);
             break;
@@ -480,12 +458,12 @@ export function processPlayerAction(
             if (leader.locationId !== action.locationId) {
                 return { success: false, newState: state, error: 'Leader is not at this location' };
             }
-            
+
             const location = updatedState.locations.find(l => l.id === action.locationId);
             if (!location || location.faction !== playerFaction) {
                 return { success: false, newState: state, error: 'Location not controlled by your faction' };
             }
-            
+
             // Update leader status to GOVERNING and set policies
             const updatedCharacters = updatedState.characters.map(c => {
                 if (c.id === action.characterId) {
@@ -497,26 +475,26 @@ export function processPlayerAction(
                 }
                 return c;
             });
-            
+
             // Update location governor policies
             const newGovernorPolicies: Partial<Record<GovernorPolicy, boolean>> = {};
             for (const policy of action.policies) {
                 newGovernorPolicies[policy as GovernorPolicy] = true;
             }
-            
+
             const updatedLocations = updatedState.locations.map(l => {
                 if (l.id === action.locationId) {
                     return { ...l, governorPolicies: newGovernorPolicies };
                 }
                 return l;
             });
-            
+
             updatedState = {
                 ...updatedState,
                 characters: updatedCharacters,
                 locations: updatedLocations
             } as MultiplayerGameState;
-            
+
             console.log(`[SERVER] ${leader.name} now governing ${location.name} with policies: ${action.policies.join(', ')}`);
             break;
         }
@@ -529,11 +507,11 @@ export function processPlayerAction(
             if (updatedState.chosenInternalFaction) {
                 return { success: false, newState: state, error: 'Internal faction already chosen' };
             }
-            
+
             const playerGold = updatedState.resources[playerFaction].gold;
             let result;
             let goldCost = 0;
-            
+
             switch (action.choice) {
                 case 'KNIGHTLY_COUP':
                     if (playerGold < KNIGHTLY_COUP_GOLD_COST) {
@@ -546,7 +524,7 @@ export function processPlayerAction(
                     );
                     goldCost = KNIGHTLY_COUP_GOLD_COST;
                     break;
-                    
+
                 case 'RABBLE_VICTORY':
                     result = executeRabbleVictoryChoice(
                         updatedState.characters,
@@ -555,7 +533,7 @@ export function processPlayerAction(
                     );
                     goldCost = 0; // Free
                     break;
-                    
+
                 case 'MERCHANT_DOMINATION':
                     if (playerGold < MERCHANT_DOMINATION_GOLD_COST) {
                         return { success: false, newState: state, error: `Not enough gold (need ${MERCHANT_DOMINATION_GOLD_COST})` };
@@ -567,15 +545,15 @@ export function processPlayerAction(
                     );
                     goldCost = MERCHANT_DOMINATION_GOLD_COST;
                     break;
-                    
+
                 default:
                     return { success: false, newState: state, error: 'Invalid internal faction choice' };
             }
-            
+
             if (!result.success) {
                 return { success: false, newState: state, error: result.error || 'Failed to apply internal faction choice' };
             }
-            
+
             updatedState = {
                 ...updatedState,
                 characters: result.updatedCharacters,
@@ -588,7 +566,7 @@ export function processPlayerAction(
                     }
                 }
             } as MultiplayerGameState;
-            
+
             console.log(`[SERVER] Republicans chose internal faction: ${action.choice} (cost: ${goldCost}g)`);
             break;
         }
