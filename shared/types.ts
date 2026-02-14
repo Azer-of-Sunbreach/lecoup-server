@@ -778,6 +778,8 @@ export type GameAction =
   | { type: 'SEND_UNDERCOVER'; targetLocationId: string; leaderId: string; goldBudget: number; faction: FactionId }
   // === NEW: Governor Policies Action ===
   | { type: 'SET_GOVERNOR_POLICIES'; locationId: string; characterId: string; policies: string[]; faction: FactionId }
+  // === NEW: Appoint Governor Action ===
+  | { type: 'APPOINT_GOVERNOR'; leaderId: string; locationId: string; faction: FactionId }
   // === NEW: Internal Faction Choice (Republicans) ===
   | { type: 'CHOOSE_INTERNAL_FACTION'; choice: 'KNIGHTLY_COUP' | 'RABBLE_VICTORY' | 'MERCHANT_DOMINATION'; faction: FactionId };
 
