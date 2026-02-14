@@ -36,6 +36,8 @@ import {
     executeConscription
 } from '../../shared/services/domain';
 import { executeRetreat } from '../../shared/services/domain/retreat';
+// Governor Service
+import { executeAppointGovernor } from '../../shared/services/domain/governor/governorService';
 // Leader Recruitment
 import {
     executeConspiratorRecruitLeader,
@@ -568,6 +570,31 @@ export function processPlayerAction(
             } as MultiplayerGameState;
 
             console.log(`[SERVER] Republicans chose internal faction: ${action.choice} (cost: ${goldCost}g)`);
+            break;
+        }
+
+        // === APPOINT_GOVERNOR ===
+        case 'APPOINT_GOVERNOR': {
+            const result = executeAppointGovernor(
+                updatedState.characters,
+                action.leaderId,
+                action.locationId,
+                updatedState.locations,
+                updatedState.roads,
+                playerFaction
+            );
+
+            if (!result.success) {
+                return { success: false, newState: state, error: result.error || 'Failed to appoint governor' };
+            }
+
+            updatedState = {
+                ...updatedState,
+                characters: result.updatedCharacters!,
+                locations: result.updatedLocations || updatedState.locations
+            } as MultiplayerGameState;
+
+            console.log(`[SERVER] ${playerFaction} appointed ${action.leaderId} as governor of ${action.locationId}`);
             break;
         }
 
