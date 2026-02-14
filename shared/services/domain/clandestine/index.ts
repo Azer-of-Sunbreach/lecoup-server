@@ -47,3 +47,7 @@ export {
     shouldExecuteImmediately
 } from './executeImmediateGrandInsurrection';
 export type { ImmediateGrandInsurrectionResult } from './executeImmediateGrandInsurrection';
+
+// Update Leader Clandestine Actions (multiplayer support)
+export { executeUpdateLeaderClandestineActions } from './updateLeaderClandestineActions';
+export type { UpdateClandestineActionsResult } from './updateLeaderClandestineActions';
