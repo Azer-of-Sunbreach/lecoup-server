@@ -79,7 +79,8 @@ export function calculateFoodSurplus(
     locations: Location[],
     armies: Army[],
     characters: Character[],
-    faction: FactionId = FactionId.NOBLES
+    faction: FactionId = FactionId.NOBLES,
+    mapId?: string
 ): FoodSurplusResult {
     const controlledLocations = locations.filter(l => l.faction === faction);
     const controlledIds = new Set(controlledLocations.map(l => l.id));
@@ -96,8 +97,8 @@ export function calculateFoodSurplus(
             const rural = locations.find(l => l.id === city.linkedLocationId);
             if (rural && rural.type === 'RURAL') {
                 // Use territorialStats for accurate calculation
-                const ruralStats = calculateRuralFoodStats(rural, locations, armies, characters);
-                const cityStats = calculateCityFoodStats(city, locations, armies, characters);
+                const ruralStats = calculateRuralFoodStats(rural, locations, armies, characters, mapId);
+                const cityStats = calculateCityFoodStats(city, locations, armies, characters, mapId);
                 
                 // Net food = rural production - city consumption (excluding rural supply since it's circular)
                 const ruralProduction = ruralStats?.netProduction || 0;
@@ -148,9 +149,10 @@ export function selectFiefLocation(
     armies: Army[],
     characters: Character[],
     faction: FactionId = FactionId.NOBLES,
-    leaderValue: number = 0
+    leaderValue: number = 0,
+    mapId?: string
 ): FiefSelectionResult {
-    const surplusResult = calculateFoodSurplus(locations, armies, characters, faction);
+    const surplusResult = calculateFoodSurplus(locations, armies, characters, faction, mapId);
     const controlledLocations = locations.filter(l => l.faction === faction);
 
     // Get all locations without existing fief

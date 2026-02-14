@@ -142,7 +142,7 @@ export function processAINoblesRecruitment(
     // =========================================================================
     const livingLeaders = getLivingNoblesLeaders(state.characters);
     const factionRevenues = getFactionRevenues(state.locations, faction);
-    const foodSurplusResult = calculateFoodSurplus(state.locations, state.armies, state.characters, faction);
+    const foodSurplusResult = calculateFoodSurplus(state.locations, state.armies, state.characters, faction, state.mapId);
 
     const evaluationContext: NoblesLeaderEvaluationContext = {
         locations: state.locations,
@@ -202,7 +202,8 @@ export function processAINoblesRecruitment(
         state.armies,
         state.characters,
         faction,
-        bestLeader.totalValue
+        bestLeader.totalValue,
+        state.mapId
     );
 
     if (!fiefSelection.canGrantFief) {

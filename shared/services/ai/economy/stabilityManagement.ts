@@ -50,6 +50,28 @@ export const STABILITY_THRESHOLDS: Record<FactionId, { normal: number; emergency
     [FactionId.CONFEDERATE_CITIES]: {
         normal: 50,
         emergency: 40
+    },
+    // Thyrakat Tutorial factions
+    [FactionId.LARION_KNIGHTS]: {
+        normal: 50,
+        emergency: 40
+    },
+    [FactionId.THYRAKAT_SULTANATE]: {
+        normal: 50,
+        emergency: 40
+    },
+    // Thyrakat factions
+    [FactionId.LINEAGES_COUNCIL]: {
+        normal: 50,
+        emergency: 40
+    },
+    [FactionId.OATH_COALITION]: {
+        normal: 50,
+        emergency: 40
+    },
+    [FactionId.LARION_EXPEDITION]: {
+        normal: 50,
+        emergency: 40
     }
 };
 
