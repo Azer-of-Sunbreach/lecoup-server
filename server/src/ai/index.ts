@@ -14,11 +14,12 @@ import { findBestSiegeOpportunity, reserveSiegeBudget } from '../../../shared/se
 import { executeSiegeFromOpportunity, executeCaptureFromOpportunity } from '../../../shared/services/ai/military/siegeExecution';
 import { distributeClandestineBudget } from '../../../shared/services/ai/budgetDistributor';
 
-import { manageLeadersUnified } from '../../../shared/services/ai/leaders';
+import { manageLeadersUnified } from '../../../shared/services/ai/leaders/core/UnifiedLeaderManager';
 // AI Leader Recruitment (CONSPIRATORS)
-import { calculateRecruitmentBudgetReservation, processAIRecruitment, ENABLE_RECRUITMENT_LOGS } from '../../../shared/services/ai/leaders/recruitment';
+import { calculateRecruitmentBudgetReservation, processAIRecruitment } from '../../../shared/services/ai/leaders/recruitment/AIConspiratorsRecruitment';
+import { ENABLE_RECRUITMENT_LOGS } from '../../../shared/services/ai/leaders/recruitment/RecruitmentFundManager';
 // AI Leader Recruitment (NOBLES)
-import { processAINoblesRecruitment, applyNoblesRecruitmentResults } from '../../../shared/services/ai/leaders/recruitment';
+import { processAINoblesRecruitment, applyNoblesRecruitmentResults } from '../../../shared/services/ai/leaders/recruitment/AINoblesRecruitment';
 // Insurrection Defense (shared) - Import directly from source file
 import { detectInsurrectionThreats, convertToAlerts, dispatchEmergencyReinforcements } from '../../../shared/services/ai/strategy/insurrectionDefense';
 // Stability Management (shared)
