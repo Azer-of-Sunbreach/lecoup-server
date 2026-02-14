@@ -9,8 +9,8 @@ import { manageDiplomacy } from './diplomacy';
 import { manageMilitary } from './military';
 import { AIBudget } from './types';
 import { applyBalancedRecruitmentOverride, allocateSiegeBudget } from './economy/budget';
-// Siege Priority (shared)
-import { findBestSiegeOpportunity, reserveSiegeBudget } from '../../../shared/services/ai/military';
+// Siege Priority (shared) - Import directly from source files to avoid re-export issues
+import { findBestSiegeOpportunity, reserveSiegeBudget } from '../../../shared/services/ai/military/siegePriority';
 import { executeSiegeFromOpportunity, executeCaptureFromOpportunity } from '../../../shared/services/ai/military/siegeExecution';
 import { distributeClandestineBudget } from '../../../shared/services/ai/budgetDistributor';
 
@@ -19,8 +19,8 @@ import { manageLeadersUnified } from '../../../shared/services/ai/leaders';
 import { calculateRecruitmentBudgetReservation, processAIRecruitment, ENABLE_RECRUITMENT_LOGS } from '../../../shared/services/ai/leaders/recruitment';
 // AI Leader Recruitment (NOBLES)
 import { processAINoblesRecruitment, applyNoblesRecruitmentResults } from '../../../shared/services/ai/leaders/recruitment';
-// Insurrection Defense (shared)
-import { detectInsurrectionThreats, convertToAlerts, dispatchEmergencyReinforcements } from '../../../shared/services/ai/strategy';
+// Insurrection Defense (shared) - Import directly from source file
+import { detectInsurrectionThreats, convertToAlerts, dispatchEmergencyReinforcements } from '../../../shared/services/ai/strategy/insurrectionDefense';
 // Stability Management (shared)
 import { enforceHighTaxLimits, detectEmergency } from '../../../shared/services/ai/economy/stabilityManagement';
 // Republicans Internal Factions (shared)
@@ -38,12 +38,14 @@ import {
  */
 export const processSingleFactionAITurn = (gameState: GameState, faction: FactionId): GameState => {
     // START HUMAN CHECK (Double safety)
-    const playerFactions = (gameState as any).playerFactions || (gameState.playerFaction ? [gameState.playerFaction] : []);
-    if (playerFactions.includes(faction)) {
+    // Note: In multiplayer, humanFactions is used instead of playerFactions
+    const humanFactions = (gameState as any).humanFactions || (gameState as any).playerFactions || (gameState.playerFaction ? [gameState.playerFaction] : []);
+    if (humanFactions.includes(faction)) {
         console.warn(`[AI SERVER] Attempted to process AI for HUMAN faction ${faction}. Aborting.`);
         return gameState;
     }
     // END HUMAN CHECK
+    console.log(`[AI SERVER] processSingleFactionAITurn starting for ${faction}, humanFactions=${JSON.stringify(humanFactions)}`);
 
     let state = { ...gameState };
     const profile = AI_PROFILES[faction];
