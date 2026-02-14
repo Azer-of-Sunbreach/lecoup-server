@@ -78,13 +78,21 @@ export const FORTIFICATION_LEVELS: Record<number, FortificationLevel> = {
 export const INITIAL_PLAYER_RESOURCES = {
     REPUBLICANS: 1000,
     CONSPIRATORS: 350,
-    NOBLES: 500
+    NOBLES: 500,
+    // Thyrakat
+    LINEAGES_COUNCIL: 400,
+    OATH_COALITION: 400,
+    LARION_EXPEDITION: 800
 };
 
 export const INITIAL_AI_RESOURCES = {
     REPUBLICANS: 3000,
     CONSPIRATORS: 850,
-    NOBLES: 1200
+    NOBLES: 1200,
+    // Thyrakat
+    LINEAGES_COUNCIL: 800,
+    OATH_COALITION: 800,
+    LARION_EXPEDITION: 1600
 };
 
 // Deprecated constants kept for compatibility

@@ -194,13 +194,54 @@ export const LARION_ALTERNATE_NAVAL_TIMES: Record<string, Record<string, number>
 };
 
 // ===========================================
+// THYRAKAT - 6 ports
+// ===========================================
+export const THYRAKAT_PORTS = [
+    'faith_pier',
+    'harabour',
+    'yehid',
+    'Maqom',
+    'het-yod',
+    'saphir',
+];
+
+export const THYRAKAT_NAVAL_TIMES: Record<string, Record<string, number>> = {
+    faith_pier: {
+        harabour: 3,
+        yehid: 6,
+        Maqom: 7,
+        'het-yod': 10,
+        saphir: 12
+    },
+    harabour: {
+        yehid: 3,
+        Maqom: 4,
+        'het-yod': 7,
+        saphir: 9
+    },
+    yehid: {
+        Maqom: 1,
+        'het-yod': 4,
+        saphir: 6
+    },
+    Maqom: {
+        'het-yod': 3,
+        saphir: 5
+    },
+    'het-yod': {
+        saphir: 2
+    },
+};
+
+// ===========================================
 // ALL_PORTS - Union of all ports from all maps
 // Used for map-agnostic port detection
 // ===========================================
 export const ALL_PORTS: Set<string> = new Set([
     ...LARION_PORTS,
     ...LARION_LARGE_PORTS,
-    ...LARION_ALTERNATE_PORTS
+    ...LARION_ALTERNATE_PORTS,
+    ...THYRAKAT_PORTS
 ]);
 
 /**
@@ -211,7 +252,7 @@ export const isPort = (locationId: string): boolean => ALL_PORTS.has(locationId)
 // ===========================================
 // Map-specific accessors
 // ===========================================
-export type MapId = 'larion' | 'larion_large' | 'larion_alternate';
+export type MapId = 'larion' | 'larion_large' | 'larion_alternate' | 'thyrakat' | 'thyrakat_tutorial';
 
 export const getPortsForMap = (mapId: MapId | undefined): string[] => {
     switch (mapId) {
@@ -219,6 +260,9 @@ export const getPortsForMap = (mapId: MapId | undefined): string[] => {
             return LARION_LARGE_PORTS;
         case 'larion':
             return LARION_PORTS;
+        case 'thyrakat':
+        case 'thyrakat_tutorial':
+            return THYRAKAT_PORTS;
         case 'larion_alternate':
         default:
             return LARION_ALTERNATE_PORTS;
@@ -231,6 +275,9 @@ export const getNavalTimesForMap = (mapId: MapId | undefined): Record<string, Re
             return LARION_LARGE_NAVAL_TIMES;
         case 'larion':
             return LARION_NAVAL_TIMES;
+        case 'thyrakat':
+        case 'thyrakat_tutorial':
+            return THYRAKAT_NAVAL_TIMES;
         case 'larion_alternate':
         default:
             return LARION_ALTERNATE_NAVAL_TIMES;
@@ -270,7 +317,8 @@ const mergeNavalTimes = (...timesTables: Record<string, Record<string, number>>[
 export const ALL_NAVAL_TIMES: Record<string, Record<string, number>> = mergeNavalTimes(
     LARION_NAVAL_TIMES,
     LARION_LARGE_NAVAL_TIMES,
-    LARION_ALTERNATE_NAVAL_TIMES
+    LARION_ALTERNATE_NAVAL_TIMES,
+    THYRAKAT_NAVAL_TIMES
 );
 
 /**

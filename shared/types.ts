@@ -1,5 +1,6 @@
 
 export * from './types/governorTypes';
+export * from './types/tutorialTypes';
 
 export enum FactionId {
   REPUBLICANS = 'REPUBLICANS',
@@ -10,6 +11,15 @@ export enum FactionId {
   LOYALISTS = 'LOYALISTS',
   PRINCELY_ARMY = 'PRINCELY_ARMY',
   CONFEDERATE_CITIES = 'CONFEDERATE_CITIES',
+
+  // Thyrakat Tutorial Factions
+  LARION_KNIGHTS = 'LARION_KNIGHTS',
+  THYRAKAT_SULTANATE = 'THYRAKAT_SULTANATE',
+
+  // Thyrakat Factions
+  LINEAGES_COUNCIL = 'LINEAGES_COUNCIL',
+  OATH_COALITION = 'OATH_COALITION',
+  LARION_EXPEDITION = 'LARION_EXPEDITION',
 
   NEUTRAL = 'NEUTRAL'
 }
@@ -106,7 +116,7 @@ export interface LogEntry {
 }
 
 // Extended to include new abilities from leader system refactoring
-export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND' | 'MAN_OF_CHURCH' | 'DAREDEVIL' | 'GHOST' | 'PARANOID' | 'SMUGGLER' | 'ELITE_NETWORKS' | 'CONSCRIPTION' | 'AGITATIONAL_NETWORKS';
+export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND' | 'MAN_OF_CHURCH' | 'DAREDEVIL' | 'GHOST' | 'PARANOID' | 'SMUGGLER' | 'ELITE_NETWORKS' | 'CONSCRIPTION' | 'AGITATIONAL_NETWORKS' | 'PREEXISTING_CELLS';
 
 // Re-export new leader types for easy access
 export * from './types/leaderTypes';
@@ -625,6 +635,15 @@ export const FACTION_COLORS = {
   [FactionId.CONSPIRATORS]: 'text-amber-400 bg-amber-900 border-amber-500',
   [FactionId.NOBLES]: 'text-red-400 bg-red-900 border-red-500',
   [FactionId.NEUTRAL]: 'text-gray-400 bg-gray-800 border-gray-500',
+
+  // Thyrakat Tutorial
+  [FactionId.LARION_KNIGHTS]: 'text-yellow-400 bg-stone-950 border-yellow-600',
+  [FactionId.THYRAKAT_SULTANATE]: 'text-purple-400 bg-purple-950 border-purple-500',
+
+  // Thyrakat main factions
+  [FactionId.LINEAGES_COUNCIL]: 'text-purple-400 bg-purple-900 border-purple-500',
+  [FactionId.OATH_COALITION]: 'text-stone-200 bg-stone-800 border-stone-400',
+  [FactionId.LARION_EXPEDITION]: 'text-red-400 bg-red-900 border-red-500',
 };
 
 export const FACTION_NAMES = {
@@ -632,6 +651,15 @@ export const FACTION_NAMES = {
   [FactionId.CONSPIRATORS]: 'Conspirators',
   [FactionId.NOBLES]: "Nobles' rights faction",
   [FactionId.NEUTRAL]: 'Neutral',
+
+  // Thyrakat Tutorial
+  [FactionId.LARION_KNIGHTS]: 'Knights of Larion',
+  [FactionId.THYRAKAT_SULTANATE]: 'Thyrakat Sultanate',
+
+  // Thyrakat main factions
+  [FactionId.LINEAGES_COUNCIL]: 'Council of Lineages',
+  [FactionId.OATH_COALITION]: 'Coalition of the Oath',
+  [FactionId.LARION_EXPEDITION]: "Larion's Expedition",
 };
 
 // --- MULTIPLAYER TYPES ---

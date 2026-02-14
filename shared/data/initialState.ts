@@ -58,6 +58,22 @@ export const getInitialResources = (playerFaction: FactionId) => {
                 ? INITIAL_PLAYER_RESOURCES.NOBLES
                 : INITIAL_AI_RESOURCES.NOBLES
         },
+        // Thyrakat
+        [FactionId.LINEAGES_COUNCIL]: {
+            gold: playerFaction === FactionId.LINEAGES_COUNCIL
+                ? INITIAL_PLAYER_RESOURCES.LINEAGES_COUNCIL
+                : INITIAL_AI_RESOURCES.LINEAGES_COUNCIL
+        },
+        [FactionId.OATH_COALITION]: {
+            gold: playerFaction === FactionId.OATH_COALITION
+                ? INITIAL_PLAYER_RESOURCES.OATH_COALITION
+                : INITIAL_AI_RESOURCES.OATH_COALITION
+        },
+        [FactionId.LARION_EXPEDITION]: {
+            gold: playerFaction === FactionId.LARION_EXPEDITION
+                ? INITIAL_PLAYER_RESOURCES.LARION_EXPEDITION
+                : INITIAL_AI_RESOURCES.LARION_EXPEDITION
+        },
         [FactionId.NEUTRAL]: { gold: 0 },
     };
 };
@@ -89,9 +105,26 @@ export const createInitialState = (playerFaction: FactionId, mapId: MapId = 'lar
             [FactionId.REPUBLICANS]: { gold: INITIAL_PLAYER_RESOURCES.REPUBLICANS },
             [FactionId.CONSPIRATORS]: { gold: INITIAL_PLAYER_RESOURCES.CONSPIRATORS },
             [FactionId.NOBLES]: { gold: INITIAL_PLAYER_RESOURCES.NOBLES },
-            [FactionId.LOYALISTS]: { gold: 1000 },
-            [FactionId.PRINCELY_ARMY]: { gold: 1000 },
-            [FactionId.CONFEDERATE_CITIES]: { gold: 1000 },
+            [FactionId.LOYALISTS]: { gold: 500 },
+            [FactionId.PRINCELY_ARMY]: { gold: 500 },
+            [FactionId.CONFEDERATE_CITIES]: { gold: 500 },
+            [FactionId.LARION_KNIGHTS]: { gold: 500 },
+            [FactionId.THYRAKAT_SULTANATE]: { gold: 500 },
+            [FactionId.LINEAGES_COUNCIL]: {
+                gold: playerFaction === FactionId.LINEAGES_COUNCIL
+                    ? INITIAL_PLAYER_RESOURCES.LINEAGES_COUNCIL
+                    : INITIAL_AI_RESOURCES.LINEAGES_COUNCIL
+            },
+            [FactionId.OATH_COALITION]: {
+                gold: playerFaction === FactionId.OATH_COALITION
+                    ? INITIAL_PLAYER_RESOURCES.OATH_COALITION
+                    : INITIAL_AI_RESOURCES.OATH_COALITION
+            },
+            [FactionId.LARION_EXPEDITION]: {
+                gold: playerFaction === FactionId.LARION_EXPEDITION
+                    ? INITIAL_PLAYER_RESOURCES.LARION_EXPEDITION
+                    : INITIAL_AI_RESOURCES.LARION_EXPEDITION
+            },
             [FactionId.NEUTRAL]: { gold: 0 },
         },
         pendingNegotiations: [],

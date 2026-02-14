@@ -1,6 +1,6 @@
 import { FactionId, GameState, Location, Army, Character, Road } from '../types';
 
-export type MapId = 'larion' | 'larion_alternate' | 'valis';
+export type MapId = 'larion' | 'larion_alternate' | 'valis' | 'thyrakat_tutorial' | 'thyrakat';
 
 export interface FactionMetadata {
     id: FactionId;

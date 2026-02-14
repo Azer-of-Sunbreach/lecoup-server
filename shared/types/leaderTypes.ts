@@ -80,7 +80,8 @@ export type LeaderAbilityNew =
     | 'SMUGGLER'       // Generates food in a city if rural area is not controlled
     | 'ELITE_NETWORKS' // No costs for propaganda actions if resentment < 50
     | 'CONSCRIPTION'   // Reduces recruitment cost
-    | 'AGITATIONAL_NETWORKS'; // +200 gold for new missions if resentment < 60
+    | 'AGITATIONAL_NETWORKS' // +200 gold for new missions if resentment < 60
+    | 'PREEXISTING_CELLS'; // Instant GRAND_INSURRECTION without 4-turn preparation
 
 /**
  * Tooltips for leader statistics.
@@ -109,7 +110,8 @@ export const LEADER_ABILITY_TOOLTIPS = {
     SMUGGLER: 'When in a city you control whose rural area is controlled by another faction, generate up to 15 food per turn.',
     ELITE_NETWORKS: 'As long as resentment against your faction in a region is under 50, will incur no costs there for Undermine authorities, Distribute sediitous pamphlets and Spread propaganda.',
     CONSCRIPTION: 'Once per turn, reduce the recruitment cost in the region he\'s in from 50 to 25 gold.',
-    AGITATIONAL_NETWORKS: 'When sent in a new clandestine mission in a region where resentment against your faction is below 60, gather 200 extra gold. Doesn\'t work when being exfiltrated.'
+    AGITATIONAL_NETWORKS: 'When sent in a new clandestine mission in a region where resentment against your faction is below 60, gather 200 extra gold. Doesn\'t work when being exfiltrated.',
+    PREEXISTING_CELLS: 'This leader is able to launch uprisings under his banner immediately, without four turns of preparation.'
 } as const;
 
 /**
