@@ -8,7 +8,7 @@ import { StabilityProcessingResult } from './types';
  * Uses stabilityModifierOverride if set (from Internal Factions effects),
  * otherwise falls back to stats.stabilityPerTurn.
  */
-function getEffectiveStabilityModifier(character: Character): number {
+export function getEffectiveStabilityModifier(character: Character): number {
     return character.stabilityModifierOverride ?? character.stats.stabilityPerTurn;
 }
 
