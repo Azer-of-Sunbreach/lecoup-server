@@ -11,10 +11,8 @@
 import { FactionId, Location, Army, Road, Character } from '../../../../types';
 import { AIBudget, FactionPersonality } from '../types';
 import { InsurrectionAlert } from '../strategy/insurrectionDefense';
-import { 
-    handleRecruitment as sharedHandleRecruitment,
-    InsurrectionAlert as SharedInsurrectionAlert
-} from '../../economy';
+import { handleRecruitment as sharedHandleRecruitment } from '../../economy/recruitment';
+import { InsurrectionAlert as SharedInsurrectionAlert } from '../../economy/types';
 
 // Re-export types for backwards compatibility
 export type { InsurrectionAlert } from '../strategy/insurrectionDefense';

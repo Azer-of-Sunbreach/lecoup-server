@@ -10,15 +10,16 @@ import { enforceHighTaxLimits, detectEmergency } from '../economy/stabilityManag
 import { manageDiplomacy } from './diplomacy';
 import { manageMilitary } from './military';
 // Use unified IPG-based leader assignment system (shared between solo and multiplayer)
-import { manageLeadersUnified } from '../leaders';
+import { manageLeadersUnified } from '../leaders/core/UnifiedLeaderManager';
 import { AIBudget } from './types';
 import { applyBalancedRecruitmentOverride, allocateSiegeBudget } from './economy/budget';
-import { findBestSiegeOpportunity, reserveSiegeBudget } from './military/siegePriority';
+import { findBestSiegeOpportunity, reserveSiegeBudget } from '../military/siegePriority';
 import { executeSiegeFromOpportunity, executeCaptureFromOpportunity } from '../military/siegeExecution';
 // AI Leader Recruitment (CONSPIRATORS)
-import { calculateRecruitmentBudgetReservation, processAIRecruitment, ENABLE_RECRUITMENT_LOGS } from '../leaders/recruitment';
+import { calculateRecruitmentBudgetReservation, processAIRecruitment } from '../leaders/recruitment/AIConspiratorsRecruitment';
+import { ENABLE_RECRUITMENT_LOGS } from '../leaders/recruitment/RecruitmentFundManager';
 // AI Leader Recruitment (NOBLES)
-import { processAINoblesRecruitment, applyNoblesRecruitmentResults } from '../leaders/recruitment';
+import { processAINoblesRecruitment, applyNoblesRecruitmentResults } from '../leaders/recruitment/AINoblesRecruitment';
 
 export const processAITurn = (gameState: GameState): GameState => {
     let state = { ...gameState };

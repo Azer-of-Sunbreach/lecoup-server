@@ -13,8 +13,8 @@ import { handleRoadDefense } from './military/roadDefense';
 import { handleIdleArmies } from './military/idleHandler';
 import { handleEnRouteReversals } from './military/reversalHandler';
 
-// Siege sortie (breaking enemy sieges of our cities)
-import { processSiegeSorties } from '../military';
+// Siege sortie (breaking enemy sieges of our cities) - Import directly from source
+import { processSiegeSorties } from '../military/siegeSortie';
 
 /**
  * Main military management function for AI factions.
