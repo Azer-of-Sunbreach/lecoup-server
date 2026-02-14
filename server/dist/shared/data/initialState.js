@@ -8,7 +8,6 @@ exports.createInitialState = exports.getInitialResources = exports.generateIniti
 const types_1 = require("../types");
 const larion_alternate_1 = require("./maps/larion_alternate");
 const larion_alternate_2 = require("./maps/larion_alternate");
-const characters_1 = require("./characters");
 const gameConstants_1 = require("./gameConstants");
 /**
  * Generate initial armies based on garrison data and locations
@@ -64,49 +63,60 @@ const getInitialResources = (playerFaction) => {
     };
 };
 exports.getInitialResources = getInitialResources;
+const MapRegistry_1 = require("../maps/MapRegistry");
 /**
  * Create the initial game state for starting a new game
  */
-const createInitialState = () => ({
-    turn: 1,
-    playerFaction: types_1.FactionId.REPUBLICANS,
-    locations: larion_alternate_1.LARION_ALTERNATE_LOCATIONS,
-    characters: characters_1.CHARACTERS_NEW,
-    armies: (0, exports.generateInitialArmies)(),
-    convoys: [],
-    navalConvoys: [],
-    roads: larion_alternate_2.LARION_ALTERNATE_ROADS,
-    resources: {
-        [types_1.FactionId.REPUBLICANS]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.REPUBLICANS },
-        [types_1.FactionId.CONSPIRATORS]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.CONSPIRATORS },
-        [types_1.FactionId.NOBLES]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.NOBLES },
-        [types_1.FactionId.NEUTRAL]: { gold: 0 },
-    },
-    pendingNegotiations: [],
-    logs: [
-        { id: 'init_1', type: types_1.LogType.GAME_START, message: "The coup has begun. Count Rivenberg has claimed the regency for himself.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
-        { id: 'init_2', type: types_1.LogType.GAME_START, message: "Baron Lekal has called on the great Dukes to defend their feudal rights.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
-        { id: 'init_3', type: types_1.LogType.GAME_START, message: "Sir Azer and the Republicans took control of Sunbreach.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
-        { id: 'init_4', type: types_1.LogType.GAME_START, message: "Civil war engulfs Larion.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO }
-    ],
-    stats: { deathToll: 0 },
-    selectedType: null,
-    selectedId: null,
-    selectedStageIndex: null,
-    selectedLocationId: null,
-    isProcessing: false,
-    combatQueue: [],
-    combatState: null,
-    showLeadersModal: false,
-    showStartScreen: true,
-    showStatsModal: false,
-    showFactionModal: false,
-    logsExpanded: true,
-    grainTradeNotification: null,
-    insurrectionNotification: null,
-    famineNotification: null,
-    siegeNotification: null,
-    leaderEliminatedNotification: null,
-    hasScannedBattles: false
-});
+const createInitialState = (playerFaction, mapId = 'larion_alternate') => {
+    // Get map definition rules
+    const mapDef = MapRegistry_1.MapRegistry.get(mapId);
+    const initialCharacters = mapDef.rules ? mapDef.rules.getInitialCharacters() : [];
+    return {
+        turn: 1,
+        // (NEW) Store mapId in state so economy calculator knows which rules to use
+        mapId: mapId,
+        playerFaction: playerFaction,
+        locations: JSON.parse(JSON.stringify(larion_alternate_1.LARION_ALTERNATE_LOCATIONS)), // Deep copy to prevent mutation persistence
+        characters: JSON.parse(JSON.stringify(initialCharacters)),
+        armies: (0, exports.generateInitialArmies)(),
+        convoys: [],
+        navalConvoys: [],
+        roads: JSON.parse(JSON.stringify(larion_alternate_2.LARION_ALTERNATE_ROADS)),
+        resources: {
+            [types_1.FactionId.REPUBLICANS]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.REPUBLICANS },
+            [types_1.FactionId.CONSPIRATORS]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.CONSPIRATORS },
+            [types_1.FactionId.NOBLES]: { gold: gameConstants_1.INITIAL_PLAYER_RESOURCES.NOBLES },
+            [types_1.FactionId.LOYALISTS]: { gold: 1000 },
+            [types_1.FactionId.PRINCELY_ARMY]: { gold: 1000 },
+            [types_1.FactionId.CONFEDERATE_CITIES]: { gold: 1000 },
+            [types_1.FactionId.NEUTRAL]: { gold: 0 },
+        },
+        pendingNegotiations: [],
+        logs: [
+            { id: 'init_1', type: types_1.LogType.GAME_START, message: "The coup has begun. Count Rivenberg has claimed the regency for himself.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
+            { id: 'init_2', type: types_1.LogType.GAME_START, message: "Baron Lekal has called on the great Dukes to defend their feudal rights.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
+            { id: 'init_3', type: types_1.LogType.GAME_START, message: "Sir Azer and the Republicans took control of Sunbreach.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO },
+            { id: 'init_4', type: types_1.LogType.GAME_START, message: "Civil war engulfs Larion.", turn: 1, visibleToFactions: [], baseSeverity: types_1.LogSeverity.INFO }
+        ],
+        stats: { deathToll: 0 },
+        selectedType: null,
+        selectedId: null,
+        selectedStageIndex: null,
+        selectedLocationId: null,
+        isProcessing: false,
+        combatQueue: [],
+        combatState: null,
+        showLeadersModal: false,
+        showStartScreen: true,
+        showStatsModal: false,
+        showFactionModal: false,
+        logsExpanded: true,
+        grainTradeNotification: null,
+        insurrectionNotification: null,
+        famineNotification: null,
+        siegeNotification: null,
+        leaderEliminatedNotification: null,
+        hasScannedBattles: false
+    };
+};
 exports.createInitialState = createInitialState;

@@ -21,6 +21,10 @@ var FactionId;
     FactionId["REPUBLICANS"] = "REPUBLICANS";
     FactionId["CONSPIRATORS"] = "CONSPIRATORS";
     FactionId["NOBLES"] = "NOBLES";
+    // Valis Factions
+    FactionId["LOYALISTS"] = "LOYALISTS";
+    FactionId["PRINCELY_ARMY"] = "PRINCELY_ARMY";
+    FactionId["CONFEDERATE_CITIES"] = "CONFEDERATE_CITIES";
     FactionId["NEUTRAL"] = "NEUTRAL";
 })(FactionId || (exports.FactionId = FactionId = {}));
 var RoadQuality;

@@ -49,6 +49,16 @@ var CharacterTrait;
      * Cannot be disabled by player. Priority: small-scale insurrections first.
      */
     CharacterTrait["SCORCHED_EARTH"] = "SCORCHED_EARTH";
+    /**
+     * As a leader in a region, lowers the maximum tax and food collection levels by one.
+     * Multiple FREE_TRADER leaders stack (each reduces cap by one more level).
+     */
+    CharacterTrait["FREE_TRADER"] = "FREE_TRADER";
+    /**
+     * As governor, can only use HUNT_NETWORKS, MAKE_EXAMPLES, and RATIONING.
+     * All other governor policies are disabled.
+     */
+    CharacterTrait["MAN_OF_ACTION"] = "MAN_OF_ACTION";
 })(CharacterTrait || (exports.CharacterTrait = CharacterTrait = {}));
 /**
  * Tooltips for leader statistics.
@@ -72,7 +82,11 @@ exports.LEADER_ABILITY_TOOLTIPS = {
     MAN_OF_CHURCH: 'As a governor, is able to Stabilize region, Appease the minds, and Denounce your enemies at no cost.',
     DAREDEVIL: 'Has a chance to survive capture when acting as a clandestine agent, and to escape when being defeated while heading an insurrection.',
     GHOST: 'Systematically avoid detection when entering or leaving an enemy territory.',
-    PARANOID: 'As a governor, passively increases the risk of enemy clandestine leaders of being caught at the end of each turn by 15 points.'
+    PARANOID: 'As a governor, passively increases the risk of enemy clandestine leaders of being caught at the end of each turn by 15 points.',
+    SMUGGLER: 'When in a city you control whose rural area is controlled by another faction, generate up to 15 food per turn.',
+    ELITE_NETWORKS: 'As long as resentment against your faction in a region is under 50, will incur no costs there for Undermine authorities, Distribute sediitous pamphlets and Spread propaganda.',
+    CONSCRIPTION: 'Once per turn, reduce the recruitment cost in the region he\'s in from 50 to 25 gold.',
+    AGITATIONAL_NETWORKS: 'When sent in a new clandestine mission in a region where resentment against your faction is below 60, gather 200 extra gold. Doesn\'t work when being exfiltrated.'
 };
 /**
  * Tooltips for character traits.
@@ -81,7 +95,9 @@ exports.LEADER_ABILITY_TOOLTIPS = {
 exports.CHARACTER_TRAIT_TOOLTIPS = {
     [CharacterTrait.IRON_FIST]: 'As a governor, will systematically make examples after suppressing insurrections.',
     [CharacterTrait.FAINT_HEARTED]: 'As a clandestine agent, cannot and will not order assassinations and arson.',
-    [CharacterTrait.SCORCHED_EARTH]: 'As a clandestine agent, will systematically organize arson and insurrections.'
+    [CharacterTrait.SCORCHED_EARTH]: 'As a clandestine agent, will systematically organize arson and insurrections.',
+    [CharacterTrait.FREE_TRADER]: 'Each free trader in a given region lowers the maximum tax rate and food collection level by one.',
+    [CharacterTrait.MAN_OF_ACTION]: 'Will not act as a governor, save for hunting enemy clandestine agents, making examples and organizing rationing.'
 };
 /**
  * Display colors for character traits in the Leaders Modal.
@@ -89,5 +105,7 @@ exports.CHARACTER_TRAIT_TOOLTIPS = {
 exports.CHARACTER_TRAIT_COLORS = {
     [CharacterTrait.IRON_FIST]: 'text-red-400', // "écrit en rouge discret"
     [CharacterTrait.FAINT_HEARTED]: 'text-blue-400', // "écrit en bleu discret"
-    [CharacterTrait.SCORCHED_EARTH]: 'text-red-400' // "écrit en rouge discret"
+    [CharacterTrait.SCORCHED_EARTH]: 'text-red-400', // "écrit en rouge discret"
+    [CharacterTrait.FREE_TRADER]: 'text-green-400', // Green for economic trait
+    [CharacterTrait.MAN_OF_ACTION]: 'text-red-400' // Red for restrictive trait
 };

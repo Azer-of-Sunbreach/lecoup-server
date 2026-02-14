@@ -28,9 +28,9 @@ export interface CharacterNew extends Omit<Character, 'stats'> {
     };
 }
 export declare const CHARACTERS_NEW: CharacterNew[];
-import { Character as OldCharacter } from '../types';
 /**
- * @deprecated Use CHARACTERS_NEW instead with the new stats structure.
- * This export is kept for backward compatibility during migration.
+ * @deprecated Use CHARACTERS_NEW for full new stats structure.
+ * This alias maintains backward compatibility for existing code.
+ * The CharacterNew type extends Character, so this cast is safe.
  */
-export declare const CHARACTERS: OldCharacter[];
+export declare const CHARACTERS: import("../types").Character[];

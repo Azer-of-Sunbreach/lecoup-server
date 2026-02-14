@@ -3,6 +3,9 @@ export declare enum FactionId {
     REPUBLICANS = "REPUBLICANS",
     CONSPIRATORS = "CONSPIRATORS",
     NOBLES = "NOBLES",
+    LOYALISTS = "LOYALISTS",
+    PRINCELY_ARMY = "PRINCELY_ARMY",
+    CONFEDERATE_CITIES = "CONFEDERATE_CITIES",
     NEUTRAL = "NEUTRAL"
 }
 export declare enum RoadQuality {
@@ -70,12 +73,15 @@ export interface LogEntry {
     criticalForFactions?: FactionId[];
     warningForFactions?: FactionId[];
     highlightTarget?: LogHighlightTarget;
+    i18nKey?: string;
+    i18nParams?: Record<string, any>;
 }
-export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND' | 'MAN_OF_CHURCH' | 'DAREDEVIL' | 'GHOST' | 'PARANOID';
+export type LeaderAbility = 'NONE' | 'MANAGER' | 'LEGENDARY' | 'FIREBRAND' | 'MAN_OF_CHURCH' | 'DAREDEVIL' | 'GHOST' | 'PARANOID' | 'SMUGGLER' | 'ELITE_NETWORKS' | 'CONSCRIPTION' | 'AGITATIONAL_NETWORKS';
 export * from './types/leaderTypes';
 import { GovernorPolicy } from './types/governorTypes';
 export * from './types/governorTypes';
 export * from './types/clandestineTypes';
+export type RepublicanInternalFaction = 'KNIGHTLY_COUP' | 'RABBLE_VICTORY' | 'MERCHANT_DOMINATION' | null;
 export interface Coordinates {
     x: number;
     y: number;
@@ -124,16 +130,15 @@ export interface Location {
     governorFoodCost?: number;
     burnedFields?: number;
     burnedDistricts?: number;
+    grantedFief?: {
+        grantedBy: FactionId;
+    };
     demographics?: {
         nobles: number;
         wealthyCommoners: number;
         labouringFolks: number;
     };
-    resentment?: {
-        [FactionId.NOBLES]: number;
-        [FactionId.CONSPIRATORS]: number;
-        [FactionId.REPUBLICANS]: number;
-    };
+    resentment?: Partial<Record<FactionId, number>>;
 }
 export interface RoadStage {
     index: number;
@@ -235,7 +240,7 @@ export interface Character {
         commandBonus: number;
         insurrectionValue: number;
         ability: LeaderAbility[];
-        traits?: ('IRON_FIST' | 'FAINT_HEARTED' | 'SCORCHED_EARTH')[];
+        traits?: ('IRON_FIST' | 'FAINT_HEARTED' | 'SCORCHED_EARTH' | 'FREE_TRADER' | 'MAN_OF_ACTION')[];
         clandestineOps?: number;
         discretion?: number;
         statesmanship?: number;
@@ -286,6 +291,20 @@ export interface Character {
     plannedMissionAction?: import('./types/clandestineTypes').ClandestineActionId;
     /** Last turn this leader was exfiltrated/moved. Prevents double-exfiltration exploit. */
     lastExfiltrationTurn?: number;
+    /** Tracks if this leader has already provided a recruitment discount this turn */
+    usedConscriptionThisTurn?: boolean;
+    /** True if leader is on a SMUGGLER support mission (cumulative with GOVERNOR role) */
+    isSmugglerMission?: boolean;
+    /** Target city ID for active SMUGGLER mission */
+    smugglerTargetCityId?: string;
+    /** True if this leader is available for mid-game recruitment (stored as DEAD in graveyard until recruited) */
+    isRecruitableLeader?: boolean;
+    /** Abilities disabled by Internal Factions choice (runtime only, not in base data) */
+    disabledAbilities?: LeaderAbility[];
+    /** Abilities granted by Internal Factions choice (runtime only, not in base data) */
+    grantedAbilities?: LeaderAbility[];
+    /** Stability modifier override (for Internal Factions effect, replaces stats.stabilityPerTurn for display/calc) */
+    stabilityModifierOverride?: number;
 }
 export interface NegotiationMission {
     targetLocationId: string;
@@ -321,6 +340,7 @@ export interface FamineNotification {
     ruralName: string;
 }
 export interface SiegeNotification {
+    targetId: string;
     targetName: string;
     attackerName: string;
 }
@@ -374,6 +394,12 @@ export interface FactionAIState {
     goals: AIGoal[];
     missions: AIMission[];
     savings: number;
+    leaderRecruitmentFund?: number;
+    republicanInternalFaction?: {
+        savingsMode: 'KNIGHTLY_COUP' | 'MERCHANT_DOMINATION' | null;
+        savedGold: number;
+        decisionMade: boolean;
+    };
 }
 export interface LeaderEliminatedNotification {
     faction: FactionId;
@@ -383,6 +409,7 @@ export interface LeaderEliminatedNotification {
 }
 export interface GameState {
     turn: number;
+    mapId?: string;
     playerFaction: FactionId;
     currentPlayerFaction?: FactionId;
     locations: Location[];
@@ -436,6 +463,7 @@ export interface GameState {
             gold: number;
         };
     };
+    chosenInternalFaction?: RepublicanInternalFaction;
 }
 export declare const FACTION_COLORS: {
     REPUBLICANS: string;
@@ -537,6 +565,10 @@ export interface GameLobby {
 /** Game actions that can be sent over network */
 export type GameAction = {
     type: 'RECRUIT';
+    locationId: string;
+    faction: FactionId;
+} | {
+    type: 'CONSCRIPT';
     locationId: string;
     faction: FactionId;
 } | {

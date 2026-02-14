@@ -25,7 +25,8 @@ export declare const getInitialResources: (playerFaction: FactionId) => {
         gold: number;
     };
 };
+import { MapId } from '../maps/types';
 /**
  * Create the initial game state for starting a new game
  */
-export declare const createInitialState: () => GameState;
+export declare const createInitialState: (playerFaction: FactionId, mapId?: MapId) => GameState;

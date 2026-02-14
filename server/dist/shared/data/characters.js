@@ -60,7 +60,7 @@ exports.CHARACTERS_NEW = [
             clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
             statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
-            ability: ['MANAGER'],
+            ability: ['MANAGER', 'SMUGGLER', 'AGITATIONAL_NETWORKS'],
             traits: [leaderTypes_1.CharacterTrait.FAINT_HEARTED],
             insurrectionValue: 20 // DEPRECATED
         }
@@ -78,7 +78,8 @@ exports.CHARACTERS_NEW = [
         armyId: null,
         description: 'Daughter of landless nobles.',
         bonuses: {},
-        budget: 500, // NEW: Starts with budget
+        budget: 0, // NEW: Starts with budget
+        clandestineBudget: 500, // Required for AI processing
         stats: {
             stabilityPerTurn: -3,
             commandBonus: 0,
@@ -109,7 +110,7 @@ exports.CHARACTERS_NEW = [
             clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             statesmanship: leaderTypes_1.LeaderStatLevel.INEPT,
-            ability: ['NONE'],
+            ability: [],
             traits: [leaderTypes_1.CharacterTrait.FAINT_HEARTED],
             insurrectionValue: 20 // DEPRECATED
         }
@@ -128,13 +129,14 @@ exports.CHARACTERS_NEW = [
         description: 'Popular orator.',
         bonuses: {},
         budget: 600, // NEW: Starts with budget
+        clandestineBudget: 600, // Required for AI processing
         stats: {
             stabilityPerTurn: -3,
             commandBonus: 0,
             clandestineOps: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
             discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             statesmanship: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
-            ability: ['NONE'],
+            ability: [],
             traits: [], // No trait
             insurrectionValue: 30 // DEPRECATED
         }
@@ -158,7 +160,7 @@ exports.CHARACTERS_NEW = [
             clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
-            ability: ['NONE'],
+            ability: [],
             traits: [], // No trait
             insurrectionValue: 30 // DEPRECATED
         }
@@ -300,7 +302,7 @@ exports.CHARACTERS_NEW = [
         bonuses: {},
         budget: 0,
         stats: {
-            stabilityPerTurn: 0, // "-" means 0
+            stabilityPerTurn: 3, // "-" means 0
             commandBonus: 0.15,
             clandestineOps: leaderTypes_1.LeaderStatLevel.CAPABLE,
             discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
@@ -347,14 +349,15 @@ exports.CHARACTERS_NEW = [
         armyId: null,
         description: 'An ear in every noble manor.',
         bonuses: {},
-        budget: 600, // NEW: Starts with budget
+        budget: 0, // NEW: Starts with budget
+        clandestineBudget: 600, // Required for AI processing
         stats: {
             stabilityPerTurn: 0,
             commandBonus: 0,
             clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
-            ability: ['DAREDEVIL', 'GHOST'],
+            ability: ['DAREDEVIL', 'GHOST', 'ELITE_NETWORKS'],
             traits: [], // No trait
             insurrectionValue: 20 // DEPRECATED
         }
@@ -376,7 +379,7 @@ exports.CHARACTERS_NEW = [
         bonuses: {},
         budget: 0,
         stats: {
-            stabilityPerTurn: 5,
+            stabilityPerTurn: 10,
             commandBonus: 0,
             clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
             discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
@@ -429,7 +432,7 @@ exports.CHARACTERS_NEW = [
             clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             discretion: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
             statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
-            ability: ['NONE'],
+            ability: ['NONE', 'ELITE_NETWORKS'],
             traits: [], // No trait (empty cell in specs)
             insurrectionValue: 30 // DEPRECATED
         }
@@ -495,14 +498,15 @@ exports.CHARACTERS_NEW = [
         armyId: null,
         description: 'The emissary-at-arms.',
         bonuses: {},
-        budget: 500, // NEW: Starts with budget
+        budget: 0, // NEW: Starts with budget
+        clandestineBudget: 500, // Required for AI processing
         stats: {
             stabilityPerTurn: 0, // "-" means 0
             commandBonus: 0,
             clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
             discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
             statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
-            ability: ['FIREBRAND', 'PARANOID'],
+            ability: ['FIREBRAND', 'PARANOID', 'ELITE_NETWORKS'],
             traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
             insurrectionValue: 20 // DEPRECATED
         }
@@ -526,7 +530,7 @@ exports.CHARACTERS_NEW = [
             clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
             discretion: leaderTypes_1.LeaderStatLevel.INEPT,
             statesmanship: leaderTypes_1.LeaderStatLevel.INEPT,
-            ability: ['NONE'],
+            ability: ['SMUGGLER'],
             traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
             insurrectionValue: 10 // DEPRECATED
         }
@@ -550,128 +554,597 @@ exports.CHARACTERS_NEW = [
             clandestineOps: leaderTypes_1.LeaderStatLevel.CAPABLE,
             discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
             statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
-            ability: ['NONE'],
+            ability: ['ELITE_NETWORKS'],
             traits: [], // No trait
             insurrectionValue: 10 // DEPRECATED
         }
     },
+    // ============================================================
+    // Recruitable Leaders (available for mid-game recruitment)
+    // These start as NEUTRAL/DEAD in graveyard until recruited
+    // ============================================================
+    {
+        id: 'gaiard',
+        name: 'Gaiard',
+        title: 'City councillor',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD, // Stored as dead until recruited
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Merchant of everything foreign.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true, // Flag for recruitment system
+        stats: {
+            stabilityPerTurn: 5,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.INEPT,
+            discretion: leaderTypes_1.LeaderStatLevel.INEPT,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            ability: ['MANAGER', 'SMUGGLER'],
+            traits: [leaderTypes_1.CharacterTrait.FREE_TRADER],
+            insurrectionValue: 0 // DEPRECATED
+        }
+    },
+    {
+        id: 'gildas',
+        name: 'Gildas',
+        title: 'City councillor',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD, // Stored as dead until recruited
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Guild master.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.INEPT,
+            discretion: leaderTypes_1.LeaderStatLevel.INEPT,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            ability: ['MANAGER'],
+            traits: [leaderTypes_1.CharacterTrait.FAINT_HEARTED, leaderTypes_1.CharacterTrait.FREE_TRADER],
+            insurrectionValue: 0 // DEPRECATED
+        }
+    },
+    {
+        id: 'clavestone',
+        name: 'Clavestone',
+        title: 'Manufacture owner',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD, // Stored as dead until recruited
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Former adventurer.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 3,
+            commandBonus: 0.15,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            ability: ['MANAGER', 'SMUGGLER'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST, leaderTypes_1.CharacterTrait.FREE_TRADER],
+            insurrectionValue: 0 // DEPRECATED
+        }
+    },
+    {
+        id: 'jack_the_fox',
+        name: 'Jack the Fox',
+        title: 'Pamphleteer',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A cord-maker turned radical agitator.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: -4,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            discretion: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            statesmanship: leaderTypes_1.LeaderStatLevel.INEPT,
+            ability: ['FIREBRAND', 'SMUGGLER'],
+            traits: [leaderTypes_1.CharacterTrait.SCORCHED_EARTH],
+            insurrectionValue: 0 // DEPRECATED
+        }
+    },
+    {
+        id: 'richard_fayre',
+        name: 'Richard Fayre',
+        title: 'Demagogue',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A hoodlum with a quill.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: -4,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.INEPT,
+            ability: ['FIREBRAND'],
+            traits: [],
+            insurrectionValue: 0 // DEPRECATED
+        }
+    },
+    {
+        id: 'enoch',
+        name: 'Sir Enoch',
+        title: 'Knight Captain',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: "Barrett's right hand man.",
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 1,
+            commandBonus: 0.20,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['NONE'],
+            traits: [],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'alb_turvrard',
+        name: 'Alb Turvrard',
+        title: 'Royal Treasurer',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Looking for a strong regime.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            ability: ['MANAGER', 'ELITE_NETWORKS'],
+            traits: [],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'father_tallysse',
+        name: 'Father Tallysse',
+        title: 'Witch-Hunter General',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A stake in the heart of the aristocracy.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['FIREBRAND', 'ELITE_NETWORKS', 'MAN_OF_CHURCH', 'PARANOID'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'maxime_jacob',
+        name: 'Maxime Jacob',
+        title: 'Lawyer',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Man of virtue.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 3,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            ability: ['PARANOID'],
+            traits: [],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'holvein',
+        name: 'Sir Holvein',
+        title: "Stormbay's Watch commander",
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A wall of discipline.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0.30,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['CONSCRIPTION'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST, leaderTypes_1.CharacterTrait.MAN_OF_ACTION],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'lazare_montagne',
+        name: 'Lazare Montagne',
+        title: 'Former soldier',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Will organize victory.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 1,
+            commandBonus: 0.30,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            ability: ['MANAGER', 'CONSCRIPTION'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'vendemer',
+        name: 'Vendemer',
+        title: 'Ship captain',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Traveled far beyond Larion.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            discretion: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['DAREDEVIL', 'GHOST', 'SMUGGLER'],
+            traits: [],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'armand',
+        name: 'Sir Armand',
+        title: 'Knight Commander',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Too weak for the new regime.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 3,
+            commandBonus: 0.15,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['NONE'],
+            traits: [leaderTypes_1.CharacterTrait.FAINT_HEARTED],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'vergier',
+        name: 'Count Vergier',
+        title: 'Heir of Jaquelein Rock',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'As devout as he is brave.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 6 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 3,
+            commandBonus: 0.15,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            discretion: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['FIREBRAND', 'DAREDEVIL', 'AGITATIONAL_NETWORKS'],
+            traits: [leaderTypes_1.CharacterTrait.MAN_OF_ACTION],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'georges_cadal',
+        name: 'Georges Cadal',
+        title: 'Wealthy landlord',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A towering, charismatic commoner.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 14 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0.15,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EXCEPTIONAL,
+            discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            ability: ['FIREBRAND', 'GHOST', 'DAREDEVIL'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST, leaderTypes_1.CharacterTrait.MAN_OF_ACTION],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'klemath',
+        name: 'Klemath',
+        title: "Baron Lekal's right hand",
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'The loyal, harsh attack dog.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 12 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 1,
+            commandBonus: 0.15,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            discretion: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['SMUGGLER', 'CONSCRIPTION'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'baron_ystrir',
+        name: 'Baron of Ystrir',
+        title: 'Southern lord',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: "Rotten by the Sunbreach's court life.",
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 18 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            ability: ['NONE'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'duke_great_plains',
+        name: 'Duke of the Great Plains',
+        title: 'Lord of the golden fields',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Seeking revenge against the Regent.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 2 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0.15,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['NONE'],
+            traits: [],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'spelttiller',
+        name: 'Castellan Spelttiller',
+        title: 'Vassal of the Duke of the Great Plains',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A better man than his master.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 16 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 3,
+            commandBonus: 0.10,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            ability: ['NONE'],
+            traits: [leaderTypes_1.CharacterTrait.FAINT_HEARTED],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'duke_esmarch',
+        name: 'Duke of Esmarch',
+        title: 'Lord of the northern marshes',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A provincial lord, in power as in mind.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 8 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['MANAGER'],
+            traits: [],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'duke_hornvale',
+        name: 'Duke of Hornvale',
+        title: 'Lord of the southern plains',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Backward-looking, even for his peers.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 10 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0.15,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            discretion: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.INEPT,
+            ability: ['ELITE_NETWORKS', 'CONSCRIPTION'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'demain',
+        name: 'Sir Demain',
+        title: "Defender of Sunbreach's noble district",
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'A well-meaning knight, now an aimless sword.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: false, // Becomes true at turn 4 (NOBLES recruitment)
+        stats: {
+            stabilityPerTurn: 0,
+            commandBonus: 0.30,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.CAPABLE,
+            ability: ['ELITE_NETWORKS'],
+            traits: [leaderTypes_1.CharacterTrait.FAINT_HEARTED, leaderTypes_1.CharacterTrait.MAN_OF_ACTION],
+            insurrectionValue: 0
+        }
+    },
+    {
+        id: 'castelreach',
+        name: 'Sir Castelreach',
+        title: 'Republican army commander',
+        faction: types_1.FactionId.NEUTRAL,
+        status: types_1.CharacterStatus.DEAD,
+        locationId: 'graveyard',
+        destinationId: null,
+        turnsUntilArrival: 0,
+        armyId: null,
+        description: 'Rallied royal army officer.',
+        bonuses: {},
+        budget: 0,
+        isRecruitableLeader: true,
+        stats: {
+            stabilityPerTurn: 3,
+            commandBonus: 0.30,
+            clandestineOps: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            discretion: leaderTypes_1.LeaderStatLevel.UNRELIABLE,
+            statesmanship: leaderTypes_1.LeaderStatLevel.EFFECTIVE,
+            ability: ['CONSCRIPTION'],
+            traits: [leaderTypes_1.CharacterTrait.IRON_FIST],
+            insurrectionValue: 0
+        }
+    },
 ];
+// ============================================================
+// BACKWARD COMPATIBILITY: CHARACTERS alias
+// ============================================================
 /**
- * @deprecated Use CHARACTERS_NEW instead with the new stats structure.
- * This export is kept for backward compatibility during migration.
+ * @deprecated Use CHARACTERS_NEW for full new stats structure.
+ * This alias maintains backward compatibility for existing code.
+ * The CharacterNew type extends Character, so this cast is safe.
  */
-exports.CHARACTERS = [
-    // Republicans (Spec 3.4 - Faction: Républicains)
-    {
-        id: 'azer', name: 'Sir Azer', title: 'Knight of the Republic', faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Between Honor and Duty.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 5, commandBonus: 0.15, insurrectionValue: 20, ability: ['NONE'] }
-    },
-    {
-        id: 'argo', name: 'Argo', title: 'The Financier', faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Merchant-prince.',
-        bonuses: {},
-        stats: { stabilityPerTurn: -3, commandBonus: 0, insurrectionValue: 20, ability: ['MANAGER'] }
-    },
-    {
-        id: 'alia', name: 'Alia', title: 'The Messenger', faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Daughter of landless nobles.',
-        bonuses: {},
-        stats: { stabilityPerTurn: -3, commandBonus: 0, insurrectionValue: 30, ability: ['FIREBRAND'] }
-    },
-    {
-        id: 'lain', name: 'Lain', title: 'The Philosopher', faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Ideologue.',
-        bonuses: {},
-        stats: { stabilityPerTurn: -3, commandBonus: 0, insurrectionValue: 20, ability: ['NONE'] }
-    },
-    {
-        id: 'caelan', name: 'Caelan', title: 'The Lawyer', faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Popular orator.',
-        bonuses: {},
-        stats: { stabilityPerTurn: -3, commandBonus: 0, insurrectionValue: 30, ability: ['NONE'] }
-    },
-    {
-        id: 'tordis', name: 'Tordis', title: 'Militia Captain', faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Man of practical mind.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 5, commandBonus: 0.15, insurrectionValue: 30, ability: ['NONE'] }
-    },
-    {
-        id: 'averic', name: 'Sir Averic', title: "Azer's aide-de-camp", faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'A rallied knight.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0.10, insurrectionValue: 20, ability: ['NONE'] }
-    },
-    {
-        id: 'gebren', name: 'Sir Gebren', title: "Azer's bodyguard", faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The disciplined child of Thane.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0.10, insurrectionValue: 20, ability: ['NONE'] }
-    },
-    {
-        id: 'odeke', name: 'Sir Odeke', title: "Azer's enforcer", faction: types_1.FactionId.REPUBLICANS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'sunbreach', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The commoner in armor.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0.10, insurrectionValue: 20, ability: ['NONE'] }
-    },
-    // Conspirators (Spec 3.4 - Faction: Conspirateurs)
-    {
-        id: 'rivenberg', name: 'Count Rivenberg', title: 'The Regent', faction: types_1.FactionId.CONSPIRATORS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'windward', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Leader of the Coup.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 10, commandBonus: 0.30, insurrectionValue: 30, ability: ['MANAGER'] }
-    },
-    {
-        id: 'barrett', name: 'Sir Barrett', title: 'Grandmaster of the Knights', faction: types_1.FactionId.CONSPIRATORS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'stormbay', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Legendary Knight.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 10, commandBonus: 0.30, insurrectionValue: 10, ability: ['LEGENDARY'] }
-    },
-    {
-        id: 'jadis', name: 'Jadis', title: 'Royal Advisor', faction: types_1.FactionId.CONSPIRATORS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'great_plains', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Previous Witch-Finder General.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 5, commandBonus: 0, insurrectionValue: 20, ability: ['MANAGER'] }
-    },
-    {
-        id: 'tymon', name: 'Sir Tymon', title: 'Knight Commander', faction: types_1.FactionId.CONSPIRATORS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'hornvale', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Duty over oaths.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 3, commandBonus: 0.15, insurrectionValue: 10, ability: ['NONE'] }
-    },
-    {
-        id: 'ethell', name: 'Lady Ethell', title: "King Fredrik's favorite", faction: types_1.FactionId.CONSPIRATORS, status: types_1.CharacterStatus.AVAILABLE, locationId: 'stormbay', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'An ear in every noble manor.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0, insurrectionValue: 20, ability: ['NONE'] }
-    },
-    // Nobles (Spec 3.4 - Faction: Droits des Nobles)
-    {
-        id: 'lekal', name: 'Baron Lekal', title: 'Lord of Port-de-Sable', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'port_de_sable', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The old lion of the aristocracy.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 5, commandBonus: 0, insurrectionValue: 10, ability: ['MANAGER'] }
-    },
-    {
-        id: 'thane', name: 'Duke of Thane', title: 'Lord of the Highlands', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'karamos', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The nobility of the sword.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 5, commandBonus: 0.30, insurrectionValue: 10, ability: ['NONE'] }
-    },
-    {
-        id: 'wrenfield', name: 'Lord Wrenfield', title: 'Landless noble', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'mirebridge', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'Courtesan.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 5, commandBonus: 0, insurrectionValue: 30, ability: ['NONE'] }
-    },
-    {
-        id: 'haraldic', name: 'Sir Haraldic', title: 'Rebellious Knight Commander', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'gullwing', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The staunch traditionalist.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0.30, insurrectionValue: 10, ability: ['LEGENDARY', 'FIREBRAND'] }
-    },
-    {
-        id: 'gullwing_duke', name: 'Duke of Gullwing', title: 'Lord of the southern lands', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'gullwing', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The narrow and bellicose mind.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0.15, insurrectionValue: 20, ability: ['NONE'] }
-    },
-    {
-        id: 'lys', name: 'Castellan Lys', title: 'Vassal of the Baron Lekal', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'northern_barony', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The emissary-at-arms.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0, insurrectionValue: 20, ability: ['FIREBRAND'] }
-    },
-    {
-        id: 'saltcraw', name: 'Viscount of Saltcraw', title: 'Lord of the archipelago', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'brinewaith', destinationId: null, turnsUntilArrival: 0, armyId: null, description: "The rigid wit of a ship's captain.",
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0, insurrectionValue: 10, ability: ['NONE'] }
-    },
-    {
-        id: 'shorclyff', name: 'Castellan Shorclyff', title: 'Vassal of the Duke of Thane', faction: types_1.FactionId.NOBLES, status: types_1.CharacterStatus.AVAILABLE, locationId: 'brinewaith', destinationId: null, turnsUntilArrival: 0, armyId: null, description: 'The exile from Sunbreach.',
-        bonuses: {},
-        stats: { stabilityPerTurn: 0, commandBonus: 0, insurrectionValue: 10, ability: ['NONE'] }
-    },
-];
+exports.CHARACTERS = exports.CHARACTERS_NEW;
