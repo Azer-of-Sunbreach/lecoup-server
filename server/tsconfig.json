@@ -29,6 +29,9 @@
         "node_modules",
         "dist",
         "../shared/node_modules",
-        "../shared/dist"
+        "../shared/dist",
+        "../shared/services/ai/**/*_LEGACY*",
+        "../shared/services/ai/**/legacy/**/*",
+        "../shared/services/ai/leaders_legacy/**/*"
     ]
 }
