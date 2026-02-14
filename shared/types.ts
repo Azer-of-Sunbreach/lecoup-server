@@ -780,6 +780,10 @@ export type GameAction =
   | { type: 'SET_GOVERNOR_POLICIES'; locationId: string; characterId: string; policies: string[]; faction: FactionId }
   // === NEW: Appoint Governor Action ===
   | { type: 'APPOINT_GOVERNOR'; leaderId: string; locationId: string; faction: FactionId }
+  // === NEW: Cancel Governor Appointment ===
+  | { type: 'CANCEL_GOVERNOR_APPOINTMENT'; leaderId: string; faction: FactionId }
+  // === NEW: Update Leader Clandestine Actions ===
+  | { type: 'UPDATE_LEADER_CLANDESTINE_ACTIONS'; leaderId: string; activeActions: import('./types/clandestineTypes').ActiveClandestineAction[]; faction: FactionId }
   // === NEW: Internal Faction Choice (Republicans) ===
   | { type: 'CHOOSE_INTERNAL_FACTION'; choice: 'KNIGHTLY_COUP' | 'RABBLE_VICTORY' | 'MERCHANT_DOMINATION'; faction: FactionId };
 
