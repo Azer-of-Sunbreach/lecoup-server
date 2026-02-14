@@ -11,9 +11,10 @@ import {
     generateCampaignMissions,
     generateDiplomacyMissions,
     generateRoadDefenseMissions,
-    detectInsurrectionThreats,
     generateGarrisonMissions
 } from './strategy/index';
+// Import insurrection detection directly from shared strategy module
+import { detectInsurrectionThreats } from '../strategy/insurrectionDefense';
 // Legacy import kept for backwards compatibility
 import { generateCounterInsurrectionMissions } from './strategy/counterInsurrection';
 

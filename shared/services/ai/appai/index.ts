@@ -3,7 +3,7 @@ import { GameState, FactionId } from '../../../types';
 import { MapRegistry } from '../../../maps/MapRegistry';
 import { AI_PROFILES } from './profiles';
 import { analyzeTheaters, updateMissions } from './strategy';
-import { detectInsurrectionThreats, convertToAlerts, dispatchEmergencyReinforcements } from './strategy/insurrectionDefense';
+import { detectInsurrectionThreats, convertToAlerts, dispatchEmergencyReinforcements } from '../strategy/insurrectionDefense';
 import { executeRepublicanEarlyGame } from './strategy/republicanEarlyGame';
 import { manageEconomy } from './economy';
 import { enforceHighTaxLimits, detectEmergency } from '../economy/stabilityManagement';
