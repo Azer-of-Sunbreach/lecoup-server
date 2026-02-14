@@ -367,8 +367,7 @@ export const processTurn = async (
         // --- VICTORY CHECK ---
         const activeFactions = [
             FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES,
-            FactionId.LINEAGES_COUNCIL, FactionId.OATH_COALITION, FactionId.LARION_EXPEDITION,
-            FactionId.LARION_KNIGHTS
+            FactionId.LINEAGES_COUNCIL, FactionId.OATH_COALITION, FactionId.LARION_EXPEDITION
         ];
         for (const faction of activeFactions) {
             const ownedLocations = state.locations.filter(l => l.faction === faction);
@@ -382,8 +381,6 @@ export const processTurn = async (
                     case FactionId.OATH_COALITION: messageKey = "thyrakat:victory.messages.OATH_COALITION"; break;
                     case FactionId.LINEAGES_COUNCIL: messageKey = "thyrakat:victory.messages.LINEAGES_COUNCIL"; break;
                     case FactionId.LARION_EXPEDITION: messageKey = "thyrakat:victory.messages.LARION_EXPEDITION"; break;
-                    // Tutorial
-                    case FactionId.LARION_KNIGHTS: messageKey = "tutorial:tutorial.victory.message"; break;
                 }
 
                 state.victory = {
