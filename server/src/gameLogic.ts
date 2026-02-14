@@ -676,11 +676,19 @@ export async function advanceTurn(
         console.log(`[ADVANCE_TURN] Round wrapped! Calling processTurn...`);
         // Process turn for ALL factions (AI movement, economy, etc.)
         // IMPORTANT: Pass humanFactions so resolveAIBattles can exclude human battles
-        const processed = await processTurn({
-            ...updatedState,
-            playerFaction: state.aiFaction || FactionId.NEUTRAL, // Let AI faction be processed
-            humanFactions: state.humanFactions // Pass human factions for correct battle filtering
-        } as any);
+        let processed: any;
+        try {
+            processed = await processTurn({
+                ...updatedState,
+                playerFaction: state.aiFaction || FactionId.NEUTRAL, // Let AI faction be processed
+                humanFactions: state.humanFactions // Pass human factions for correct battle filtering
+            } as any);
+        } catch (processTurnError: any) {
+            console.error(`[ADVANCE_TURN] processTurn FAILED:`, processTurnError);
+            console.error(`[ADVANCE_TURN] processTurn error message:`, processTurnError?.message);
+            console.error(`[ADVANCE_TURN] processTurn error stack:`, processTurnError?.stack);
+            throw processTurnError;
+        }
 
         console.log(`[ADVANCE_TURN] processTurn returned. combatState=${processed.combatState ? 'SET' : 'NULL'}`);
         if (processed.combatState) {
