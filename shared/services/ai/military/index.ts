@@ -16,7 +16,7 @@ export {
 export type { SiegeOpportunity } from './siegePriority';
 
 // Siege Execution (executing siege opportunities)
-export { executeSiegeFromOpportunity } from './siegeExecution';
+export { executeSiegeFromOpportunity, executeCaptureFromOpportunity } from './siegeExecution';
 export type { SiegeExecutionResult } from './siegeExecution';
 
 // Siege Sortie (breaking enemy sieges of our cities)

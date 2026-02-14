@@ -257,6 +257,14 @@ function evaluateSiegeAction(
         return 'SKIP';
     }
 
+    // Rule: Undefended city - capture directly regardless of fort level
+    // Per Spec 7.5.1: Fortifications are ignored if no soldiers are there to hold them.
+    // Must be checked BEFORE Stormbay deprioritization (an empty Stormbay should be captured).
+    if (enemyGarrison === 0 && availableTroops > 0) {
+        if (DEBUG_SIEGE) console.log(`[AI SIEGE PRIORITY ${faction}] CAPTURE: Undefended city (fort ${fortificationLevel}), troops ${availableTroops}`);
+        return 'CAPTURE';
+    }
+
     // Rule: Stormbay (level 4) deprioritized unless wealthy
     if (fortificationLevel === 4) {
         if (!hasExcessResources(state, faction)) {

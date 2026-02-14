@@ -146,3 +146,61 @@ export function executeSiegeFromOpportunity(
     console.log(`[AI SIEGE EXEC ${faction}] SUCCESS: Sieged ${city.name} (Fort ${city.fortificationLevel} -> ${newFortLevel}), Cost: ${opportunity.siegeCost}g`);
     return result;
 }
+
+/**
+ * Execute a CAPTURE from a SiegeOpportunity.
+ * 
+ * Moves armies from the rural area into the linked city via LOCAL road.
+ * The turn processor's processAutoCapture will handle the control flip.
+ * No gold cost — this is a direct march into a weakly defended city.
+ * 
+ * @param state - Current game state
+ * @param faction - Faction executing the capture
+ * @param opportunity - The CAPTURE opportunity
+ * @returns Updated armies array
+ */
+export function executeCaptureFromOpportunity(
+    state: GameState,
+    faction: FactionId,
+    opportunity: SiegeOpportunity
+): Army[] {
+    if (opportunity.action !== 'CAPTURE') return state.armies;
+
+    const updatedArmies = [...state.armies];
+
+    // Find available armies at the rural location
+    const armiesAtRural = updatedArmies.filter(a =>
+        a.locationId === opportunity.ruralId &&
+        a.faction === faction &&
+        a.locationType === 'LOCATION' &&
+        !a.isSpent &&
+        !a.isSieging &&
+        !a.isInsurgent
+    );
+
+    if (armiesAtRural.length === 0) {
+        console.log(`[AI CAPTURE ${faction}] FAILED: No armies at ${opportunity.ruralId}`);
+        return state.armies;
+    }
+
+    // Move armies into the city (LOCAL road = instant)
+    for (const army of armiesAtRural) {
+        const idx = updatedArmies.findIndex(a => a.id === army.id);
+        if (idx !== -1) {
+            updatedArmies[idx] = {
+                ...army,
+                locationId: opportunity.cityId,
+                originLocationId: opportunity.cityId,
+                destinationId: null,
+                roadId: null,
+                turnsUntilArrival: 0,
+                justMoved: false,
+                isGarrisoned: false
+            };
+        }
+    }
+
+    const totalMoved = armiesAtRural.reduce((s, a) => s + a.strength, 0);
+    console.log(`[AI CAPTURE ${faction}] SUCCESS: Moved ${totalMoved} troops from ${opportunity.ruralId} into ${opportunity.cityName}`);
+    return updatedArmies;
+}
