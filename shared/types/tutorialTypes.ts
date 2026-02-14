@@ -46,7 +46,6 @@ export type TutorialActionType =
     | 'PREPARE_GRAND_INSURRECTION'
     | 'END_TURN'
     | 'RECRUIT'
-    | 'REQUISITION'
     | 'FORTIFY'
     | 'INCITE'
     | 'CHANGE_TAX'
@@ -104,8 +103,6 @@ export interface TutorialStep {
     scrollOnlyZones?: TutorialHighlightZone[];
     autoAdvanceOn?: string;
     hideNextButton?: boolean;
-    /** If set, shows objective text instead of the Previous button */
-    objectiveKey?: string;
 }
 
 /**
@@ -114,8 +111,6 @@ export interface TutorialStep {
 export interface TutorialState {
     isActive: boolean;
     currentStepIndex: number;
-    /** Highest step index ever reached (for detecting revisits) */
-    maxStepIndexReached: number;
     steps: TutorialStep[];
     completedStepIds: string[];
 }
@@ -126,7 +121,6 @@ export interface TutorialState {
 export const createInitialTutorialState = (): TutorialState => ({
     isActive: false,
     currentStepIndex: 0,
-    maxStepIndexReached: 0,
     steps: [],
     completedStepIds: []
 });
