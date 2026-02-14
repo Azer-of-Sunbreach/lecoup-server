@@ -39,3 +39,11 @@ export {
     shouldResetDetectionLevel,
     applyDetectionLevelReset
 } from './detectionLevelService';
+
+// Immediate Grand Insurrection (PREEXISTING_CELLS ability)
+export {
+    executeImmediateGrandInsurrection,
+    hasPreexistingCells,
+    shouldExecuteImmediately
+} from './executeImmediateGrandInsurrection';
+export type { ImmediateGrandInsurrectionResult } from './executeImmediateGrandInsurrection';

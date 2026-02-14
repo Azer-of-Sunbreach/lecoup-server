@@ -58,7 +58,8 @@ const calculateFoodBalance = (
     locations: Location[],
     armies: Army[],
     characters: Character[],
-    faction: FactionId
+    faction: FactionId,
+    mapId?: string
 ): number => {
     const factionLocations = locations.filter(l => l.faction === faction);
     const cities = factionLocations.filter(l => l.type === LocationType.CITY);
@@ -69,7 +70,7 @@ const calculateFoodBalance = (
 
     // Calculate rural production
     rurals.forEach(rural => {
-        const ruralStats = calculateRuralFoodStats(rural, locations, armies, characters);
+        const ruralStats = calculateRuralFoodStats(rural, locations, armies, characters, mapId);
         if (ruralStats) {
             totalProduction += Math.max(0, ruralStats.netProduction);
         }
@@ -77,7 +78,7 @@ const calculateFoodBalance = (
 
     // Calculate city consumption
     cities.forEach(city => {
-        const cityStats = calculateCityFoodStats(city, locations, armies, characters);
+        const cityStats = calculateCityFoodStats(city, locations, armies, characters, mapId);
         if (cityStats) {
             // Consumption = pop + army + governor actions + embargo - food imports - rationing
             const consumption = cityStats.populationConsumption + 
@@ -117,7 +118,7 @@ export const captureSnapshot = (state: GameState): TurnSnapshot => {
             troops: calculateTotalTroops(state.armies, faction),
             leaders: countLivingLeaders(state.characters, faction),
             income: calculateTotalIncome(state.locations, state.roads, state.characters, faction),
-            foodBalance: calculateFoodBalance(state.locations, state.armies, state.characters, faction)
+            foodBalance: calculateFoodBalance(state.locations, state.armies, state.characters, faction, state.mapId)
         };
     }
     

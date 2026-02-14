@@ -260,7 +260,8 @@ export const processTurn = async (
             state.characters,
             state.armies,
             state.resources,
-            state.turn
+            state.turn,
+            state.mapId
         );
         state.locations = govPoliciesResult.locations;
         logs.push(...govPoliciesResult.logs);
@@ -364,7 +365,11 @@ export const processTurn = async (
         // logs.push(createNarrativeLog(flavorText, state.turn));
 
         // --- VICTORY CHECK ---
-        const activeFactions = [FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES];
+        const activeFactions = [
+            FactionId.REPUBLICANS, FactionId.CONSPIRATORS, FactionId.NOBLES,
+            FactionId.LINEAGES_COUNCIL, FactionId.OATH_COALITION, FactionId.LARION_EXPEDITION,
+            FactionId.LARION_KNIGHTS
+        ];
         for (const faction of activeFactions) {
             const ownedLocations = state.locations.filter(l => l.faction === faction);
             if (ownedLocations.length === state.locations.length) {
@@ -373,6 +378,12 @@ export const processTurn = async (
                     case FactionId.REPUBLICANS: messageKey = "victory.messages.REPUBLICANS"; break;
                     case FactionId.CONSPIRATORS: messageKey = "victory.messages.CONSPIRATORS"; break;
                     case FactionId.NOBLES: messageKey = "victory.messages.NOBLES"; break;
+                    // Thyrakat factions use the thyrakat namespace
+                    case FactionId.OATH_COALITION: messageKey = "thyrakat:victory.messages.OATH_COALITION"; break;
+                    case FactionId.LINEAGES_COUNCIL: messageKey = "thyrakat:victory.messages.LINEAGES_COUNCIL"; break;
+                    case FactionId.LARION_EXPEDITION: messageKey = "thyrakat:victory.messages.LARION_EXPEDITION"; break;
+                    // Tutorial
+                    case FactionId.LARION_KNIGHTS: messageKey = "tutorial:tutorial.victory.message"; break;
                 }
 
                 state.victory = {

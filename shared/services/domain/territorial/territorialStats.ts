@@ -11,6 +11,7 @@
 import { Location, Army, Character, Road, LocationType, RuralCategory, FactionId, ManagementLevel, Convoy, NavalConvoy, GovernorPolicy, GOVERNOR_POLICY_COSTS, CharacterStatus } from '../../../types';
 import { FORTIFICATION_LEVELS, BONUS_HUNTING_ONLY, BONUS_FISHING_HUNTING, isPort, getAppeaseFoodCost as _getAppeaseFoodCost } from '../../../data';
 import { getEffectiveTaxLevel, getEffectiveTradeTaxLevel, getEffectiveFoodCollectionLevel, countFreeTradersAtLocation, getMaxManagementLevel } from '../economy/freeTrader';
+import { getFoodProductionConfig } from '../../../data/maps/foodProductionConfig';
 
 export const getAppeaseFoodCost = _getAppeaseFoodCost;
 
@@ -33,14 +34,15 @@ export interface RevenueStats {
     improvedEconomyBonus: number; // From governor's Improve Economy policy (2 * statesmanship)
     governorActionsCost: number;  // Gold cost of active governor policies
     grantedFiefCost: number;      // -30 gold if fief granted and granting faction controls
-    total: number;
+    grossTotal: number;           // Total BEFORE governor policy costs (used for Location.goldIncome)
+    total: number;                // Total AFTER governor policy costs (for UI display)
 }
 
 /**
  * Food production breakdown for rural areas
  */
 export interface RuralFoodStats {
-    productionBase: number;       // Pop/10000
+    productionBase: number;       // Pop / baseDivisor (10000 default, 20000 for thyrakat)
     fertilityEffect: number;      // Multiplier based on rural category
     collectionOrders: number;     // From slider
     huntingBonus: number;         // Hunting or Fishing+Hunting
@@ -255,6 +257,15 @@ export function calculateRevenueStats(
     else if (location.id === 'mirebridge') specialIncome = 10;
     else if (location.id === 'stormbay') specialIncome = 10;
     else if (location.id === 'gre_au_vent') specialIncome = 25;
+    // Thyrakat
+    else if (location.id === 'hhad') specialIncome = 30;
+    else if (location.id === 'harabour') specialIncome = 25;
+    else if (location.id === 'saphir') specialIncome = 25;
+    else if (location.id === 'faith_pier') specialIncome = 20;
+    else if (location.id === 'yehid') specialIncome = 10;
+    else if (location.id === 'Maqom') specialIncome = 10;
+    else if (location.id === 'het-yod') specialIncome = 10;
+    else if (location.id === 'archaris') specialIncome = 10;
 
     // Embargo impact on Windward
     let embargoImpact = 0;
@@ -301,7 +312,8 @@ export function calculateRevenueStats(
         grantedFiefCost = 30;
     }
 
-    const total = Math.max(0, personalTaxBase + personalTaxMod + tradeGold + managerBonus + specialIncome + embargoImpact - burnedDistricts + improvedEconomyBonus - governorActionsCost - grantedFiefCost);
+    const grossTotal = Math.max(0, personalTaxBase + personalTaxMod + tradeGold + managerBonus + specialIncome + embargoImpact - burnedDistricts + improvedEconomyBonus - grantedFiefCost);
+    const total = Math.max(0, grossTotal - governorActionsCost);
 
     return {
         personalTaxBase,
@@ -314,6 +326,7 @@ export function calculateRevenueStats(
         improvedEconomyBonus,
         governorActionsCost,
         grantedFiefCost,
+        grossTotal,
         total
     };
 }
@@ -325,12 +338,14 @@ export function calculateRuralFoodStats(
     location: Location,
     allLocations: Location[],
     armies: Army[],
-    characters: Character[] = [] // Optional, needed for Improve Economy bonus
+    characters: Character[] = [], // Optional, needed for Improve Economy bonus
+    mapId?: string
 ): RuralFoodStats | undefined {
     if (location.type !== LocationType.RURAL) return undefined;
 
-    // Base production: 1 per 10000 inhabitants
-    const productionBase = Math.floor(location.population / 10000);
+    // Base production: divisor is map-specific (10000 default, 20000 for thyrakat)
+    const { baseDivisor } = getFoodProductionConfig(mapId);
+    const productionBase = Math.floor(location.population / baseDivisor);
 
     // Fertility effect
     let fertilityEffect = 0;
@@ -453,7 +468,8 @@ export function calculateCityFoodStats(
     location: Location,
     allLocations: Location[],
     armies: Army[],
-    characters: Character[] = []
+    characters: Character[] = [],
+    mapId?: string
 ): CityFoodStats | undefined {
     if (location.type !== LocationType.CITY) return undefined;
 
@@ -484,10 +500,7 @@ export function calculateCityFoodStats(
     const linkedRural = allLocations.find(l => l.id === location.linkedLocationId);
     if (linkedRural && linkedRural.faction === location.faction) {
         // Calculate rural net production including governor bonuses
-        const ruralStats = calculateRuralFoodStats(linkedRural, allLocations, armies, characters);
-        if (ruralStats) {
-            ruralSupply = Math.max(0, ruralStats.netProduction);
-        }
+        const ruralStats = calculateRuralFoodStats(linkedRural, allLocations, armies, characters, mapId);
         if (ruralStats) {
             ruralSupply = Math.max(0, ruralStats.netProduction);
         }
@@ -499,7 +512,7 @@ export function calculateCityFoodStats(
         // Leaders with MOVING status don't count - they're in transit
         const smugglerLeader = characters.find(c => c.locationId === location.id && c.faction === location.faction && c.status !== CharacterStatus.MOVING && c.stats.ability.includes('SMUGGLER'));
         if (smugglerLeader) {
-            const ruralStats = calculateRuralFoodStats(linkedRural, allLocations, armies, characters);
+            const ruralStats = calculateRuralFoodStats(linkedRural, allLocations, armies, characters, mapId);
             if (ruralStats) {
                 smugglingBonus = Math.max(5, Math.min(15, ruralStats.netProduction));
             }
@@ -660,7 +673,8 @@ export function calculateTerritorialStats(
     roads: Road[],
     convoys: Convoy[],
     navalConvoys: NavalConvoy[],
-    playerGold: number
+    playerGold: number,
+    mapId?: string
 ): TerritorialStats {
     const isCity = location.type === LocationType.CITY;
 
@@ -686,8 +700,8 @@ export function calculateTerritorialStats(
         stability: location.stability,
 
         revenue: isCity ? calculateRevenueStats(location, allLocations, roads, characters) : undefined,
-        ruralFood: !isCity ? calculateRuralFoodStats(location, allLocations, armies, characters) : undefined,
-        cityFood: isCity ? calculateCityFoodStats(location, allLocations, armies, characters) : undefined,
+        ruralFood: !isCity ? calculateRuralFoodStats(location, allLocations, armies, characters, mapId) : undefined,
+        cityFood: isCity ? calculateCityFoodStats(location, allLocations, armies, characters, mapId) : undefined,
 
         defense: calculateDefenseStats(location, armies, playerGold),
         leaders: getLocationLeaders(location, characters),
@@ -834,7 +848,7 @@ export function canChangeFoodCollection(
         const nextLevel = LEVELS[idx - 1];
         const collModUnit = Math.floor(location.population / 20000);
         const nextCollectionOrders = COLLECTION_MODIFIERS[nextLevel] * collModUnit;
-        
+
         // Calculate base production components (simplified - without full context)
         const productionBase = Math.floor(location.population / 10000);
         let fertilityEffect = 0;
@@ -843,10 +857,10 @@ export function canChangeFoodCollection(
         } else if (location.ruralCategory === RuralCategory.ORDINARY) {
             fertilityEffect = productionBase;
         }
-        
+
         // Estimate production at next level (without hunting/fishing bonuses for safety margin)
         const estimatedProduction = productionBase + fertilityEffect + nextCollectionOrders - 30; // -30 for fief
-        
+
         if (estimatedProduction <= 0) return false;
     }
 

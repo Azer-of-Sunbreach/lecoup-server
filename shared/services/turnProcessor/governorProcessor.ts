@@ -40,7 +40,8 @@ export function processGovernorPolicies(
     characters: Character[],
     armies: Army[],
     resources: Record<FactionId, { gold: number }>,
-    turn: number
+    turn: number,
+    mapId?: string
 ): GovernorPoliciesResult {
     let updatedLocations = [...locations];
     const goldCosts: Record<FactionId, number> = {
@@ -50,7 +51,12 @@ export function processGovernorPolicies(
         [FactionId.NEUTRAL]: 0,
         [FactionId.LOYALISTS]: 0,
         [FactionId.PRINCELY_ARMY]: 0,
-        [FactionId.CONFEDERATE_CITIES]: 0
+        [FactionId.CONFEDERATE_CITIES]: 0,
+        [FactionId.LARION_KNIGHTS]: 0,
+        [FactionId.THYRAKAT_SULTANATE]: 0,
+        [FactionId.LINEAGES_COUNCIL]: 0,
+        [FactionId.OATH_COALITION]: 0,
+        [FactionId.LARION_EXPEDITION]: 0
     };
     const foodCosts: Record<string, number> = {};
     const logs: LogEntry[] = [];
@@ -184,13 +190,13 @@ export function processGovernorPolicies(
             let ruralNetProduction = 0;
             if (loc.type === LocationType.RURAL) {
                 // FIX: For rural areas, calculate their OWN net production
-                const ruralStats = calculateRuralFoodStats(loc, locations, armies);
+                const ruralStats = calculateRuralFoodStats(loc, locations, armies, [], mapId);
                 ruralNetProduction = ruralStats?.netProduction || 0;
             } else if (loc.linkedLocationId) {
                 // For cities, get the linked rural's production
                 const linkedRural = locations.find(l => l.id === loc.linkedLocationId);
                 if (linkedRural && linkedRural.faction === loc.faction) {
-                    const ruralStats = calculateRuralFoodStats(linkedRural, locations, armies);
+                    const ruralStats = calculateRuralFoodStats(linkedRural, locations, armies, [], mapId);
                     ruralNetProduction = ruralStats?.netProduction || 0;
                 }
             }

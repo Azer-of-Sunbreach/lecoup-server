@@ -88,9 +88,7 @@ export function processFamine(state: GameState): FamineProcessingResult {
         const cityArmies = armies.filter(a =>
             a.locationId === cityId &&
             a.locationType === 'LOCATION' &&
-            (a.faction === FactionId.REPUBLICANS ||
-                a.faction === FactionId.CONSPIRATORS ||
-                a.faction === FactionId.NOBLES)
+            a.faction !== FactionId.NEUTRAL
         );
 
         if (cityArmies.length > 0) {
@@ -122,9 +120,7 @@ export function processFamine(state: GameState): FamineProcessingResult {
                 const ruralArmies = armies.filter(a =>
                     a.locationId === rural.id &&
                     a.locationType === 'LOCATION' &&
-                    (a.faction === FactionId.REPUBLICANS ||
-                        a.faction === FactionId.CONSPIRATORS ||
-                        a.faction === FactionId.NOBLES)
+                    a.faction !== FactionId.NEUTRAL
                 );
 
                 if (ruralArmies.length > 0) {

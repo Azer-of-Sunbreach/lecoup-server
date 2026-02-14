@@ -100,7 +100,10 @@ export function processPrepareGrandInsurrection(
     // T+2 (Elapsed 2). 
     // T+3 (Elapsed 3). 
     // T+4 (Elapsed 4) -> Trigger.
-    if (turnsElapsed < 4) {
+    // PREEXISTING_CELLS ability: Skip preparation, execute immediately
+    const hasPreexistingCells = leader.stats.ability.includes('PREEXISTING_CELLS');
+
+    if (turnsElapsed < 4 && !hasPreexistingCells) {
         // Ensure status is ON_MISSION during preparation
         let finalLeader = leader;
         if (leader.status !== CharacterStatus.ON_MISSION) {

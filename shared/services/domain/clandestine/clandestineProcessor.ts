@@ -209,7 +209,12 @@ export function processClandestineActions(
         [FactionId.NEUTRAL]: 0,
         [FactionId.LOYALISTS]: 0,
         [FactionId.PRINCELY_ARMY]: 0,
-        [FactionId.CONFEDERATE_CITIES]: 0
+        [FactionId.CONFEDERATE_CITIES]: 0,
+        [FactionId.LARION_KNIGHTS]: 0,
+        [FactionId.THYRAKAT_SULTANATE]: 0,
+        [FactionId.LINEAGES_COUNCIL]: 0,
+        [FactionId.OATH_COALITION]: 0,
+        [FactionId.LARION_EXPEDITION]: 0
     };
     const newArmies: Army[] = [];
 
