@@ -7,12 +7,12 @@
  * @module Application/services/ai/military/siegePriority
  */
 
-// Re-export everything from shared
+// Re-export everything from shared - Import directly from source file
 export {
     findSiegeOpportunities,
     selectBestSiegeOpportunity,
     findBestSiegeOpportunity,
     reserveSiegeBudget
-} from '../../military';
+} from '../../military/siegePriority';
 
-export type { SiegeOpportunity } from '../../military';
+export type { SiegeOpportunity } from '../../military/siegePriority';

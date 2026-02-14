@@ -10,7 +10,7 @@
 
 import { GameState, FactionId, Army } from '../../../../types';
 
-// Re-export types and functions from shared
+// Re-export types and functions from shared - Import directly from source file
 export {
     detectInsurrectionThreats,
     convertToAlerts,
@@ -19,20 +19,20 @@ export {
     analyzeGarrisonDeficits,
     groupThreatsByPair,
     allocateGarrison
-} from '../../strategy';
+} from '../../strategy/insurrectionDefense';
 
 export type {
     InsurrectionThreat,
     InsurrectionThreatType,
     InsurrectionAlert
-} from '../../strategy';
+} from '../../strategy/insurrectionDefense';
 
-// Import for local use
+// Import for local use - Import directly from source file
 import {
     InsurrectionThreat,
     getCurrentGarrison,
     analyzeGarrisonDeficits
-} from '../../strategy';
+} from '../../strategy/insurrectionDefense';
 
 
 // ============================================================================
