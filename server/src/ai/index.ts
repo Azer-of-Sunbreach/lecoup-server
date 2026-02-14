@@ -11,6 +11,7 @@ import { AIBudget } from './types';
 import { applyBalancedRecruitmentOverride, allocateSiegeBudget } from './economy/budget';
 // Siege Priority (shared)
 import { findBestSiegeOpportunity, reserveSiegeBudget } from '../../../shared/services/ai/military';
+import { executeSiegeFromOpportunity, executeCaptureFromOpportunity } from '../../../shared/services/ai/military/siegeExecution';
 import { distributeClandestineBudget } from '../../../shared/services/ai/budgetDistributor';
 
 import { manageLeadersUnified } from '../../../shared/services/ai/leaders';
@@ -248,7 +249,25 @@ function processAITurnForFaction(gameState: GameState, faction: FactionId, profi
     // 5. MILITARY MOVEMENT
     state.armies = manageMilitary(state, faction, profile);
 
-    // 5.5 EMERGENCY DISPATCH (Phase 2) - Move existing armies to threatened locations
+    // 5.5 SIEGE/CAPTURE EXECUTION - Execute sieges or captures from detected opportunities
+    if (siegeOpportunity && siegeOpportunity.action === 'SIEGE') {
+        const siegeResult = executeSiegeFromOpportunity(state, faction, siegeOpportunity);
+        if (siegeResult.executed) {
+            state = {
+                ...state,
+                locations: siegeResult.updatedLocations,
+                armies: siegeResult.updatedArmies,
+                resources: { ...state.resources, ...siegeResult.updatedResources }
+            };
+            if (siegeResult.siegeNotification) {
+                state.siegeNotification = siegeResult.siegeNotification;
+            }
+        }
+    } else if (siegeOpportunity && siegeOpportunity.action === 'CAPTURE') {
+        state.armies = executeCaptureFromOpportunity(state, faction, siegeOpportunity);
+    }
+
+    // 5.6 EMERGENCY DISPATCH (Phase 2) - Move existing armies to threatened locations
     // Must run AFTER manageMilitary to avoid being overwritten by army object recreation
     if (insurrectionThreats.length > 0) {
         dispatchEmergencyReinforcements(state, faction, insurrectionThreats, state.armies);
