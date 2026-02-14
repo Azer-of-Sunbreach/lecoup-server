@@ -14,7 +14,7 @@ import { manageLeadersUnified } from '../leaders';
 import { AIBudget } from './types';
 import { applyBalancedRecruitmentOverride, allocateSiegeBudget } from './economy/budget';
 import { findBestSiegeOpportunity, reserveSiegeBudget } from './military/siegePriority';
-import { executeSiegeFromOpportunity } from '../military/siegeExecution';
+import { executeSiegeFromOpportunity, executeCaptureFromOpportunity } from '../military/siegeExecution';
 // AI Leader Recruitment (CONSPIRATORS)
 import { calculateRecruitmentBudgetReservation, processAIRecruitment, ENABLE_RECRUITMENT_LOGS } from '../leaders/recruitment';
 // AI Leader Recruitment (NOBLES)
@@ -177,7 +177,7 @@ export const processAITurn = (gameState: GameState): GameState => {
         // 5. MILITARY MOVEMENT
         state.armies = manageMilitary(state, faction, profile);
 
-        // 5.5 SIEGE EXECUTION - Execute sieges from detected opportunities
+        // 5.5 SIEGE/CAPTURE EXECUTION - Execute sieges or captures from detected opportunities
         if (siegeOpportunity && siegeOpportunity.action === 'SIEGE') {
             const siegeResult = executeSiegeFromOpportunity(state, faction, siegeOpportunity);
             if (siegeResult.executed) {
@@ -191,6 +191,10 @@ export const processAITurn = (gameState: GameState): GameState => {
                     state.siegeNotification = siegeResult.siegeNotification;
                 }
             }
+        } else if (siegeOpportunity && siegeOpportunity.action === 'CAPTURE') {
+            // CAPTURE: Move armies from rural into the undefended/weak city
+            // processAutoCapture in the turn processor will flip control
+            state.armies = executeCaptureFromOpportunity(state, faction, siegeOpportunity);
         }
 
         // 5.6 EMERGENCY DISPATCH (Phase 2) - Move existing armies to threatened locations

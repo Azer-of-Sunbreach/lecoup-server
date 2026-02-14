@@ -78,7 +78,11 @@ export function handleCampaign(
     const enemyGarrisonStr = enemyArmiesAtTarget.reduce((s, a) => s + a.strength, 0);
 
     // MASSING LOGIC
-    const minAttackForce = Math.min(3000, Math.max(1000, enemyGarrisonStr * 1.25));
+    // FIX: When city is undefended (garrison=0), only need a token force to march in.
+    // Previously always required 1000 minimum, blocking weak factions from taking empty cities.
+    const minAttackForce = enemyGarrisonStr === 0
+        ? 200  // Undefended: a single small regiment suffices
+        : Math.min(3000, Math.max(1000, enemyGarrisonStr * 1.25));
 
     // ZOMBIE CAMPAIGN CHECK - detect broken campaigns and fix them
     checkAndFixBrokenCampaign(mission, faction, reqStrength, strengthIncludingEnRoute, stagingId, armies, state, assigned);
@@ -735,7 +739,10 @@ function handleNonSiegeScenario(
     // FIX: Fortification bonus only applies if garrison >= 500
     const effectiveDefense = enemyGarrison >= 500 ? (freshTargetLoc.defense || 0) : 0;
 
-    if (freshTargetLoc.fortificationLevel === 0 || strengthAtTarget > (effectiveDefense + 2000) * 1.5) {
+    // FIX: When city is undefended (no garrison, no effective defense), any troops can assault.
+    // Previously required 3000+ troops even for empty cities due to hardcoded +2000 buffer.
+    const canOverrun = effectiveDefense === 0 && enemyGarrison === 0 && strengthAtTarget > 0;
+    if (freshTargetLoc.fortificationLevel === 0 || canOverrun || strengthAtTarget > (effectiveDefense + 2000) * 1.5) {
         mission.stage = 'ASSAULTING';
     }
 
