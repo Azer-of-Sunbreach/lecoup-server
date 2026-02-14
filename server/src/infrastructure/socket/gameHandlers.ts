@@ -338,7 +338,14 @@ export function registerGameHandlers(
                 console.log(`[AI_TURN_DEBUG] Before processSingleFactionAITurn - turn=${room.gameState.turn}, currentTurnFaction=${room.gameState.currentTurnFaction}`);
 
                 // Execute AI logic for this faction
-                room.gameState = processSingleFactionAITurn(room.gameState, result.nextFaction);
+                try {
+                    room.gameState = processSingleFactionAITurn(room.gameState, result.nextFaction);
+                    console.log(`[AI_TURN_DEBUG] After processSingleFactionAITurn completed successfully`);
+                } catch (aiError: any) {
+                    console.error(`[AI_TURN_ERROR] processSingleFactionAITurn failed:`, aiError?.message);
+                    console.error(`[AI_TURN_ERROR] Stack:`, aiError?.stack);
+                    throw aiError; // Re-throw to be caught by outer try/catch
+                }
 
                 // Handle any combats generated during AI turn
                 while (room.gameState.combatState) {
@@ -503,8 +510,17 @@ export function registerGameHandlers(
             }
 
         } catch (err: any) {
+            // Enhanced error logging - capture ALL forms of errors
+            const errStr = typeof err === 'string' ? err : (err?.message || err?.toString?.() || JSON.stringify(err) || 'Unknown error');
+            const errStack = err?.stack || new Error().stack || 'No stack available';
             console.error(`[Game] ${code}: Error ending turn:`, err);
-            socket.emit('error', { message: 'Failed to process end turn' });
+            console.error(`[Game] ${code}: Error type:`, typeof err);
+            console.error(`[Game] ${code}: Error string:`, errStr);
+            console.error(`[Game] ${code}: Error stack:`, errStack);
+            if (err && typeof err === 'object') {
+                console.error(`[Game] ${code}: Error keys:`, Object.keys(err));
+            }
+            socket.emit('error', { message: `Failed to process end turn: ${errStr}` });
         }
     });
 }

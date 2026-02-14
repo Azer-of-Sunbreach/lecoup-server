@@ -9,6 +9,9 @@ import { LobbyManager } from '../../lobbyManager';
 import { GameRoomManager } from '../../gameRoom';
 import { createMultiplayerGameState, getClientState } from '../../gameLogic';
 
+// Track sockets waiting to rejoin a game (key: lobbyCode, value: Map<socketId, faction>)
+const pendingRejoins = new Map<string, Map<string, FactionId>>();
+
 export function registerLobbyHandlers(
     io: Server,
     socket: Socket,
@@ -151,7 +154,14 @@ export function registerLobbyHandlers(
         // Find the game room
         const room = gameRoomManager.getRoom(lobbyCode);
         if (!room) {
-            console.log(`[Rejoin] No room found for ${lobbyCode}`);
+            console.log(`[Rejoin] No room found for ${lobbyCode}, adding to pending rejoins`);
+            
+            // Add to pending rejoins - will be notified when game is restored
+            if (!pendingRejoins.has(lobbyCode)) {
+                pendingRejoins.set(lobbyCode, new Map());
+            }
+            pendingRejoins.get(lobbyCode)!.set(socket.id, faction);
+            
             socket.emit('rejoin_error', { message: 'Game not found or has ended' });
             return;
         }
@@ -264,5 +274,19 @@ export function registerLobbyHandlers(
         socket.emit('state_update', { gameState: getClientState(room.gameState) });
 
         console.log(`[Restore] Successfully restored game ${lobbyCode} from player state`);
+
+        // Notify pending rejoins that the game has been restored
+        const pending = pendingRejoins.get(lobbyCode);
+        if (pending && pending.size > 0) {
+            console.log(`[Restore] Notifying ${pending.size} pending clients to rejoin ${lobbyCode}`);
+            for (const [pendingSocketId, pendingFaction] of pending) {
+                // Don't notify the restorer themselves
+                if (pendingSocketId !== socket.id) {
+                    io.to(pendingSocketId).emit('game_ready_to_rejoin', { lobbyCode, faction: pendingFaction });
+                    console.log(`[Restore] Notified ${pendingSocketId} (${pendingFaction}) to rejoin`);
+                }
+            }
+            pendingRejoins.delete(lobbyCode);
+        }
     });
 }
