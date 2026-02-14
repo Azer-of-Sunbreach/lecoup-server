@@ -332,8 +332,10 @@ export function registerGameHandlers(
 
             // 2. If it's an AI turn, process it immediately
             // Loop in case multiple AI turns happen in sequence (unlikely in this design but good for robustness)
+            console.log(`[END_TURN] Entering AI loop. isAITurn=${result.isAITurn}, nextFaction=${result.nextFaction}`);
             while (result.isAITurn) {
                 console.log(`[Game] ${code}: Processing AI turn for ${result.nextFaction}`);
+                console.log(`[AI_TURN_DEBUG] Before processSingleFactionAITurn - turn=${room.gameState.turn}, currentTurnFaction=${room.gameState.currentTurnFaction}`);
 
                 // Execute AI logic for this faction
                 room.gameState = processSingleFactionAITurn(room.gameState, result.nextFaction);
@@ -406,8 +408,10 @@ export function registerGameHandlers(
                 }
 
                 // Advance to next player after AI finishes
+                console.log(`[AI_TURN_DEBUG] After AI turn, calling advanceTurn again...`);
                 result = await advanceTurn(room.gameState);
                 room.gameState = result.newState;
+                console.log(`[AI_TURN_DEBUG] After advanceTurn - isAITurn=${result.isAITurn}, nextFaction=${result.nextFaction}, turn=${room.gameState.turn}`);
 
                 // Send state update after advancing turn - ALWAYS clear combatState
                 const stateAfterAdvance = getClientState(room.gameState);
@@ -417,6 +421,7 @@ export function registerGameHandlers(
                     turnNumber: room.gameState.turn
                 });
             }
+            console.log(`[END_TURN] Exited AI loop. Final state: turn=${room.gameState.turn}, currentFaction=${room.gameState.currentTurnFaction}`);
 
             // CRITICAL FIX: After AI turn loop completes, check for any battles that need routing
             // This catches insurrection battles from processTurn that weren't detected during the loop
