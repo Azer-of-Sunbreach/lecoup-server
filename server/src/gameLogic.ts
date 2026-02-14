@@ -37,7 +37,9 @@ import {
 } from '../../shared/services/domain';
 import { executeRetreat } from '../../shared/services/domain/retreat';
 // Governor Service
-import { executeAppointGovernor } from '../../shared/services/domain/governor/governorService';
+import { executeAppointGovernor, executeCancelGovernorAppointment } from '../../shared/services/domain/governor/governorService';
+// Clandestine Actions
+import { executeUpdateLeaderClandestineActions } from '../../shared/services/domain/clandestine';
 // Leader Recruitment
 import {
     executeConspiratorRecruitLeader,
@@ -595,6 +597,43 @@ export function processPlayerAction(
             } as MultiplayerGameState;
 
             console.log(`[SERVER] ${playerFaction} appointed ${action.leaderId} as governor of ${action.locationId}`);
+            break;
+        }
+
+        // === UPDATE_LEADER_CLANDESTINE_ACTIONS ===
+        case 'UPDATE_LEADER_CLANDESTINE_ACTIONS': {
+            const result = executeUpdateLeaderClandestineActions(
+                updatedState.characters,
+                action.leaderId,
+                action.activeActions
+            );
+
+            if (!result.success) {
+                return { success: false, newState: state, error: result.error || 'Failed to update clandestine actions' };
+            }
+
+            updatedState = {
+                ...updatedState,
+                characters: result.characters!
+            } as MultiplayerGameState;
+
+            console.log(`[SERVER] ${playerFaction} updated clandestine actions for ${action.leaderId}`);
+            break;
+        }
+
+        // === CANCEL_GOVERNOR_APPOINTMENT ===
+        case 'CANCEL_GOVERNOR_APPOINTMENT': {
+            const updatedCharacters = executeCancelGovernorAppointment(
+                updatedState.characters,
+                action.leaderId
+            );
+
+            updatedState = {
+                ...updatedState,
+                characters: updatedCharacters
+            } as MultiplayerGameState;
+
+            console.log(`[SERVER] ${playerFaction} canceled governor appointment for ${action.leaderId}`);
             break;
         }
 
